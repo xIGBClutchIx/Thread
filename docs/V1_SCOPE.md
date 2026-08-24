@@ -15,7 +15,7 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Minecraft Java Edition
 - Fabric only
 - Java implementation
-- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.158.0+26.2
+- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2
 - Local MCP access only by default
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions

@@ -112,6 +112,8 @@ Verify:
 - structured success and tool-error results
 - unknown methods/tools and malformed JSON-RPC requests
 - protocol version and mirrored `Mcp-Method`/`Mcp-Name` validation
+- required per-request capabilities metadata, response identity stamps, and cache hints
+- rejection of the retired initialization, session-header, and cancellation-notification flow
 - Base64-encoded MCP names
 - loopback Origin, content type, request size, and listener bind enforcement
 - repeated independent clients, idempotent shutdown, and same-port restart

@@ -57,9 +57,7 @@ final class McpJsonRpcHandler {
     }
 
     if (!request.has("id")) {
-      return method.equals("notifications/cancelled")
-          ? McpHttpResponse.accepted()
-          : McpHttpResponse.empty(404);
+      return McpHttpResponse.empty(404);
     }
     return switch (method) {
       case "server/discover" -> success(id, discoveryResult());

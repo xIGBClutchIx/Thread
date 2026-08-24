@@ -101,6 +101,9 @@ interoperability may replace the narrow wire implementation without changing cor
   options.
 - Each request is an independent HTTP POST. There are no sessions, initialization calls, legacy
   GET/SSE endpoints, or server-to-client feature surfaces.
+- Requests carrying the retired `Mcp-Session-Id` header are rejected. The modern HTTP cancellation
+  signal is closing the in-flight response stream, so Thread does not accept the retired
+  `notifications/cancelled` POST.
 - `server/discover` advertises only the tools capability and includes Thread name/version metadata.
 - `tools/list` is derived directly from deterministic `ToolRegistry` descriptors, including input
   schema, output schema, and read-only annotations.

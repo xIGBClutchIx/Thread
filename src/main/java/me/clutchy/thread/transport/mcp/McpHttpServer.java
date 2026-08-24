@@ -26,6 +26,7 @@ public final class McpHttpServer implements AutoCloseable {
   public static final String ENDPOINT_PATH = "/mcp";
 
   private static final String JSON_MEDIA_TYPE = "application/json";
+  private static final String SESSION_ID_HEADER = "Mcp-Session-Id";
   private static final String SSE_MEDIA_TYPE = "text/event-stream";
 
   private final HttpServer server;
@@ -97,6 +98,9 @@ public final class McpHttpServer implements AutoCloseable {
     }
     if (!validOrigin(exchange.getRequestHeaders().getFirst("Origin"))) {
       return rpc.invalidRequest("Forbidden Origin").withStatus(403);
+    }
+    if (exchange.getRequestHeaders().containsKey(SESSION_ID_HEADER)) {
+      return rpc.invalidRequest("Mcp-Session-Id is not supported by MCP 2026-07-28");
     }
     if (!mediaType(exchange.getRequestHeaders().getFirst("Content-Type")).equals(JSON_MEDIA_TYPE)) {
       return rpc.invalidRequest("Content-Type must be application/json").withStatus(415);

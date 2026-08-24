@@ -8,10 +8,6 @@ record McpHttpResponse(int status, JsonObject body, boolean hasBody) {
     return new McpHttpResponse(status, Objects.requireNonNull(body, "body"), true);
   }
 
-  static McpHttpResponse accepted() {
-    return empty(202);
-  }
-
   static McpHttpResponse empty(int status) {
     return new McpHttpResponse(status, null, false);
   }

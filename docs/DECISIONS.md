@@ -204,7 +204,7 @@ Slice 0 pins this baseline:
 - Minecraft `26.2`
 - Java `25`
 - Fabric Loader `0.19.3`
-- Fabric API `0.158.0+26.2`
+- Fabric API `0.154.0+26.2`
 - Fabric Loom `1.17.19`
 - Gradle `9.5.1`
 - Spotless `8.10.0`

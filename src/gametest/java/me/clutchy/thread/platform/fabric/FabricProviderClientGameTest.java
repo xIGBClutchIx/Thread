@@ -20,6 +20,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 /** End-to-end proof that the vanilla catalog reads a real integrated game session. */
 @SuppressWarnings("UnstableApiUsage")
@@ -92,10 +95,12 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     assertTrue(mcp.running(), "invalid MCP call leaves listener running");
 
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-      singleplayer.getConnection().waitForChunksDownload();
+      singleplayer.getClientLevel().waitForChunksDownload();
       singleplayer.getServer().runCommand("give @a minecraft:diamond 3");
-      singleplayer.getConnection().waitForClientboundPackets();
-      context.waitTick();
+      // Fabric API 0.154 predates the connection-level packet drain helper. Waiting for the
+      // command's observable client state keeps the test deterministic without depending on a
+      // newer game-test convenience API.
+      context.waitFor(client -> hasInventoryStack(client, Items.DIAMOND, 3));
 
       assertTrue(
           invokeSuccessfully(context, tools, "minecraft.get_status", "{}")
@@ -257,6 +262,19 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       throw new AssertionError("external provider call did not finish within 200 game ticks");
     }
     return result.join();
+  }
+
+  private static boolean hasInventoryStack(Minecraft client, Item item, int count) {
+    if (client.player == null) {
+      return false;
+    }
+    for (int slot = 0; slot < client.player.getInventory().getContainerSize(); slot++) {
+      if (client.player.getInventory().getItem(slot).is(item)
+          && client.player.getInventory().getItem(slot).getCount() == count) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void assertTrue(boolean condition, String description) {

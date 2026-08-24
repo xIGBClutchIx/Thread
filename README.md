@@ -64,7 +64,7 @@ A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
 ## Development baseline
 
-Thread currently targets Minecraft 26.2 with Fabric Loader 0.19.3, Fabric API 0.158.0+26.2,
+Thread currently targets Minecraft 26.2 with Fabric Loader 0.19.3, Fabric API 0.154.0+26.2,
 and Java 25. The Gradle Wrapper is the supported build entry point.
 
 Run the complete local quality gate with:
