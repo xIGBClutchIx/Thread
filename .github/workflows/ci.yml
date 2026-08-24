@@ -1,0 +1,54 @@
+name: CI
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        name: Build and verify
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out sources
+              uses: actions/checkout@v6
+
+            - name: Set up Java
+              uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: "25"
+
+            - name: Set up Gradle
+              uses: gradle/actions/setup-gradle@v6
+
+            - name: Verify Gradle wrapper permissions
+              run: chmod +x gradlew
+
+            - name: Run Slice 0 quality gate
+              run: ./gradlew --no-daemon spotlessCheck check build
+
+            - name: Upload failure reports
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: build-reports
+                  path: build/reports/
+                  if-no-files-found: ignore
+
+            - name: Upload development mod
+              if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: thread-${{ github.sha }}
+                  path: build/libs/thread-*.jar
+                  if-no-files-found: error

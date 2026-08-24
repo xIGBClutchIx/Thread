@@ -1,0 +1,115 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'java'
+    id 'checkstyle'
+    id 'com.diffplug.spotless' version "${spotless_version}"
+}
+
+group = project.maven_group
+version = project.mod_version
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        thread {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraftVersion', project.minecraft_version
+    inputs.property 'loaderVersion', project.loader_version
+    inputs.property 'fabricApiVersion', project.fabric_api_version
+
+    filesMatching('fabric.mod.json') {
+        expand(
+                version: project.version,
+                minecraftVersion: project.minecraft_version,
+                loaderVersion: project.loader_version,
+                fabricApiVersion: project.fabric_api_version)
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+    }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat(project.google_java_format_version)
+        removeUnusedImports()
+        forbidWildcardImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format 'repositoryFiles', {
+        target '*.gradle', '*.properties', '*.md', '*.json', '*.yml', '*.yaml',
+                '.github/**/*.yml', '.github/**/*.yaml', 'config/**/*.xml', 'docs/**/*.md',
+                'src/**/*.json'
+        targetExclude '.gradle/**', 'build/**', 'run/**'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+checkstyle {
+    toolVersion = project.checkstyle_version
+    configFile = file('config/checkstyle/checkstyle.xml')
+    maxWarnings = 0
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('spotlessCheck')
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('spotlessCheck')
+}

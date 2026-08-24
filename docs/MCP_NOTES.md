@@ -1,0 +1,130 @@
+# Thread MCP Notes
+
+## V1 role of MCP
+
+MCP is Thread's first external transport. It is not the core domain model.
+
+Thread core owns:
+
+- tools
+- schemas/models
+- providers
+- capabilities
+- execution
+- errors
+
+The MCP adapter owns:
+
+- protocol/server lifecycle
+- MCP tool discovery mapping
+- MCP call mapping
+- protocol-specific schema/result/error translation
+- HTTP transport details
+
+## Protocol target
+
+The Slice 0 investigation was refreshed on 2026-08-24. Re-check the ecosystem before Slice 4 in
+case a compatible Java SDK has shipped.
+
+As of 2026-08-24:
+
+- the current MCP specification is `2026-07-28`;
+- that revision moves the core toward stateless request/response semantics;
+- Streamable HTTP is the relevant HTTP transport direction;
+- legacy HTTP+SSE is deprecated;
+- Roots, Sampling, and Logging are deprecated in the core and are unnecessary for Thread V1;
+- Thread V1 only needs the tools surface.
+
+## Java SDK compatibility caveat
+
+As of 2026-08-19, the official MCP Java SDK active 2.0.x line reports support for the `2025-11-25` MCP specification, not `2026-07-28`.
+
+Therefore Slice 0 must make an explicit decision rather than assuming the Java SDK is current.
+
+Acceptable V1 strategies include:
+
+### A. Use the official Java SDK behind an adapter
+
+Use it if interoperability with target MCP clients is confirmed for the V1 subset.
+
+Pros:
+
+- less protocol code
+- official implementation
+- existing Streamable HTTP support
+- schema/validation helpers
+
+Cons:
+
+- spec revision lag
+- protocol-specific types must be carefully contained
+
+### B. Implement the minimal current MCP tools subset in `transport/mcp`
+
+Only consider this if the official SDK cannot interoperate cleanly with the target clients.
+
+Pros:
+
+- current protocol behavior can be targeted directly
+- no wait for SDK release
+
+Cons:
+
+- more protocol/security/testing responsibility
+- greater risk of subtle incompatibility
+
+### C. External sidecar bridge
+
+Not preferred for V1 unless JVM transport constraints make embedded MCP unreasonable.
+
+A sidecar could translate MCP <-> a private Thread local API, but it adds packaging and lifecycle complexity for players.
+
+## Selected V1 approach
+
+The released official Java SDK 2.0.0 was evaluated but is not selected for the V1 runtime. It
+implements the `2025-11-25` protocol era, including the initialization/session model that was
+removed by `2026-07-28`. A confirmed SDK issue also shows 2.0.0 returning HTTP 500 when an OpenAI
+client sends the current `server/discover` request.
+
+Slice 4 will therefore implement the minimal `2026-07-28` tools-only Streamable HTTP surface in
+`transport.mcp`. The adapter will cover `server/discover`, `tools/list`, and `tools/call`, with
+JSON-RPC/error translation and required header validation. It will not implement deprecated
+HTTP+SSE, the retired initialization/session flow, or unrelated MCP surfaces.
+
+Before that implementation begins, check whether a stable Java SDK release supports
+`2026-07-28` and the intended clients. If so, it may replace the planned wire adapter, but SDK
+types must remain confined to `transport.mcp` and core APIs must not change.
+
+## Transport and security
+
+- bind to `127.0.0.1`/loopback by default
+- V1 should preferably remain local-only
+- use bounded request sizes
+- do not log complete inventories/world results at normal log levels
+- validate input schemas before reaching providers
+- enforce Thread's own query limits even if protocol/client validation exists
+
+## MCP surface for V1
+
+Expose tools only.
+
+Do not add V1 complexity for:
+
+- MCP Apps
+- prompts
+- sampling
+- roots
+- tasks
+- elicitation
+- remote OAuth flows
+- public discovery
+
+Those can be reconsidered when there is a concrete product use case.
+
+## References checked for this plan
+
+- MCP 2026-07-28 release: https://blog.modelcontextprotocol.io/posts/2026-07-28/
+- MCP roadmap update, 2026-08-22: https://blog.modelcontextprotocol.io/posts/mcp-roadmap/
+- Official Java SDK: https://github.com/modelcontextprotocol/java-sdk
+- Java SDK changelog: https://github.com/modelcontextprotocol/java-sdk/blob/main/CHANGELOG.md
+- Java SDK 2.0.0/OpenAI discovery incompatibility: https://github.com/modelcontextprotocol/java-sdk/issues/1072
