@@ -209,6 +209,7 @@ Slice 0 pins this baseline:
 - google-java-format `1.36.0`
 - Checkstyle `14.0.0`
 - JUnit `6.1.2`
+- Gson `2.14.0` (provided by Minecraft 26.2)
 
 Minecraft 26.2 is the current stable Fabric target at the time of implementation, and the Fabric
 example project uses Java 25 and Gradle 9.5.1. Stable Loom 1.17.19 is pinned instead of the example
@@ -216,3 +217,22 @@ project's moving `1.17-SNAPSHOT` coordinate.
 
 V1 intentionally supports only this Minecraft target. Dependency automation may propose updates,
 but Minecraft, Fabric, Java, Gradle, and MCP changes require deliberate compatibility validation.
+
+## D018: Core JSON contracts use explicit schemas with Minecraft-provided Gson
+
+**Status:** Accepted
+
+Slice 1 validates explicit Thread-owned JSON Schema documents and uses Gson for Java/JSON
+conversion. Schemas are not generated from Java reflection, and serialized outputs are checked
+against the same declared contracts before crossing the registry boundary.
+
+Minecraft 26.2 supplies Gson 2.14.0 on Thread's compile, test, and client runtime classpaths, so V1
+does not add or bundle a second JSON implementation. Gson remains a serialization detail: game
+DTOs and provider interfaces do not expose Gson, Minecraft, Fabric, or MCP types.
+
+Why:
+
+- one explicit schema remains the discovery and validation contract;
+- output validation catches DTO/schema drift before transport serialization;
+- using the runtime-provided library keeps the mod dependency surface small;
+- the MCP adapter can translate JSON without leaking protocol types into core abstractions.

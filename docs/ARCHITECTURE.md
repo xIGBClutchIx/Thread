@@ -119,14 +119,26 @@ Conceptually:
 public interface GameTool<I, O> {
     ToolId id();
     String description();
-    Class<I> inputType();
-    Class<O> outputType();
+    JsonCodec<I> inputCodec();
+    JsonCodec<O> outputCodec();
+    ToolCapabilities capabilities();
 
-    ToolResult<O> execute(I input, ToolExecutionContext context);
+    ToolResult<O> execute(I input);
 }
 ```
 
 Do not over-engineer generic reflection if explicit serializers/schemas are simpler.
+
+### Serialization and schemas
+
+Thread contracts use explicit JSON Schema documents paired with small Gson codecs. Schemas are not
+inferred from Java reflection: each tool or context provider owns the schema it exposes during
+discovery, and the same schema validates input before execution and output after serialization.
+
+Gson 2.14.0 is already supplied on the compile, test, and client runtime classpaths by the pinned
+Minecraft 26.2 dependency. Thread uses that runtime library rather than introducing a second JSON
+stack. Gson types are confined to `core.serialization` and the core registry invocation boundary;
+public game DTOs and provider contracts remain plain Java and MCP-independent.
 
 ### Context registry
 
@@ -270,6 +282,8 @@ thread/
     tool/
     context/
     integration/
+    provider/
+    serialization/
     error/
   platform/
     fabric/
@@ -296,6 +310,8 @@ dev.xigbclutch.thread
     tool
     context
     integration
+    provider
+    serialization
     error
   platform.fabric
     game

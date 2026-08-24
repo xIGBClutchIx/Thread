@@ -22,9 +22,9 @@ class ArchitectureBoundaryTest {
       String path = normalizedPath(source);
       if (path.contains("/core/")) {
         String contents = Files.readString(source, StandardCharsets.UTF_8);
-        assertFalse(contents.contains("import net.fabricmc."), source::toString);
-        assertFalse(contents.contains("import net.minecraft."), source::toString);
-        assertFalse(contents.contains("import io.modelcontextprotocol."), source::toString);
+        assertFalse(contents.contains("net.fabricmc."), source::toString);
+        assertFalse(contents.contains("net.minecraft."), source::toString);
+        assertFalse(contents.contains("io.modelcontextprotocol."), source::toString);
       }
     }
   }
