@@ -21,12 +21,16 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.BlockHitResult;
 
 /** End-to-end proof that the vanilla catalog reads a real integrated game session. */
 @SuppressWarnings("UnstableApiUsage")
 public final class FabricProviderClientGameTest implements FabricClientGameTest {
+  private static final String EXPECT_MCP_DISABLED = "thread.gametest.expectMcpDisabled";
+
   @Override
   public void runTest(ClientGameTestContext context) {
     ThreadFabricClient entrypoint =
@@ -38,6 +42,11 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .findFirst()
             .orElseThrow();
     ToolRegistry tools = entrypoint.tools();
+    if (Boolean.getBoolean(EXPECT_MCP_DISABLED)) {
+      assertTrue(!entrypoint.mcpRunning(), "MCP remains stopped when configured off");
+      assertEquals(10, tools.descriptors().size(), "tools initialize independently of MCP");
+      return;
+    }
     McpHttpServer mcp = entrypoint.mcpServer();
 
     assertEquals(10, tools.descriptors().size(), "registered vanilla tool count");
@@ -96,11 +105,28 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
       singleplayer.getClientLevel().waitForChunksDownload();
+      singleplayer.getServer().runCommand("fill -3 99 -3 3 99 5 minecraft:stone");
+      singleplayer.getServer().runCommand("setblock 0 101 3 minecraft:gold_block");
+      singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 0 0");
+      singleplayer
+          .getServer()
+          .runCommand("item replace entity @a hotbar.0 with minecraft:diamond_pickaxe");
+      singleplayer
+          .getServer()
+          .runCommand("item replace entity @a armor.head with minecraft:diamond_helmet");
       singleplayer.getServer().runCommand("give @a minecraft:diamond 3");
+      singleplayer.getServer().runCommand("give @a minecraft:stick 2");
+      singleplayer.getServer().runCommand("summon minecraft:armor_stand 2 100 0");
       // Fabric API 0.154 predates the connection-level packet drain helper. Waiting for the
       // command's observable client state keeps the test deterministic without depending on a
       // newer game-test convenience API.
-      context.waitFor(client -> hasInventoryStack(client, Items.DIAMOND, 3));
+      context.waitFor(
+          client ->
+              hasInventoryStack(client, Items.DIAMOND, 3)
+                  && hasInventoryStack(client, Items.STICK, 2)
+                  && client.player != null
+                  && client.player.getMainHandItem().is(Items.DIAMOND_PICKAXE));
+      context.waitFor(FabricProviderClientGameTest::targetsKnownGoldBlock);
 
       assertTrue(
           invokeSuccessfully(context, tools, "minecraft.get_status", "{}")
@@ -149,22 +175,81 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
                           && stack.get("count").getAsInt() == 3),
           "inventory preserves registry ID and count");
 
-      assertTrue(
-          mcpTool(context, mcp.endpoint(), 6, "minecraft.get_status", new JsonObject())
-              .get("supported")
-              .getAsBoolean(),
-          "MCP loaded-world support");
+      JsonObject mcpStatus =
+          mcpTool(context, mcp.endpoint(), 6, "minecraft.get_status", new JsonObject());
+      assertTrue(mcpStatus.get("supported").getAsBoolean(), "MCP loaded-world support");
+      assertEquals("SINGLEPLAYER", mcpStatus.get("state").getAsString(), "MCP single-player state");
+
+      JsonObject mcpPlayer =
+          mcpTool(context, mcp.endpoint(), 7, "minecraft.get_player", new JsonObject());
+      assertEquals(
+          "minecraft:overworld", mcpPlayer.get("dimension").getAsString(), "MCP player dimension");
+      assertTrue(mcpPlayer.get("health").getAsDouble() > 0, "MCP health");
+      assertTrue(mcpPlayer.get("food").getAsInt() > 0, "MCP hunger/food level");
+
       JsonObject mcpInventory =
-          mcpTool(context, mcp.endpoint(), 7, "minecraft.get_inventory", new JsonObject());
+          mcpTool(context, mcp.endpoint(), 8, "minecraft.get_inventory", new JsonObject());
+      assertEquals(3, itemCount(mcpInventory, "minecraft:diamond"), "MCP diamond count");
+      assertEquals(2, itemCount(mcpInventory, "minecraft:stick"), "MCP stick count");
+
+      JsonObject mcpEquipment =
+          mcpTool(context, mcp.endpoint(), 9, "minecraft.get_equipment", new JsonObject());
+      assertEquals(
+          "minecraft:diamond_pickaxe",
+          mcpEquipment.getAsJsonObject("mainHand").get("itemId").getAsString(),
+          "MCP main-hand equipment");
+      assertEquals(
+          "minecraft:diamond_helmet",
+          mcpEquipment.getAsJsonObject("head").get("itemId").getAsString(),
+          "MCP head equipment");
+
+      JsonObject mcpTarget =
+          mcpTool(context, mcp.endpoint(), 10, "minecraft.get_target_block", new JsonObject());
+      assertEquals(
+          "minecraft:gold_block", mcpTarget.get("blockId").getAsString(), "MCP targeted block");
+
+      JsonObject entityArguments = new JsonObject();
+      entityArguments.addProperty("radius", 16);
+      entityArguments.addProperty("limit", 8);
+      JsonObject mcpEntities =
+          mcpTool(context, mcp.endpoint(), 11, "minecraft.get_nearby_entities", entityArguments);
       assertTrue(
-          mcpInventory.getAsJsonArray("slots").asList().stream()
+          mcpEntities.getAsJsonArray("entities").asList().stream()
               .map(JsonElement::getAsJsonObject)
-              .map(slot -> slot.getAsJsonObject("stack"))
               .anyMatch(
-                  stack ->
-                      stack.get("itemId").getAsString().equals("minecraft:diamond")
-                          && stack.get("count").getAsInt() == 3),
-          "MCP inventory preserves live registry ID and count");
+                  entity -> entity.get("entityType").getAsString().equals("minecraft:armor_stand")),
+          "MCP nearby entity within 16 blocks");
+
+      JsonObject recipeArguments = new JsonObject();
+      recipeArguments.addProperty("itemId", "minecraft:diamond_pickaxe");
+      JsonObject mcpRecipe =
+          mcpTool(context, mcp.endpoint(), 12, "minecraft.get_recipe", recipeArguments);
+      assertTrue(!mcpRecipe.getAsJsonArray("recipes").isEmpty(), "MCP diamond pickaxe recipe");
+      assertTrue(
+          recipeOccurrences(mcpRecipe, "minecraft:diamond") >= 3,
+          "MCP recipe requires three diamonds");
+      assertTrue(
+          recipeOccurrences(mcpRecipe, "minecraft:stick") >= 2, "MCP recipe requires two sticks");
+      assertTrue(
+          itemCount(mcpInventory, "minecraft:diamond") >= 3
+              && itemCount(mcpInventory, "minecraft:stick") >= 2,
+          "MCP inventory and recipe prove the player has pickaxe materials");
+
+      JsonObject searchArguments = new JsonObject();
+      searchArguments.addProperty("query", "diamond pick");
+      searchArguments.addProperty("limit", 10);
+      JsonObject mcpSearch =
+          mcpTool(context, mcp.endpoint(), 13, "minecraft.search_items", searchArguments);
+      assertTrue(
+          mcpSearch.getAsJsonArray("items").asList().stream()
+              .map(JsonElement::getAsJsonObject)
+              .anyMatch(
+                  item -> item.get("itemId").getAsString().equals("minecraft:diamond_pickaxe")),
+          "MCP item search");
+
+      JsonObject mcpCapabilities =
+          mcpTool(context, mcp.endpoint(), 14, "minecraft.get_capabilities", new JsonObject());
+      assertEquals(10, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
     }
   }
 
@@ -275,6 +360,34 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       }
     }
     return false;
+  }
+
+  private static boolean targetsKnownGoldBlock(Minecraft client) {
+    return client.hitResult instanceof BlockHitResult blockHit
+        && blockHit.getBlockPos().equals(new BlockPos(0, 101, 3));
+  }
+
+  private static int itemCount(JsonObject inventory, String itemId) {
+    return inventory.getAsJsonArray("slots").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .map(slot -> slot.getAsJsonObject("stack"))
+        .filter(stack -> stack.get("itemId").getAsString().equals(itemId))
+        .mapToInt(stack -> stack.get("count").getAsInt())
+        .sum();
+  }
+
+  private static int recipeOccurrences(JsonObject recipeResult, String itemId) {
+    return recipeResult.getAsJsonArray("recipes").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .flatMap(recipe -> recipe.getAsJsonArray("ingredients").asList().stream())
+        .map(JsonElement::getAsJsonObject)
+        .filter(
+            ingredient ->
+                ingredient.getAsJsonArray("itemIds").asList().stream()
+                    .map(JsonElement::getAsString)
+                    .anyMatch(itemId::equals))
+        .mapToInt(ingredient -> ingredient.get("count").getAsInt())
+        .sum();
   }
 
   private static void assertTrue(boolean condition, String description) {

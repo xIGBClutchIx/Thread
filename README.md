@@ -62,25 +62,40 @@ Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 
 A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
-## Development baseline
+## Install
 
-Thread currently targets Minecraft 26.2 with Fabric Loader 0.19.3, Fabric API 0.154.0+26.2,
-and Java 25. The Gradle Wrapper is the supported build entry point.
+Thread 0.1.0 requires Minecraft 26.2, Java 25, Fabric Loader 0.19.3 or newer, and Fabric API
+0.154.0+26.2 or newer for Minecraft 26.2.
 
-Run the complete local quality gate with:
+1. Install the required Minecraft, Fabric Loader, and Fabric API versions.
+2. Download `thread-0.1.0.jar` and `thread-0.1.0.jar.sha256` from the matching GitHub release.
+3. Verify the checksum, then copy only `thread-0.1.0.jar` into the instance's `mods` folder.
+4. Launch Minecraft and confirm the log contains `Thread 0.1.0 initialized` and
+   `Thread MCP listener started at http://127.0.0.1:25580/mcp`.
 
-```bash
-./gradlew spotlessCheck check build
+PowerShell checksum verification:
+
+```powershell
+(Get-FileHash .\thread-0.1.0.jar -Algorithm SHA256).Hash.ToLower()
+Get-Content .\thread-0.1.0.jar.sha256
 ```
 
-Use `./gradlew spotlessApply` to format local changes. CI only runs `spotlessCheck`; it never
-rewrites source. Launch the development client with `./gradlew runClient`, or run the live
-provider and MCP verification with `./gradlew runClientGameTest`.
+See [Installation](docs/INSTALLATION.md) for Linux/macOS verification and launcher-specific paths.
 
-The implementation through Slice 5 includes ten configurable read-only vanilla tools and a local MCP
-`2026-07-28` Streamable HTTP endpoint at `http://127.0.0.1:25580/mcp`. The endpoint is enabled by
-default, starts with the Fabric client, and stops during client shutdown. The final user-facing
-connection guide and release proof belong to Slice 6.
+## Connect an MCP client
+
+Thread exposes the stateless MCP `2026-07-28` Streamable HTTP endpoint at
+`http://127.0.0.1:25580/mcp`. A Codex configuration example is:
+
+```toml
+[mcp_servers.minecraft]
+enabled = true
+url = "http://127.0.0.1:25580/mcp"
+```
+
+Restart Codex and open a new task after changing its MCP configuration. Thread must be running in
+Minecraft before the client connects. Clients discover ten read-only `minecraft.*` tools; no
+`initialize` handshake or session ID is used.
 
 ## Configuration
 
@@ -109,3 +124,51 @@ capability results. V1 accepts only the explicit loopback hosts `127.0.0.1`, `lo
 Thread also applies hard ceilings to every configurable safety limit. Invalid existing files are
 preserved for correction, logged without their contents, and replaced in memory by safe defaults
 for that launch.
+
+Set `"mcpEnabled": false` to run Thread without opening a listener. The rest of the mod initializes
+normally, so this is a clean supported state rather than a startup failure.
+
+## Troubleshooting
+
+- **The client cannot connect:** verify Minecraft is running, the startup log shows the listener,
+  and the client URL is exactly `http://127.0.0.1:25580/mcp`.
+- **The port is already in use:** stop the other process or choose another `mcpPort`, then update the
+  MCP client URL to match.
+- **Fabric reports incompatible mods:** use the exact Minecraft 26.2 build of Fabric API. A Fabric
+  API build for another Minecraft version is not interchangeable.
+- **Gameplay tools return `UNSUPPORTED_SESSION`:** enter an integrated single-player world. Status
+  and game-info discovery remain available in menus and unsupported multiplayer.
+- **A tool is missing:** check `enabledTools`; disabled tools are omitted from discovery.
+- **Configuration is rejected:** read the logged validation message, correct
+  `config/thread.json`, and restart. Thread never logs the file contents.
+
+See [Installation](docs/INSTALLATION.md) for the complete troubleshooting guide.
+
+## Known V1 limitations
+
+- Fabric client only; no Forge/NeoForge or dedicated-server build.
+- Single-player and read-only. Multiplayer gameplay queries, commands, movement, crafting, and
+  world/inventory changes are intentionally rejected or absent.
+- Nearby-entity queries only inspect already-loaded state and never force-load chunks.
+- No authentication or remote binding. The server is intentionally restricted to loopback.
+- No third-party mod integrations or in-game assistant UI.
+- Recipe-material comparisons are performed by the MCP client from recipe and inventory snapshots;
+  Thread does not expose a separate crafting-planner tool.
+
+## Development and release
+
+The Gradle Wrapper is the supported build entry point. Run the complete local quality gate with:
+
+```bash
+./gradlew spotlessCheck check build
+```
+
+Run the live development test with `./gradlew runClientGameTest`. Run the clean-install proof against
+the packaged mod with `./gradlew runProductionClientGameTest`, and verify disabled MCP startup with
+`./gradlew runMcpDisabledProductionClientGameTest`. `./gradlew releaseBundle` writes the validated
+runtime JAR and SHA-256 file to `build/release/`.
+
+V1 uses semantic versions in `gradle.properties` and matching `vMAJOR.MINOR.PATCH` Git tags. A tag
+push runs the full gate, packaged-client tests, version match check, and GitHub release upload. See
+[Release process](docs/RELEASE.md), [Testing](docs/TESTING.md), and the
+[manual MCP smoke checklist](docs/MANUAL_SMOKE_TEST.md).

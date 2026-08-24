@@ -16,7 +16,12 @@ public final class ContextRegistry {
   private final ConcurrentSkipListMap<ContextId, RegisteredContext<?>> providers =
       new ConcurrentSkipListMap<>();
 
-  /** Registers a context provider and rejects duplicate identifiers. */
+  /**
+   * Registers a context provider and rejects duplicate identifiers.
+   *
+   * @throws me.clutchy.thread.core.error.DuplicateRegistrationException when the ID is registered
+   *     already
+   */
   public void register(ContextProvider<?> provider) {
     Objects.requireNonNull(provider, "provider");
     RegisteredContext<?> registered = registeredContext(provider);

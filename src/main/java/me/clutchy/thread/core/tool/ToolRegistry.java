@@ -17,7 +17,13 @@ public final class ToolRegistry {
   private final ConcurrentSkipListMap<ToolId, RegisteredTool<?, ?>> tools =
       new ConcurrentSkipListMap<>();
 
-  /** Registers one tool, rejecting duplicate IDs and non-read-only V1 capabilities. */
+  /**
+   * Registers one tool, rejecting duplicate IDs and non-read-only V1 capabilities.
+   *
+   * @throws me.clutchy.thread.core.error.DuplicateRegistrationException when the ID is registered
+   *     already
+   * @throws IllegalArgumentException when the tool is not read-only
+   */
   public void register(GameTool<?, ?> tool) {
     Objects.requireNonNull(tool, "tool");
     RegisteredTool<?, ?> registered = registeredTool(tool);
@@ -31,7 +37,12 @@ public final class ToolRegistry {
     return tools.values().stream().map(RegisteredTool::descriptor).toList();
   }
 
-  /** Invokes a tool from an untrusted transport-provided identifier. */
+  /**
+   * Invokes a tool from an untrusted transport-provided identifier.
+   *
+   * <p>Invalid or unknown identifiers and codec failures are returned as structured results; they
+   * do not escape as argument exceptions.
+   */
   public ToolResult<JsonElement> invoke(String toolId, JsonElement input) {
     ToolId parsedId;
     try {

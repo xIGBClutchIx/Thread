@@ -14,6 +14,7 @@ public final class IntegrationRegistry {
   private final ContextRegistry contexts;
   private final SortedMap<IntegrationId, IntegrationInfo> integrations = new TreeMap<>();
 
+  /** Creates an integration registry backed by the core registries it will extend. */
   public IntegrationRegistry(ToolRegistry tools, ContextRegistry contexts) {
     this.tools = Objects.requireNonNull(tools, "tools");
     this.contexts = Objects.requireNonNull(contexts, "contexts");

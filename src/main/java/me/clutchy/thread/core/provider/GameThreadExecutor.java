@@ -10,5 +10,11 @@ import java.util.function.Supplier;
  * transport-independent.
  */
 public interface GameThreadExecutor {
+  /**
+   * Executes one non-null state read on its owning game thread.
+   *
+   * @return the operation result after dispatch completes
+   * @throws RuntimeException when dispatch is rejected, times out, or the operation fails
+   */
   <T> T call(Supplier<T> operation);
 }

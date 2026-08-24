@@ -362,3 +362,17 @@ packages grow:
 - `core` cannot import Fabric, Minecraft, or MCP types;
 - MCP SDK types can only appear below `transport.mcp`;
 - `transport.mcp` cannot import Fabric or Minecraft types directly.
+
+## Distribution and packaged-runtime proof
+
+The release artifact is one client mod JAR containing both core and platform/transport adapters.
+This does not collapse their dependency boundaries: package architecture tests still inspect
+production sources, and `verifyReleaseArtifact` inspects the expanded Fabric metadata and JAR
+contents before distribution.
+
+Production client tests launch that runtime JAR through Loom's production runner. A separate
+`thread-gametest` JAR supplies only the test entrypoint and fixtures, depends on Thread as a normal
+mod, and is never copied into the release bundle. This separation proves the published JAR does not
+need a second Thread component or development class directories. A second production launch writes
+an isolated `mcpEnabled: false` configuration and proves transport disablement does not prevent core
+tool registration.

@@ -1,0 +1,59 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+
+permissions:
+    contents: write
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    release:
+        name: Validate and release
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out tagged sources
+              uses: actions/checkout@v6
+
+            - name: Set up Java
+              uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: "25"
+
+            - name: Set up Gradle
+              uses: gradle/actions/setup-gradle@v6
+
+            - name: Verify Gradle wrapper permissions
+              run: chmod +x gradlew
+
+            - name: Run clean release gate
+              run: >-
+                  ./gradlew --no-daemon clean spotlessCheck check build
+                  runProductionClientGameTest runMcpDisabledProductionClientGameTest
+                  verifyReleaseVersion releaseBundle -PreleaseTag="${GITHUB_REF_NAME}"
+
+            - name: Upload release bundle
+              uses: actions/upload-artifact@v4
+              with:
+                  name: thread-${{ github.ref_name }}
+                  path: build/release/*
+                  if-no-files-found: error
+
+            - name: Create or update GitHub release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+                    gh release upload "${GITHUB_REF_NAME}" build/release/* --clobber
+                  else
+                    gh release create "${GITHUB_REF_NAME}" build/release/* \
+                      --verify-tag \
+                      --generate-notes \
+                      --title "Thread ${GITHUB_REF_NAME#v}"
+                  fi

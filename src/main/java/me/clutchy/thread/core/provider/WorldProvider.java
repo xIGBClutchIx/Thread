@@ -10,5 +10,8 @@ import me.clutchy.thread.core.tool.ToolResult;
  * <p>Implementations must not force-load chunks and must honor the supplied query bounds.
  */
 public interface WorldProvider {
+  /**
+   * Returns nearby entities from already-loaded state, bounded by the supplied radius and limit.
+   */
   ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query);
 }

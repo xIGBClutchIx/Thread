@@ -84,11 +84,16 @@ Critical edge cases:
 - recipe not found
 - entity result cap reached
 
-Slice 2 introduced an isolated Fabric client game test under `src/gametest`, and Slice 3 extends it
-through the complete internal tool registry. Run `./gradlew runClientGameTest` to create a temporary
-single-player world and invoke all ten vanilla V1 tools, including external-thread dispatch, exact
-inventory IDs/counts, loaded-state queries, deterministic item search, capability discovery, and
-integrated-server recipe access. The game-test source set is not packaged in the production mod.
+The isolated Fabric client game test under `src/gametest` creates a temporary single-player world
+and invokes all ten vanilla V1 tools. It covers external-thread dispatch, exact inventory and
+equipment IDs/counts, a deterministic target block, an already-loaded entity within 16 blocks,
+diamond-pickaxe recipe access, inventory/recipe material comparison, item search, capability
+discovery, and MCP calls from both menu and supported-world states.
+
+`./gradlew runClientGameTest` runs this proof against development outputs.
+`./gradlew runProductionClientGameTest` instead loads the installable runtime JAR plus an isolated
+game-test JAR; production classes do not leak in through the harness. The game-test source set is
+never packaged in the runtime mod.
 
 ## Threading tests
 
@@ -122,11 +127,13 @@ Verify:
 Do not require Minecraft for most MCP tests.
 
 The Fabric client game test additionally starts the production listener at
-`http://127.0.0.1:25580/mcp`. It performs `server/discover` and `tools/list`, calls
-`minecraft.get_status` from the main menu and a loaded temporary world, calls
-`minecraft.get_game_info`, verifies a known live inventory through `minecraft.get_inventory`, and
-confirms an invalid MCP call does not stop the listener. Normal client shutdown must log that the
-listener stopped.
+`http://127.0.0.1:25580/mcp`. It performs `server/discover` and `tools/list`, verifies all ten
+release scenarios through real HTTP `tools/call` requests, and confirms an invalid MCP call does
+not stop the listener. Normal client shutdown must log that the listener stopped.
+
+`./gradlew runMcpDisabledProductionClientGameTest` writes an isolated config with MCP disabled,
+loads the packaged runtime JAR, proves no listener was started, and verifies that normal Thread tool
+registration still completes.
 
 Slice 5 unit coverage also verifies persistent configuration creation/validation, pre-registration
 tool filtering, server-enforced provider limits, game-thread timeout cancellation, and controlled
@@ -136,31 +143,9 @@ escape the tool boundary.
 
 ## Manual end-to-end smoke test
 
-Required before V1 release:
-
-First verify `minecraft.get_status` in the main menu, while loading/entering a world, and in a loaded single-player world. Gameplay tools should only become available in the supported single-player state.
-
-### Environment
-
-- clean Thread config
-- development or packaged Fabric instance
-- survival world
-- known inventory contents
-- known nearby entity/block setup
-- MCP-capable client connected to Thread
-
-### Scenarios
-
-1. Ask current Minecraft version.
-2. Ask current player health/hunger.
-3. Ask for inventory summary.
-4. Ask what is equipped.
-5. Look at a known block and ask what it is.
-6. Place/spawn known entities nearby and ask what is nearby.
-7. Ask for a vanilla recipe.
-8. Put exact recipe ingredients in inventory and ask whether the player can make it.
-
-When the MCP client exposes tool traces, capture which tools were called. The model should use Thread for live-state questions.
+Required before V1 release. Follow [the ten-scenario checklist](MANUAL_SMOKE_TEST.md) against the
+downloaded release JAR and retain client tool traces. The manual pass validates model tool choice
+and the real MCP-capable client integration that an automated HTTP harness cannot represent.
 
 ## Quality gate
 
@@ -169,7 +154,7 @@ The normal Gradle lifecycle is part of testing. From a clean checkout, formattin
 Expected preflight:
 
 ```bash
-./gradlew spotlessCheck check build
+./gradlew clean spotlessCheck check build
 ```
 
 A plain `./gradlew build` must include all required quality gates.
@@ -189,3 +174,7 @@ Do not tag V1 unless:
 - all V1 tools are read-only
 - docs reflect actual behavior
 - tag/release workflow can produce the installable V1 JAR from a clean checkout
+
+The local release-equivalent gate is documented in [RELEASE.md](RELEASE.md). It adds both packaged
+client runs, the tag/version check, runtime artifact inspection, and checksum generation to the
+normal quality gate.

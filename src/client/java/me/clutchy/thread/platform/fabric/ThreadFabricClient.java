@@ -149,4 +149,8 @@ public final class ThreadFabricClient implements ClientModInitializer {
   McpHttpServer mcpServer() {
     return Objects.requireNonNull(mcpServer, "MCP server is not running");
   }
+
+  boolean mcpRunning() {
+    return mcpServer != null && mcpServer.running();
+  }
 }
