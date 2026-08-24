@@ -196,6 +196,9 @@ Example result:
 
 V1 does not need to dump block entity inventories or NBT.
 
+When the normal client raycast has no valid block target, Thread returns a structured `NOT_FOUND`
+tool error rather than inventing block data.
+
 ## `minecraft.get_nearby_entities`
 
 Purpose: summarize loaded entities around the local player.

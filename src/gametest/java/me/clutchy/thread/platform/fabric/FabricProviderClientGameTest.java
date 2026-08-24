@@ -1,12 +1,12 @@
 package me.clutchy.thread.platform.fabric;
 
-import java.util.List;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
-import me.clutchy.thread.core.model.InventorySlotInfo;
-import me.clutchy.thread.core.model.NearbyEntityQuery;
-import me.clutchy.thread.core.model.RecipeInfo;
-import me.clutchy.thread.core.model.SessionState;
+import me.clutchy.thread.core.error.ToolErrorCode;
+import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -14,7 +14,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
 
-/** End-to-end proof that Slice 2 providers read a real integrated game session. */
+/** End-to-end proof that the vanilla catalog reads a real integrated game session. */
 @SuppressWarnings("UnstableApiUsage")
 public final class FabricProviderClientGameTest implements FabricClientGameTest {
   @Override
@@ -27,12 +27,24 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .map(container -> (ThreadFabricClient) container.getEntrypoint())
             .findFirst()
             .orElseThrow();
-    FabricProviderBundle providers = entrypoint.providers();
+    ToolRegistry tools = entrypoint.tools();
 
+    assertEquals(10, tools.descriptors().size(), "registered vanilla tool count");
+    JsonObject menuStatus = invokeSuccessfully(context, tools, "minecraft.get_status", "{}");
+    assertEquals("MAIN_MENU", menuStatus.get("state").getAsString(), "menu status");
     assertEquals(
-        SessionState.MAIN_MENU,
-        awaitExternal(context, providers.game()::sessionStatus).state(),
-        "menu status");
+        "26.2",
+        invokeSuccessfully(context, tools, "minecraft.get_game_info", "{}")
+            .get("minecraftVersion")
+            .getAsString(),
+        "live Minecraft version");
+    assertEquals(
+        10,
+        invokeSuccessfully(context, tools, "minecraft.get_capabilities", "{}")
+            .getAsJsonArray("tools")
+            .size(),
+        "live capability catalog");
+
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
       singleplayer.getConnection().waitForChunksDownload();
       singleplayer.getServer().runCommand("give @a minecraft:diamond 3");
@@ -40,38 +52,70 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       context.waitTick();
 
       assertTrue(
-          awaitExternal(context, providers.game()::sessionStatus).supported(),
+          invokeSuccessfully(context, tools, "minecraft.get_status", "{}")
+              .get("supported")
+              .getAsBoolean(),
           "single-player support");
-      assertTrue(awaitExternal(context, providers.player()::status).successful(), "player status");
-      ToolResult<List<RecipeInfo>> recipes =
-          awaitExternal(context, () -> providers.recipe().recipesFor("minecraft:diamond_pickaxe"));
-      assertTrue(recipes.successful(), "live recipe lookup");
-      assertTrue(!recipes.value().isEmpty(), "diamond pickaxe recipe present");
-      assertTrue(
-          awaitExternal(context, () -> providers.recipe().searchItems("diamond pick", 10))
-              .successful(),
-          "item registry search");
-      assertTrue(
-          awaitExternal(context, providers.player()::equipment).successful(), "equipment snapshot");
-      assertTrue(
-          awaitExternal(context, providers.player()::targetBlock).successful(),
-          "target-block snapshot");
-      assertTrue(
-          awaitExternal(
-                  context, () -> providers.world().nearbyEntities(new NearbyEntityQuery(16, 8)))
-              .successful(),
-          "bounded entity query");
 
-      List<InventorySlotInfo> slots =
-          awaitExternal(context, providers.player()::inventory).value().slots();
+      JsonObject player = invokeSuccessfully(context, tools, "minecraft.get_player", "{}");
+      assertEquals(
+          "minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
+
+      JsonObject recipes =
+          invokeSuccessfully(
+              context, tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
+      assertTrue(!recipes.getAsJsonArray("recipes").isEmpty(), "diamond pickaxe recipe present");
+
+      JsonObject search =
+          invokeSuccessfully(
+              context,
+              tools,
+              "minecraft.search_items",
+              "{\"query\":\"diamond pick\",\"limit\":10}");
       assertTrue(
-          slots.stream()
+          search.getAsJsonArray("items").asList().stream()
+              .map(JsonElement::getAsJsonObject)
               .anyMatch(
-                  slot ->
-                      slot.stack().itemId().equals("minecraft:diamond")
-                          && slot.stack().count() == 3),
+                  item -> item.get("itemId").getAsString().equals("minecraft:diamond_pickaxe")),
+          "live item registry search");
+
+      invokeSuccessfully(context, tools, "minecraft.get_equipment", "{}");
+      ToolResult<JsonElement> target = invoke(context, tools, "minecraft.get_target_block", "{}");
+      assertTrue(
+          target.successful() || target.error().code() == ToolErrorCode.NOT_FOUND,
+          "target-block result");
+      invokeSuccessfully(
+          context, tools, "minecraft.get_nearby_entities", "{\"radius\":16,\"limit\":8}");
+
+      JsonObject inventory = invokeSuccessfully(context, tools, "minecraft.get_inventory", "{}");
+      assertTrue(
+          inventory.getAsJsonArray("slots").asList().stream()
+              .map(JsonElement::getAsJsonObject)
+              .map(slot -> slot.getAsJsonObject("stack"))
+              .anyMatch(
+                  stack ->
+                      stack.get("itemId").getAsString().equals("minecraft:diamond")
+                          && stack.get("count").getAsInt() == 3),
           "inventory preserves registry ID and count");
     }
+  }
+
+  private static JsonObject invokeSuccessfully(
+      ClientGameTestContext context, ToolRegistry tools, String toolId, String input) {
+    ToolResult<JsonElement> result = invoke(context, tools, toolId, input);
+    if (!result.successful()) {
+      throw new AssertionError(toolId + " failed: " + result.error());
+    }
+    if (!result.value().isJsonObject()) {
+      throw new AssertionError(toolId + " returned a non-object result");
+    }
+    return result.value().getAsJsonObject();
+  }
+
+  private static ToolResult<JsonElement> invoke(
+      ClientGameTestContext context, ToolRegistry tools, String toolId, String input) {
+    JsonElement parsedInput = JsonParser.parseString(input);
+    return awaitExternal(context, () -> tools.invoke(toolId, parsedInput));
   }
 
   private static <T> T awaitExternal(ClientGameTestContext context, Supplier<T> operation) {

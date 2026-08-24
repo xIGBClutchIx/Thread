@@ -52,8 +52,7 @@ class IntegrationRegistryTest {
   }
 
   private static IntegrationRegistry registry() {
-    return new IntegrationRegistry(
-        new IntegrationContext(new ToolRegistry(), new ContextRegistry()));
+    return new IntegrationRegistry(new ToolRegistry(), new ContextRegistry());
   }
 
   private record TestIntegration(IntegrationId id, AtomicInteger registrations)

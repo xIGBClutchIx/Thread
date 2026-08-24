@@ -14,6 +14,7 @@ import me.clutchy.thread.core.model.GameInfo;
 import me.clutchy.thread.core.model.InventorySlotInfo;
 import me.clutchy.thread.core.model.InventorySnapshot;
 import me.clutchy.thread.core.model.ItemInfo;
+import me.clutchy.thread.core.model.ItemSearchResult;
 import me.clutchy.thread.core.model.ItemStackInfo;
 import me.clutchy.thread.core.model.NearbyEntityQuery;
 import me.clutchy.thread.core.model.NearbyEntityResult;
@@ -49,7 +50,8 @@ class ProviderContractsTest {
             .entities()
             .getFirst()
             .entityType());
-    assertEquals("minecraft:stick", recipes.searchItems("stick", 5).value().getFirst().itemId());
+    assertEquals(
+        "minecraft:stick", recipes.searchItems("stick", 5).value().items().getFirst().itemId());
     assertEquals(
         "minecraft:iron_pickaxe",
         recipes.recipesFor("minecraft:iron_pickaxe").value().getFirst().result().itemId());
@@ -129,8 +131,10 @@ class ProviderContractsTest {
     }
 
     @Override
-    public ToolResult<List<ItemInfo>> searchItems(String query, int limit) {
-      return ToolResult.success(List.of(new ItemInfo("minecraft:stick", "Stick")));
+    public ToolResult<ItemSearchResult> searchItems(String query, int limit) {
+      return ToolResult.success(
+          new ItemSearchResult(
+              query, limit, false, List.of(new ItemInfo("minecraft:stick", "Stick"))));
     }
   }
 }

@@ -3,7 +3,11 @@ package me.clutchy.thread.platform.fabric;
 import java.util.Objects;
 import java.util.Optional;
 import me.clutchy.thread.config.ThreadConfig;
+import me.clutchy.thread.core.context.ContextRegistry;
+import me.clutchy.thread.core.integration.IntegrationRegistry;
+import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
+import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.platform.fabric.game.FabricGameProvider;
 import me.clutchy.thread.platform.fabric.game.FabricProviderLimits;
 import me.clutchy.thread.platform.fabric.game.FabricSessionGuard;
@@ -26,6 +30,7 @@ public final class ThreadFabricClient implements ClientModInitializer {
   private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
   private FabricProviderBundle providers;
+  private ToolRegistry tools;
 
   @Override
   public void onInitializeClient() {
@@ -49,12 +54,21 @@ public final class ThreadFabricClient implements ClientModInitializer {
             new FabricWorldProvider(client, clientThread, sessionGuard, limits, mapper),
             new FabricRecipeProvider(client, clientThread, sessionGuard, limits, mapper));
 
+    ToolRegistry toolRegistry = new ToolRegistry();
+    IntegrationRegistry integrationRegistry =
+        new IntegrationRegistry(toolRegistry, new ContextRegistry());
+    integrationRegistry.register(
+        new VanillaIntegration(
+            providers.game(), providers.player(), providers.world(), providers.recipe()));
+    tools = toolRegistry;
+
     LOGGER.info(versions.startupMessage());
     LOGGER.debug(
         "Thread configuration defaults initialized (MCP enabled: {})", config.mcpEnabled());
     // Fabric invokes this entrypoint before Minecraft's client task loop is ready. Constructing
     // providers is safe here, but even a read-only dispatch must wait until initialization returns.
-    LOGGER.debug("Thread live providers initialized");
+    LOGGER.debug(
+        "Thread live providers and {} vanilla tools initialized", tools.descriptors().size());
   }
 
   private static String requiredVersion(FabricLoader loader, String modId) {
@@ -67,5 +81,9 @@ public final class ThreadFabricClient implements ClientModInitializer {
 
   FabricProviderBundle providers() {
     return Objects.requireNonNull(providers, "providers have not been initialized");
+  }
+
+  ToolRegistry tools() {
+    return Objects.requireNonNull(tools, "tools have not been initialized");
   }
 }

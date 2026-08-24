@@ -13,6 +13,7 @@ import java.util.TreeSet;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.model.ItemInfo;
+import me.clutchy.thread.core.model.ItemSearchResult;
 import me.clutchy.thread.core.model.RecipeInfo;
 import me.clutchy.thread.core.model.RecipeIngredientInfo;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
@@ -79,7 +80,7 @@ public final class FabricRecipeProvider implements RecipeProvider {
   }
 
   @Override
-  public ToolResult<List<ItemInfo>> searchItems(String query, int limit) {
+  public ToolResult<ItemSearchResult> searchItems(String query, int limit) {
     return FabricProviderSupport.read(
         clientThread, "search_items", () -> searchItemsOnClient(query, limit));
   }
@@ -151,7 +152,7 @@ public final class FabricRecipeProvider implements RecipeProvider {
     return ToolResult.success(List.copyOf(matches));
   }
 
-  private ToolResult<List<ItemInfo>> searchItemsOnClient(String query, int limit) {
+  private ToolResult<ItemSearchResult> searchItemsOnClient(String query, int limit) {
     if (query == null || query.isBlank()) {
       return failure(ToolErrorCode.INVALID_INPUT, "query must not be blank.", false);
     }
@@ -182,24 +183,27 @@ public final class FabricRecipeProvider implements RecipeProvider {
     return ToolResult.success(searchRegistry(query, limit));
   }
 
-  static List<ItemInfo> searchRegistry(String query, int limit) {
-    String[] terms = query.strip().toLowerCase(Locale.ROOT).split("\\s+");
+  static ItemSearchResult searchRegistry(String query, int limit) {
+    String normalizedQuery = query.strip();
+    String[] terms = normalizedQuery.toLowerCase(Locale.ROOT).split("\\s+");
     List<ItemInfo> matches = new ArrayList<>();
-    BuiltInRegistries.ITEM.entrySet().stream()
-        .sorted(Comparator.comparing(entry -> entry.getKey().identifier().toString()))
-        .forEachOrdered(
-            entry -> {
-              if (matches.size() >= limit) {
-                return;
-              }
-              String canonicalId = entry.getKey().identifier().toString();
-              String displayName =
-                  Component.translatable(entry.getValue().getDescriptionId()).getString();
-              if (matches(terms, canonicalId, displayName)) {
-                matches.add(new ItemInfo(canonicalId, displayName));
-              }
-            });
-    return List.copyOf(matches);
+    var definitions =
+        BuiltInRegistries.ITEM.entrySet().stream()
+            .sorted(Comparator.comparing(entry -> entry.getKey().identifier().toString()))
+            .toList();
+    for (var entry : definitions) {
+      String canonicalId = entry.getKey().identifier().toString();
+      String displayName = Component.translatable(entry.getValue().getDescriptionId()).getString();
+      if (matches(terms, canonicalId, displayName)) {
+        matches.add(new ItemInfo(canonicalId, displayName));
+        if (matches.size() > limit) {
+          break;
+        }
+      }
+    }
+    boolean truncated = matches.size() > limit;
+    List<ItemInfo> returned = truncated ? matches.subList(0, limit) : matches;
+    return new ItemSearchResult(normalizedQuery, limit, truncated, returned);
   }
 
   private RecipeInfo toRecipeInfo(RecipeHolder<?> holder, ItemStack result) {

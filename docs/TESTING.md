@@ -84,11 +84,11 @@ Critical edge cases:
 - recipe not found
 - entity result cap reached
 
-Slice 2 includes an isolated Fabric client game test under `src/gametest`. Run
-`./gradlew runClientGameTest` to create a temporary single-player world and exercise the live
-providers, including external-thread dispatch, exact inventory IDs/counts, loaded-state queries,
-item search, and integrated-server recipe access. The game-test source set is not packaged in the
-production mod.
+Slice 2 introduced an isolated Fabric client game test under `src/gametest`, and Slice 3 extends it
+through the complete internal tool registry. Run `./gradlew runClientGameTest` to create a temporary
+single-player world and invoke all ten vanilla V1 tools, including external-thread dispatch, exact
+inventory IDs/counts, loaded-state queries, deterministic item search, capability discovery, and
+integrated-server recipe access. The game-test source set is not packaged in the production mod.
 
 ## Threading tests
 

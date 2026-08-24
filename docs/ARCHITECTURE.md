@@ -96,7 +96,7 @@ public interface WorldProvider {
 
 public interface RecipeProvider {
     ToolResult<List<RecipeInfo>> recipesFor(String itemId);
-    ToolResult<List<ItemInfo>> searchItems(String query, int limit);
+    ToolResult<ItemSearchResult> searchItems(String query, int limit);
 }
 
 public interface GameThreadExecutor {
@@ -170,6 +170,11 @@ public interface GameIntegration {
 ```
 
 Future integrations can register tools/providers/context without changing MCP code.
+
+The built-in `VanillaIntegration` owns the ten V1 `minecraft.*` tools. Fabric startup supplies its
+loader-neutral providers, then activates it through `IntegrationRegistry`. The capabilities tool
+reads `ToolRegistry` and `IntegrationRegistry` at invocation time so discovery reflects actual
+registrations rather than a parallel hard-coded feature list.
 
 ## Platform boundary
 
@@ -287,6 +292,7 @@ thread/
     tool/
     context/
     integration/
+      vanilla/
     provider/
     serialization/
     error/
