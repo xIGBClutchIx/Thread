@@ -84,19 +84,23 @@ public interface GameProvider {
 }
 
 public interface PlayerProvider {
-    PlayerStatus status();
-    InventorySnapshot inventory();
-    EquipmentSnapshot equipment();
-    Optional<BlockInfo> targetBlock();
+    ToolResult<PlayerStatus> status();
+    ToolResult<InventorySnapshot> inventory();
+    ToolResult<EquipmentSnapshot> equipment();
+    ToolResult<Optional<BlockInfo>> targetBlock();
 }
 
 public interface WorldProvider {
-    NearbyEntityResult nearbyEntities(NearbyEntityQuery query);
+    ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query);
 }
 
 public interface RecipeProvider {
-    List<RecipeInfo> recipesFor(String itemId);
-    List<ItemInfo> searchItems(String query, int limit);
+    ToolResult<List<RecipeInfo>> recipesFor(String itemId);
+    ToolResult<List<ItemInfo>> searchItems(String query, int limit);
+}
+
+public interface GameThreadExecutor {
+    <T> T call(Supplier<T> operation);
 }
 ```
 
@@ -209,7 +213,7 @@ The result should also expose simple booleans such as `worldLoaded`, `playerAvai
 
 MCP requests may arrive on HTTP/server threads. Minecraft state must not be read unsafely from those threads.
 
-Create a small game-thread executor/dispatcher abstraction. Provider operations that require game state should marshal work to the correct Minecraft logical thread and return the result to the requesting transport.
+`GameThreadExecutor` is the loader-neutral synchronous dispatch boundary. Fabric supplies separate adapters for the client and integrated-server threads. Provider operations marshal state reads to their owning thread and return detached DTOs to the requesting transport.
 
 Do not hide unsafe cross-thread reads behind `synchronized`.
 
@@ -221,7 +225,8 @@ Examples:
 
 - camera target block: client-derived
 - local player's HUD-level state: often client-readable
-- authoritative server state: logical server where appropriate
+- loaded entities: bounded reads from the client level's existing entity index
+- live recipe definitions and display resolution: integrated logical server
 
 Do not duplicate state unnecessarily. Document side ownership in provider implementations.
 
@@ -301,10 +306,10 @@ A multi-module Gradle build is optional for V1. Strong package boundaries plus d
 
 ## Enforced package roots
 
-The V1 implementation uses `dev.xigbclutch.thread` as its Java root:
+The V1 implementation uses `me.clutchy.thread` as its Java root:
 
 ```text
-dev.xigbclutch.thread
+me.clutchy.thread
   core
     model
     tool

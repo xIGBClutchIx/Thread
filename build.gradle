@@ -27,6 +27,26 @@ loom {
     }
 }
 
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'thread-gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+    }
+}
+
+sourceSets {
+    test {
+        compileClasspath += sourceSets.client.output
+        runtimeClasspath += sourceSets.client.output
+    }
+    gametest {
+        compileClasspath += sourceSets.client.output
+        runtimeClasspath += sourceSets.client.output
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
@@ -71,6 +91,14 @@ tasks.withType(Test).configureEach {
         events 'failed', 'skipped'
         exceptionFormat = 'full'
     }
+}
+
+tasks.named('compileTestJava') {
+    dependsOn tasks.named('clientClasses')
+}
+
+tasks.named('compileGametestJava') {
+    dependsOn tasks.named('clientClasses')
 }
 
 spotless {

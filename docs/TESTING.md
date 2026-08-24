@@ -25,8 +25,8 @@ final class FakePlayerProvider implements PlayerProvider {
     }
 
     @Override
-    public InventorySnapshot inventory() {
-        return inventory;
+    public ToolResult<InventorySnapshot> inventory() {
+        return ToolResult.success(inventory);
     }
 }
 ```
@@ -83,6 +83,12 @@ Critical edge cases:
 - empty inventory
 - recipe not found
 - entity result cap reached
+
+Slice 2 includes an isolated Fabric client game test under `src/gametest`. Run
+`./gradlew runClientGameTest` to create a temporary single-player world and exercise the live
+providers, including external-thread dispatch, exact inventory IDs/counts, loaded-state queries,
+item search, and integrated-server recipe access. The game-test source set is not packaged in the
+production mod.
 
 ## Threading tests
 

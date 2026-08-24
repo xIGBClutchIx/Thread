@@ -10,7 +10,7 @@
     "environment": "client",
     "entrypoints": {
         "client": [
-            "dev.xigbclutch.thread.platform.fabric.ThreadFabricClient"
+            "me.clutchy.thread.platform.fabric.ThreadFabricClient"
         ]
     },
     "depends": {

@@ -1,0 +1,16 @@
+{
+    "schemaVersion": 1,
+    "id": "thread-gametest",
+    "version": "1.0.0",
+    "name": "Thread Client Game Tests",
+    "environment": "client",
+    "entrypoints": {
+        "fabric-client-gametest": [
+            "me.clutchy.thread.platform.fabric.FabricProviderClientGameTest"
+        ]
+    },
+    "depends": {
+        "thread": "*",
+        "fabric-client-gametest-api-v1": "*"
+    }
+}
