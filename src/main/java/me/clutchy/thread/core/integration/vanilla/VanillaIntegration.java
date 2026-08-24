@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.integration.GameIntegration;
@@ -33,6 +34,7 @@ import me.clutchy.thread.core.serialization.JsonCodec;
 import me.clutchy.thread.core.tool.GameTool;
 import me.clutchy.thread.core.tool.ToolCapabilities;
 import me.clutchy.thread.core.tool.ToolDescriptor;
+import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /**
@@ -46,14 +48,26 @@ public final class VanillaIntegration implements GameIntegration {
   private final PlayerProvider player;
   private final WorldProvider world;
   private final RecipeProvider recipes;
+  private final Predicate<ToolId> enabledTools;
 
   /** Creates the vanilla catalog over explicit loader-neutral providers. */
   public VanillaIntegration(
       GameProvider game, PlayerProvider player, WorldProvider world, RecipeProvider recipes) {
+    this(game, player, world, recipes, ignored -> true);
+  }
+
+  /** Creates a vanilla catalog filtered before tools enter discovery or invocation registries. */
+  public VanillaIntegration(
+      GameProvider game,
+      PlayerProvider player,
+      WorldProvider world,
+      RecipeProvider recipes,
+      Predicate<ToolId> enabledTools) {
     this.game = Objects.requireNonNull(game, "game");
     this.player = Objects.requireNonNull(player, "player");
     this.world = Objects.requireNonNull(world, "world");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
+    this.enabledTools = Objects.requireNonNull(enabledTools, "enabledTools");
   }
 
   @Override
@@ -73,16 +87,16 @@ public final class VanillaIntegration implements GameIntegration {
 
   @Override
   public void register(IntegrationContext context) {
-    context.tools().register(getStatus());
-    context.tools().register(getGameInfo());
-    context.tools().register(getPlayer());
-    context.tools().register(getInventory());
-    context.tools().register(getEquipment());
-    context.tools().register(getTargetBlock());
-    context.tools().register(getNearbyEntities());
-    context.tools().register(getRecipe());
-    context.tools().register(searchItems());
-    context.tools().register(getCapabilities(context));
+    register(context, getStatus());
+    register(context, getGameInfo());
+    register(context, getPlayer());
+    register(context, getInventory());
+    register(context, getEquipment());
+    register(context, getTargetBlock());
+    register(context, getNearbyEntities());
+    register(context, getRecipe());
+    register(context, searchItems());
+    register(context, getCapabilities(context));
   }
 
   private GameTool<EmptyInput, SessionStatus> getStatus() {
@@ -242,6 +256,12 @@ public final class VanillaIntegration implements GameIntegration {
 
   private static JsonCodec<EmptyInput> emptyInputCodec() {
     return JsonCodec.of(EmptyInput.class, VanillaToolSchemas.EMPTY_INPUT);
+  }
+
+  private void register(IntegrationContext context, GameTool<?, ?> tool) {
+    if (enabledTools.test(tool.id())) {
+      context.tools().register(tool);
+    }
   }
 
   private static <I, O> GameTool<I, O> tool(

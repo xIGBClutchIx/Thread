@@ -10,6 +10,8 @@ import com.google.gson.JsonParser;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
 import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.integration.GameIntegration;
 import me.clutchy.thread.core.integration.IntegrationContext;
@@ -41,6 +43,7 @@ import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.testing.TestJsonContracts;
 import me.clutchy.thread.core.tool.ToolAvailability;
 import me.clutchy.thread.core.tool.ToolDescriptor;
+import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
@@ -213,11 +216,37 @@ class VanillaIntegrationTest {
             .toList());
   }
 
+  @Test
+  void disabledToolsNeverEnterDiscoveryOrCapabilities() {
+    Set<String> enabled = Set.of("minecraft.get_status", "minecraft.get_capabilities");
+    Catalog catalog =
+        catalog(
+            new SupportedGameProvider(),
+            new FakePlayerProvider(),
+            toolId -> enabled.contains(toolId.value()));
+
+    assertEquals(
+        List.of("minecraft.get_capabilities", "minecraft.get_status"),
+        catalog.tools().descriptors().stream().map(tool -> tool.id().value()).toList());
+    assertEquals(
+        List.of("minecraft.get_capabilities", "minecraft.get_status"),
+        strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools"));
+    assertEquals(
+        me.clutchy.thread.core.error.ToolErrorCode.NOT_FOUND,
+        catalog.tools().invoke("minecraft.get_player", object("{}")).error().code());
+  }
+
   private static Catalog catalog(GameProvider game, PlayerProvider player) {
+    return catalog(game, player, ignored -> true);
+  }
+
+  private static Catalog catalog(
+      GameProvider game, PlayerProvider player, Predicate<ToolId> enabledTools) {
     ToolRegistry tools = new ToolRegistry();
     IntegrationRegistry integrations = new IntegrationRegistry(tools, new ContextRegistry());
     integrations.register(
-        new VanillaIntegration(game, player, new FakeWorldProvider(), new FakeRecipeProvider()));
+        new VanillaIntegration(
+            game, player, new FakeWorldProvider(), new FakeRecipeProvider(), enabledTools));
     return new Catalog(tools, integrations);
   }
 

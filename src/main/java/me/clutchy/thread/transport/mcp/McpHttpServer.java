@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import me.clutchy.thread.core.tool.ToolRegistry;
 
@@ -28,20 +29,21 @@ public final class McpHttpServer implements AutoCloseable {
   private static final String JSON_MEDIA_TYPE = "application/json";
   private static final String SESSION_ID_HEADER = "Mcp-Session-Id";
   private static final String SSE_MEDIA_TYPE = "text/event-stream";
+  private static final System.Logger LOGGER = System.getLogger(McpHttpServer.class.getName());
 
   private final HttpServer server;
   private final ExecutorService executor;
   private final McpServerOptions options;
   private final McpJsonRpcHandler rpc;
+  private final Semaphore requestPermits;
   private final AtomicBoolean running = new AtomicBoolean();
 
   private McpHttpServer(ToolRegistry tools, McpServerOptions options) throws IOException {
     this.options = Objects.requireNonNull(options, "options");
     rpc = new McpJsonRpcHandler(Objects.requireNonNull(tools, "tools"), options);
+    requestPermits = new Semaphore(options.maxConcurrentRequests());
     server = HttpServer.create(new InetSocketAddress(options.bindAddress(), options.port()), 0);
-    executor =
-        Executors.newThreadPerTaskExecutor(
-            Thread.ofPlatform().daemon(true).name("thread-mcp-", 0).factory());
+    executor = Executors.newVirtualThreadPerTaskExecutor();
     server.setExecutor(executor);
     server.createContext(ENDPOINT_PATH, this::handle);
   }
@@ -79,13 +81,40 @@ public final class McpHttpServer implements AutoCloseable {
   }
 
   private void handle(HttpExchange exchange) throws IOException {
+    long started = System.nanoTime();
+    if (!requestPermits.tryAcquire()) {
+      McpHttpResponse busy =
+          rpc.invalidRequest("Thread MCP is busy; retry the request later").withStatus(503);
+      write(exchange, busy);
+      logCompletion(busy.status(), started);
+      return;
+    }
     McpHttpResponse response;
     try {
-      response = validateAndHandle(exchange);
-    } catch (RuntimeException exception) {
-      response = rpc.internalError(JsonNull.INSTANCE);
+      try {
+        response = validateAndHandle(exchange);
+      } catch (RuntimeException exception) {
+        // Do not log request bodies, arguments, exception messages, or state-bearing results.
+        LOGGER.log(
+            System.Logger.Level.ERROR,
+            "MCP request failed unexpectedly ({0})",
+            exception.getClass().getName());
+        response = rpc.internalError(JsonNull.INSTANCE);
+      }
+      write(exchange, response);
+      logCompletion(response.status(), started);
+    } finally {
+      requestPermits.release();
     }
-    write(exchange, response);
+  }
+
+  private static void logCompletion(int status, long started) {
+    long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+    LOGGER.log(
+        System.Logger.Level.DEBUG,
+        "MCP request completed with HTTP {0} in {1} ms",
+        status,
+        elapsedMillis);
   }
 
   private McpHttpResponse validateAndHandle(HttpExchange exchange) throws IOException {

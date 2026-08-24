@@ -1,6 +1,6 @@
 package me.clutchy.thread.platform.fabric.game;
 
-/** Hard safety bounds used by live providers until Slice 5 makes them configurable. */
+/** Server-enforced safety bounds used by live Fabric providers. */
 public record FabricProviderLimits(
     double maxEntityRadius,
     int maxEntityResults,
@@ -32,5 +32,12 @@ public record FabricProviderLimits(
   /** Returns conservative V1 limits for loaded-state queries. */
   public static FabricProviderLimits defaults() {
     return new FabricProviderLimits(64, 128, 8_192, 64, 16_384, 256);
+  }
+
+  /** Returns configured player-facing limits while preserving fixed internal registry ceilings. */
+  public static FabricProviderLimits configured(
+      double maxEntityRadius, int maxEntityResults, int maxItemSearchResults) {
+    return new FabricProviderLimits(
+        maxEntityRadius, maxEntityResults, 8_192, maxItemSearchResults, 16_384, 256);
   }
 }

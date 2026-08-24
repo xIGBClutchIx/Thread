@@ -117,12 +117,28 @@ interoperability may replace the narrow wire implementation without changing cor
   same-port restart. The Fabric client game test invokes discovery, status, game info, and inventory
   through the real HTTP listener from menu and loaded-world states.
 
+## Slice 5 hardening
+
+- `config/thread.json` persists listener enablement, explicit loopback host, port, registered tool
+  selectors, provider result limits, request size, game-thread deadline, and request concurrency.
+- Disabled tools are filtered before registration, so `tools/list`, invocation, and
+  `minecraft.get_capabilities` all share the same catalog.
+- Configuration cannot opt into a non-loopback listener or exceed Thread's hard safety ceilings.
+- A semaphore bounds concurrently handled requests. Excess work receives a controlled HTTP 503;
+  accepted work runs on lightweight virtual threads without an unbounded platform-thread pool.
+- Client and integrated-server dispatch use the configured deadline. Timed-out futures are
+  cancelled and returned as retryable `TIMEOUT` tool errors; lifecycle-time task rejection is a
+  retryable `NOT_AVAILABLE` result.
+- Transport diagnostics record only status, duration, and unexpected exception class. Request
+  bodies, tool arguments, exception messages, inventories, and world results are not logged.
+
 ## Transport and security
 
 - bind only to `127.0.0.1`/loopback in V1
 - validate browser `Origin` values against loopback hosts
 - require the `2026-07-28` protocol and mirrored routing headers
-- cap request bodies at 1 MiB until Slice 5 makes the setting persistent
+- cap request bodies at the configured value (1 MiB by default, with a fixed 8 MiB hard ceiling)
+- bound concurrent requests (8 by default, with a fixed ceiling of 32)
 - do not log complete inventories/world results at normal log levels
 - validate input schemas before reaching providers
 - enforce Thread's own query limits even if protocol/client validation exists

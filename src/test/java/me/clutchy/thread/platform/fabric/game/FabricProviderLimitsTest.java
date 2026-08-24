@@ -26,4 +26,16 @@ class FabricProviderLimitsTest {
     assertThrows(
         IllegalArgumentException.class, () -> new FabricProviderLimits(64, 128, 8_192, 64, 0, 256));
   }
+
+  @Test
+  void configuredLimitsPreserveFixedRegistryCeilings() {
+    FabricProviderLimits limits = FabricProviderLimits.configured(24, 20, 10);
+
+    assertEquals(24, limits.maxEntityRadius());
+    assertEquals(20, limits.maxEntityResults());
+    assertEquals(10, limits.maxItemSearchResults());
+    assertEquals(FabricProviderLimits.defaults().maxItemDefinitions(), limits.maxItemDefinitions());
+    assertEquals(
+        FabricProviderLimits.defaults().maxRecipeDefinitions(), limits.maxRecipeDefinitions());
+  }
 }

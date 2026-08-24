@@ -2,6 +2,7 @@ package me.clutchy.thread.transport.mcp;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Locale;
 import java.util.Objects;
 
 /** Immutable local HTTP listener and server-identity settings for the Thread MCP adapter. */
@@ -9,13 +10,17 @@ public record McpServerOptions(
     InetAddress bindAddress,
     int port,
     int maxRequestBytes,
+    int maxConcurrentRequests,
     String serverName,
     String serverVersion) {
-  /** Default local port used until persistent transport configuration is introduced. */
+  /** Default local port. */
   public static final int DEFAULT_PORT = 25_580;
 
-  /** Fixed safety bound used until Slice 5 makes the request limit configurable. */
+  /** Default HTTP request-body safety bound. */
   public static final int DEFAULT_MAX_REQUEST_BYTES = 1_048_576;
+
+  /** Default number of simultaneously handled MCP requests. */
+  public static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 8;
 
   public McpServerOptions {
     Objects.requireNonNull(bindAddress, "bindAddress");
@@ -28,6 +33,9 @@ public record McpServerOptions(
     if (maxRequestBytes < 1) {
       throw new IllegalArgumentException("maxRequestBytes must be positive");
     }
+    if (maxConcurrentRequests < 1) {
+      throw new IllegalArgumentException("maxConcurrentRequests must be positive");
+    }
     if (serverName == null || serverName.isBlank()) {
       throw new IllegalArgumentException("serverName must not be blank");
     }
@@ -39,13 +47,39 @@ public record McpServerOptions(
   /** Returns the V1 loopback listener defaults for the supplied Thread version. */
   public static McpServerOptions loopbackDefaults(String serverVersion) {
     return new McpServerOptions(
-        ipv4Loopback(), DEFAULT_PORT, DEFAULT_MAX_REQUEST_BYTES, "Thread", serverVersion);
+        ipv4Loopback(),
+        DEFAULT_PORT,
+        DEFAULT_MAX_REQUEST_BYTES,
+        DEFAULT_MAX_CONCURRENT_REQUESTS,
+        "Thread",
+        serverVersion);
   }
 
   /** Returns loopback options using an ephemeral port, primarily for isolated tests. */
   public static McpServerOptions ephemeral(String serverVersion) {
     return new McpServerOptions(
-        ipv4Loopback(), 0, DEFAULT_MAX_REQUEST_BYTES, "Thread", serverVersion);
+        ipv4Loopback(),
+        0,
+        DEFAULT_MAX_REQUEST_BYTES,
+        DEFAULT_MAX_CONCURRENT_REQUESTS,
+        "Thread",
+        serverVersion);
+  }
+
+  /** Returns validated persistent listener settings for the supplied Thread version. */
+  public static McpServerOptions configured(
+      String bindHost,
+      int port,
+      int maxRequestBytes,
+      int maxConcurrentRequests,
+      String serverVersion) {
+    return new McpServerOptions(
+        explicitLoopback(bindHost),
+        port,
+        maxRequestBytes,
+        maxConcurrentRequests,
+        "Thread",
+        serverVersion);
   }
 
   private static InetAddress ipv4Loopback() {
@@ -53,6 +87,25 @@ public record McpServerOptions(
       return InetAddress.getByAddress(new byte[] {127, 0, 0, 1});
     } catch (UnknownHostException exception) {
       throw new AssertionError("IPv4 loopback literal should always be valid", exception);
+    }
+  }
+
+  private static InetAddress explicitLoopback(String host) {
+    Objects.requireNonNull(host, "bindHost");
+    return switch (host.strip().toLowerCase(Locale.ROOT)) {
+      case "127.0.0.1", "localhost" -> ipv4Loopback();
+      case "::1", "[::1]" -> ipv6Loopback();
+      default -> throw new IllegalArgumentException("V1 MCP bind host must be explicit loopback");
+    };
+  }
+
+  private static InetAddress ipv6Loopback() {
+    byte[] address = new byte[16];
+    address[15] = 1;
+    try {
+      return InetAddress.getByAddress(address);
+    } catch (UnknownHostException exception) {
+      throw new AssertionError("IPv6 loopback literal should always be valid", exception);
     }
   }
 }

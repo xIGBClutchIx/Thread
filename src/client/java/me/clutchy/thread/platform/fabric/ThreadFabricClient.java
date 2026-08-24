@@ -1,9 +1,11 @@
 package me.clutchy.thread.platform.fabric;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import me.clutchy.thread.config.ThreadConfig;
+import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
@@ -45,11 +47,14 @@ public final class ThreadFabricClient implements ClientModInitializer {
             requiredVersion(loader, MOD_ID),
             requiredVersion(loader, "minecraft"),
             requiredVersion(loader, "fabricloader"));
-    ThreadConfig config = ThreadConfig.defaults();
+    ThreadConfig config = loadConfig(loader);
+    Duration gameThreadTimeout = Duration.ofMillis(config.gameThreadTimeoutMillis());
     Minecraft client = Minecraft.getInstance();
-    GameThreadExecutor clientThread = MinecraftThreadExecutor.forClient(client);
+    GameThreadExecutor clientThread = MinecraftThreadExecutor.forClient(client, gameThreadTimeout);
     FabricSessionGuard sessionGuard = new FabricSessionGuard();
-    FabricProviderLimits limits = FabricProviderLimits.defaults();
+    FabricProviderLimits limits =
+        FabricProviderLimits.configured(
+            config.maxEntityRadius(), config.maxEntityResults(), config.maxItemSearchResults());
     FabricDtoMapper mapper = new FabricDtoMapper();
 
     providers =
@@ -57,41 +62,52 @@ public final class ThreadFabricClient implements ClientModInitializer {
             new FabricGameProvider(client, clientThread, versions.gameInfo()),
             new FabricPlayerProvider(client, clientThread, sessionGuard, mapper),
             new FabricWorldProvider(client, clientThread, sessionGuard, limits, mapper),
-            new FabricRecipeProvider(client, clientThread, sessionGuard, limits, mapper));
+            new FabricRecipeProvider(
+                client, clientThread, sessionGuard, limits, mapper, gameThreadTimeout));
 
     ToolRegistry toolRegistry = new ToolRegistry();
     IntegrationRegistry integrationRegistry =
         new IntegrationRegistry(toolRegistry, new ContextRegistry());
     integrationRegistry.register(
         new VanillaIntegration(
-            providers.game(), providers.player(), providers.world(), providers.recipe()));
+            providers.game(),
+            providers.player(),
+            providers.world(),
+            providers.recipe(),
+            config::toolEnabled));
     tools = toolRegistry;
 
     ClientLifecycleEvents.CLIENT_STOPPING.register(ignored -> stopMcpServer());
     if (config.mcpEnabled()) {
-      startMcpServer(versions.threadVersion());
+      startMcpServer(config, versions.threadVersion());
     }
 
     LOGGER.info(versions.startupMessage());
-    LOGGER.debug(
-        "Thread configuration defaults initialized (MCP enabled: {})", config.mcpEnabled());
+    LOGGER.debug("Thread configuration loaded (MCP enabled: {})", config.mcpEnabled());
     // Fabric invokes this entrypoint before Minecraft's client task loop is ready. Constructing
     // providers is safe here, but even a read-only dispatch must wait until initialization returns.
     LOGGER.debug(
         "Thread live providers and {} vanilla tools initialized", tools.descriptors().size());
   }
 
-  private void startMcpServer(String threadVersion) {
+  private void startMcpServer(ThreadConfig config, String threadVersion) {
     try {
-      mcpServer = McpHttpServer.start(tools(), McpServerOptions.loopbackDefaults(threadVersion));
+      McpServerOptions options =
+          McpServerOptions.configured(
+              config.mcpBindHost(),
+              config.mcpPort(),
+              config.maxRequestBytes(),
+              config.maxConcurrentRequests(),
+              threadVersion);
+      mcpServer = McpHttpServer.start(tools(), options);
       LOGGER.info("Thread MCP listener started at {}", mcpServer.endpoint());
     } catch (IOException exception) {
-      // A local port conflict must not take down Minecraft. The error names the endpoint without
-      // serializing any game state, and a later configuration slice will make the port selectable.
+      // A local port conflict must not take down Minecraft. Do not include request or game state.
       LOGGER.error(
-          "Thread MCP listener could not bind to 127.0.0.1:{}",
-          McpServerOptions.DEFAULT_PORT,
-          exception);
+          "Thread MCP listener could not bind to {}:{} ({})",
+          config.mcpBindHost(),
+          config.mcpPort(),
+          exception.getClass().getSimpleName());
     }
   }
 
@@ -108,6 +124,18 @@ public final class ThreadFabricClient implements ClientModInitializer {
       throw new IllegalStateException("Required runtime component is not loaded: " + modId);
     }
     return container.orElseThrow().getMetadata().getVersion().getFriendlyString();
+  }
+
+  private static ThreadConfig loadConfig(FabricLoader loader) {
+    try {
+      return ThreadConfigLoader.loadOrCreate(loader.getConfigDir().resolve("thread.json"));
+    } catch (IOException | IllegalArgumentException exception) {
+      // Keep Minecraft usable and preserve invalid player input for correction.
+      LOGGER.error(
+          "Thread configuration could not be loaded; safe defaults will be used ({})",
+          exception.getClass().getSimpleName());
+      return ThreadConfig.defaults();
+    }
   }
 
   FabricProviderBundle providers() {

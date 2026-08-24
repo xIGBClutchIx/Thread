@@ -77,7 +77,35 @@ Use `./gradlew spotlessApply` to format local changes. CI only runs `spotlessChe
 rewrites source. Launch the development client with `./gradlew runClient`, or run the live
 provider and MCP verification with `./gradlew runClientGameTest`.
 
-The implementation through Slice 4 includes the ten read-only vanilla tools and a local MCP
+The implementation through Slice 5 includes ten configurable read-only vanilla tools and a local MCP
 `2026-07-28` Streamable HTTP endpoint at `http://127.0.0.1:25580/mcp`. The endpoint is enabled by
-the current defaults, starts with the Fabric client, and stops during client shutdown. Persistent
-port/tool configuration and the final user-facing connection guide belong to Slices 5 and 6.
+default, starts with the Fabric client, and stops during client shutdown. The final user-facing
+connection guide and release proof belong to Slice 6.
+
+## Configuration
+
+Thread creates `config/thread.json` on first client startup. Every field other than
+`schemaVersion` may be omitted to retain its safe default:
+
+```json
+{
+  "schemaVersion": 1,
+  "mcpEnabled": true,
+  "mcpBindHost": "127.0.0.1",
+  "mcpPort": 25580,
+  "enabledTools": ["minecraft.*"],
+  "maxEntityRadius": 64.0,
+  "maxEntityResults": 128,
+  "maxItemSearchResults": 64,
+  "maxRequestBytes": 1048576,
+  "gameThreadTimeoutMillis": 5000,
+  "maxConcurrentRequests": 8
+}
+```
+
+`enabledTools` accepts exact IDs and namespace wildcards such as `minecraft.*`; an empty array
+exposes no tools. Disabled tools are never registered, so they are absent from MCP discovery and
+capability results. V1 accepts only the explicit loopback hosts `127.0.0.1`, `localhost`, and `::1`.
+Thread also applies hard ceilings to every configurable safety limit. Invalid existing files are
+preserved for correction, logged without their contents, and replaced in memory by safe defaults
+for that launch.

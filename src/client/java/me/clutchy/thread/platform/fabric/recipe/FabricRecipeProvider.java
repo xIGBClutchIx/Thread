@@ -1,5 +1,6 @@
 package me.clutchy.thread.platform.fabric.recipe;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -48,18 +49,21 @@ public final class FabricRecipeProvider implements RecipeProvider {
   private final FabricSessionGuard sessionGuard;
   private final FabricProviderLimits limits;
   private final FabricDtoMapper mapper;
+  private final Duration gameThreadTimeout;
 
   public FabricRecipeProvider(
       Minecraft client,
       GameThreadExecutor clientThread,
       FabricSessionGuard sessionGuard,
       FabricProviderLimits limits,
-      FabricDtoMapper mapper) {
+      FabricDtoMapper mapper,
+      Duration gameThreadTimeout) {
     this.client = Objects.requireNonNull(client, "client");
     this.clientThread = Objects.requireNonNull(clientThread, "clientThread");
     this.sessionGuard = Objects.requireNonNull(sessionGuard, "sessionGuard");
     this.limits = Objects.requireNonNull(limits, "limits");
     this.mapper = Objects.requireNonNull(mapper, "mapper");
+    this.gameThreadTimeout = Objects.requireNonNull(gameThreadTimeout, "gameThreadTimeout");
   }
 
   @Override
@@ -74,7 +78,8 @@ public final class FabricRecipeProvider implements RecipeProvider {
     RecipeReadContext context = Objects.requireNonNull(contextResult.value());
     // RecipeManager belongs to the integrated server. Leaving the client task before waiting on
     // the server avoids holding one game thread while another performs the bounded snapshot.
-    GameThreadExecutor serverThread = MinecraftThreadExecutor.forServer(context.server());
+    GameThreadExecutor serverThread =
+        MinecraftThreadExecutor.forServer(context.server(), gameThreadTimeout);
     return FabricProviderSupport.read(
         serverThread, "get_recipe.recipes", () -> readRecipes(context));
   }

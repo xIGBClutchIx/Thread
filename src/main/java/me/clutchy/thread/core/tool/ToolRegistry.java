@@ -12,6 +12,8 @@ import me.clutchy.thread.core.serialization.JsonCodec;
 
 /** Deterministic registry and transport-neutral invocation boundary for game tools. */
 public final class ToolRegistry {
+  private static final System.Logger LOGGER = System.getLogger(ToolRegistry.class.getName());
+
   private final ConcurrentSkipListMap<ToolId, RegisteredTool<?, ?>> tools =
       new ConcurrentSkipListMap<>();
 
@@ -86,6 +88,11 @@ public final class ToolRegistry {
     try {
       executed = Objects.requireNonNull(registered.tool().execute(decoded.value()), "tool result");
     } catch (RuntimeException exception) {
+      LOGGER.log(
+          System.Logger.Level.ERROR,
+          "Tool {0} failed unexpectedly ({1})",
+          registered.descriptor().id(),
+          exception.getClass().getName());
       return ToolResult.failure(
           new ToolError(
               ToolErrorCode.INTERNAL_ERROR,
@@ -94,6 +101,11 @@ public final class ToolRegistry {
               Map.of("toolId", registered.descriptor().id().toString())));
     }
     if (!executed.successful()) {
+      LOGGER.log(
+          System.Logger.Level.DEBUG,
+          "Tool {0} returned controlled error {1}",
+          registered.descriptor().id(),
+          Objects.requireNonNull(executed.error()).code());
       return ToolResult.failure(executed.error());
     }
     return registered.outputCodec().encode(executed.value());

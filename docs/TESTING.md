@@ -116,6 +116,7 @@ Verify:
 - rejection of the retired initialization, session-header, and cancellation-notification flow
 - Base64-encoded MCP names
 - loopback Origin, content type, request size, and listener bind enforcement
+- bounded concurrent request rejection without queueing more tool work
 - repeated independent clients, idempotent shutdown, and same-port restart
 
 Do not require Minecraft for most MCP tests.
@@ -126,6 +127,12 @@ The Fabric client game test additionally starts the production listener at
 `minecraft.get_game_info`, verifies a known live inventory through `minecraft.get_inventory`, and
 confirms an invalid MCP call does not stop the listener. Normal client shutdown must log that the
 listener stopped.
+
+Slice 5 unit coverage also verifies persistent configuration creation/validation, pre-registration
+tool filtering, server-enforced provider limits, game-thread timeout cancellation, and controlled
+shutdown-time dispatch rejection. Together, the timeout and rejected-dispatch cases model an
+in-flight request spanning a world or integrated-server teardown without allowing the exception to
+escape the tool boundary.
 
 ## Manual end-to-end smoke test
 

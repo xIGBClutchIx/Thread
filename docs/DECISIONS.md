@@ -238,3 +238,17 @@ Why:
 - output validation catches DTO/schema drift before transport serialization;
 - using the runtime-provided library keeps the mod dependency surface small;
 - the MCP adapter can translate JSON without leaking protocol types into core abstractions.
+
+## D019: V1 configuration cannot weaken local security boundaries
+
+**Status:** Accepted
+
+Slice 5 persists a versioned `config/thread.json` using Minecraft-provided Gson. Configuration may
+disable the listener, choose an explicit loopback host and port, filter registered tools, and lower
+or raise bounded query/transport limits within fixed hard ceilings.
+
+Non-loopback hosts remain invalid rather than becoming an expert-mode opt-in. Disabled tools are
+filtered before registry insertion so discovery cannot advertise an unusable or forbidden tool.
+Invalid files are preserved and the launch falls back to safe defaults without logging the file
+contents. The MCP request-concurrency limit and game-thread deadline are also server-enforced;
+clients cannot override them per call.

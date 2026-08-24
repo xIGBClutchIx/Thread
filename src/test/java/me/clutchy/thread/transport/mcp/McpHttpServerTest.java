@@ -18,7 +18,19 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import me.clutchy.thread.core.error.ToolError;
+import me.clutchy.thread.core.error.ToolErrorCode;
+import me.clutchy.thread.core.serialization.JsonCodec;
+import me.clutchy.thread.core.testing.TestJsonContracts;
+import me.clutchy.thread.core.tool.GameTool;
+import me.clutchy.thread.core.tool.ToolCapabilities;
+import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolRegistry;
+import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
 
 class McpHttpServerTest {
@@ -214,7 +226,12 @@ class McpHttpServerTest {
     McpServerOptions defaults = McpServerOptions.ephemeral("test");
     McpServerOptions limited =
         new McpServerOptions(
-            defaults.bindAddress(), 0, 256, defaults.serverName(), defaults.serverVersion());
+            defaults.bindAddress(),
+            0,
+            256,
+            defaults.maxConcurrentRequests(),
+            defaults.serverName(),
+            defaults.serverVersion());
     try (McpHttpServer server = McpHttpServer.start(registryWithEchoTool(), limited)) {
       JsonObject list = request(17, "tools/list");
       HttpResponse<String> hostileOrigin =
@@ -348,6 +365,7 @@ class McpHttpServerTest {
             InetAddress.getByName("127.0.0.1"),
             port,
             McpServerOptions.DEFAULT_MAX_REQUEST_BYTES,
+            McpServerOptions.DEFAULT_MAX_CONCURRENT_REQUESTS,
             "Thread",
             "test");
     try (McpHttpServer restarted = McpHttpServer.start(registry, restartOptions)) {
@@ -359,7 +377,48 @@ class McpHttpServerTest {
   void optionsRejectNonLoopbackListeners() throws Exception {
     assertThrows(
         IllegalArgumentException.class,
-        () -> new McpServerOptions(InetAddress.getByName("0.0.0.0"), 1234, 1024, "Thread", "test"));
+        () ->
+            new McpServerOptions(
+                InetAddress.getByName("0.0.0.0"), 1234, 1024, 8, "Thread", "test"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> McpServerOptions.configured("192.168.1.10", 1234, 1024, 8, "test"));
+  }
+
+  @Test
+  void rejectsExcessConcurrentRequestsWithoutUnboundedWork() throws Exception {
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    ToolRegistry registry = new ToolRegistry();
+    registry.register(new BlockingEchoTool(entered, release));
+    McpServerOptions defaults = McpServerOptions.ephemeral("test");
+    McpServerOptions singleRequest =
+        new McpServerOptions(
+            defaults.bindAddress(),
+            0,
+            defaults.maxRequestBytes(),
+            1,
+            defaults.serverName(),
+            defaults.serverVersion());
+
+    try (McpHttpServer server = McpHttpServer.start(registry, singleRequest)) {
+      JsonObject firstCall = request(30, "tools/call");
+      firstCall.getAsJsonObject("params").addProperty("name", "test.blocking_echo");
+      firstCall.getAsJsonObject("params").add("arguments", object("message", "first"));
+      CompletableFuture<HttpResponse<String>> first = postAsync(server.endpoint(), firstCall);
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+
+      JsonObject secondCall = request(31, "tools/call");
+      secondCall.getAsJsonObject("params").addProperty("name", "test.blocking_echo");
+      secondCall.getAsJsonObject("params").add("arguments", object("message", "second"));
+      HttpResponse<String> busy = post(server.endpoint(), secondCall);
+
+      assertEquals(503, busy.statusCode());
+      release.countDown();
+      assertEquals(200, first.get(2, TimeUnit.SECONDS).statusCode());
+    } finally {
+      release.countDown();
+    }
   }
 
   private static ToolRegistry registryWithEchoTool() {
@@ -400,6 +459,19 @@ class McpHttpServerTest {
     String protocol =
         params.getAsJsonObject("_meta").get(McpJsonRpcHandler.PROTOCOL_VERSION_META).getAsString();
     return send(endpoint, request.toString(), protocol, method, name, null, null);
+  }
+
+  private static CompletableFuture<HttpResponse<String>> postAsync(
+      URI endpoint, JsonObject request) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          try {
+            return post(endpoint, request);
+          } catch (IOException | InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new CompletionException(exception);
+          }
+        });
   }
 
   private static HttpResponse<String> send(
@@ -448,5 +520,58 @@ class McpHttpServerTest {
         result.getAsJsonObject("_meta").getAsJsonObject(McpJsonRpcHandler.SERVER_INFO_META);
     assertEquals("Thread", serverInfo.get("name").getAsString());
     assertEquals(version, serverInfo.get("version").getAsString());
+  }
+
+  private static final class BlockingEchoTool
+      implements GameTool<TestJsonContracts.Message, TestJsonContracts.Message> {
+    private final CountDownLatch entered;
+    private final CountDownLatch release;
+    private final JsonCodec<TestJsonContracts.Message> codec = TestJsonContracts.messageCodec();
+
+    private BlockingEchoTool(CountDownLatch entered, CountDownLatch release) {
+      this.entered = entered;
+      this.release = release;
+    }
+
+    @Override
+    public ToolId id() {
+      return ToolId.of("test.blocking_echo");
+    }
+
+    @Override
+    public String description() {
+      return "Waits for the transport concurrency test to release it.";
+    }
+
+    @Override
+    public JsonCodec<TestJsonContracts.Message> inputCodec() {
+      return codec;
+    }
+
+    @Override
+    public JsonCodec<TestJsonContracts.Message> outputCodec() {
+      return codec;
+    }
+
+    @Override
+    public ToolCapabilities capabilities() {
+      return ToolCapabilities.alwaysAvailable();
+    }
+
+    @Override
+    public ToolResult<TestJsonContracts.Message> execute(TestJsonContracts.Message input) {
+      entered.countDown();
+      try {
+        if (!release.await(5, TimeUnit.SECONDS)) {
+          return ToolResult.failure(
+              ToolError.of(ToolErrorCode.TIMEOUT, "Test release did not arrive.", true));
+        }
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        return ToolResult.failure(
+            ToolError.of(ToolErrorCode.NOT_AVAILABLE, "Test request was interrupted.", true));
+      }
+      return ToolResult.success(input);
+    }
   }
 }

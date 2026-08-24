@@ -9,6 +9,7 @@ public enum ToolErrorCode {
   NOT_FOUND,
   OUT_OF_RANGE,
   RESULT_LIMIT_EXCEEDED,
+  TIMEOUT,
   UNSUPPORTED,
   INTERNAL_ERROR
 }
