@@ -14,7 +14,7 @@
     <module name="TreeWalker">
         <module name="AvoidStarImport"/>
         <module name="IllegalImport">
-            <property name="illegalPkgs" value="sun, com.sun, jdk.internal"/>
+            <property name="illegalPkgs" value="sun, jdk.internal"/>
         </module>
         <module name="OuterTypeFilename"/>
         <module name="OneTopLevelClass"/>

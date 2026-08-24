@@ -104,20 +104,26 @@ Verify:
 
 ## MCP adapter tests
 
-Use the transport against a fake `ToolRegistry` where possible.
+`McpHttpServerTest` starts the real JDK HTTP listener on ephemeral loopback ports against a fake
+`ToolRegistry`. It verifies:
 
-Verify:
-
-- tool list mirrors registry metadata
-- tool schemas are valid
-- calls map to the correct tool
-- structured tool output survives protocol conversion
-- tool errors map correctly
-- malformed input fails safely
-- request size limits work
-- clean server shutdown works
+- discovery identity/version/capability metadata
+- tool list metadata, deterministic registry mapping, and input/output schemas
+- structured success and tool-error results
+- unknown methods/tools and malformed JSON-RPC requests
+- protocol version and mirrored `Mcp-Method`/`Mcp-Name` validation
+- Base64-encoded MCP names
+- loopback Origin, content type, request size, and listener bind enforcement
+- repeated independent clients, idempotent shutdown, and same-port restart
 
 Do not require Minecraft for most MCP tests.
+
+The Fabric client game test additionally starts the production listener at
+`http://127.0.0.1:25580/mcp`. It performs `server/discover` and `tools/list`, calls
+`minecraft.get_status` from the main menu and a loaded temporary world, calls
+`minecraft.get_game_info`, verifies a known live inventory through `minecraft.get_inventory`, and
+confirms an invalid MCP call does not stop the listener. Normal client shutdown must log that the
+listener stopped.
 
 ## Manual end-to-end smoke test
 

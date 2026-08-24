@@ -51,6 +51,26 @@ class ArchitectureBoundaryTest {
   }
 
   @Test
+  void onlyTheSupportedJdkHttpServerUsesTheComSunNamespace() throws IOException {
+    for (Path source : productionJavaSources()) {
+      String contents = Files.readString(source, StandardCharsets.UTF_8);
+      List<String> comSunImports =
+          contents
+              .lines()
+              .map(String::trim)
+              .filter(line -> line.startsWith("import com.sun."))
+              .toList();
+      if (!comSunImports.isEmpty()) {
+        assertTrue(normalizedPath(source).contains("/transport/mcp/"), source::toString);
+        assertTrue(
+            comSunImports.stream()
+                .allMatch(line -> line.startsWith("import com.sun.net.httpserver.")),
+            source::toString);
+      }
+    }
+  }
+
+  @Test
   void packageInfoFilesAreNotUsed() throws IOException {
     for (Path source : productionJavaSources()) {
       assertFalse(source.getFileName().toString().equals("package-info.java"), source::toString);

@@ -222,6 +222,26 @@ MCP requests may arrive on HTTP/server threads. Minecraft state must not be read
 
 Do not hide unsafe cross-thread reads behind `synchronized`.
 
+## MCP transport
+
+`transport.mcp` implements the narrow MCP `2026-07-28` Streamable HTTP boundary. Its only game
+facing dependency is `ToolRegistry`:
+
+```text
+HTTP server/discover -> transport-owned server metadata
+HTTP tools/list      -> ToolRegistry.descriptors()
+HTTP tools/call      -> ToolRegistry.invoke(...)
+```
+
+The adapter owns HTTP, Origin, protocol/header, JSON-RPC, schema, and result/error translation.
+It never imports Fabric/Minecraft types or calls providers directly. Requests execute on daemon
+transport workers; provider-owned `GameThreadExecutor` implementations remain responsible for
+marshalling live reads onto Minecraft's logical threads.
+
+V1 starts one `127.0.0.1` listener after built-in tool registration and closes it from the Fabric
+client-stopping event. The wire surface is stateless: it does not implement the retired MCP
+initialization/session flow or legacy HTTP+SSE.
+
 ## Client vs logical server state
 
 Minecraft has a logical server even in singleplayer. V1 should be explicit about where each fact comes from.

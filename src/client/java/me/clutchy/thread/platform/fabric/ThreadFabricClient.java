@@ -1,5 +1,6 @@
 package me.clutchy.thread.platform.fabric;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 import me.clutchy.thread.config.ThreadConfig;
@@ -16,7 +17,10 @@ import me.clutchy.thread.platform.fabric.player.FabricPlayerProvider;
 import me.clutchy.thread.platform.fabric.recipe.FabricRecipeProvider;
 import me.clutchy.thread.platform.fabric.threading.MinecraftThreadExecutor;
 import me.clutchy.thread.platform.fabric.world.FabricWorldProvider;
+import me.clutchy.thread.transport.mcp.McpHttpServer;
+import me.clutchy.thread.transport.mcp.McpServerOptions;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.client.Minecraft;
@@ -31,6 +35,7 @@ public final class ThreadFabricClient implements ClientModInitializer {
 
   private FabricProviderBundle providers;
   private ToolRegistry tools;
+  private McpHttpServer mcpServer;
 
   @Override
   public void onInitializeClient() {
@@ -62,6 +67,11 @@ public final class ThreadFabricClient implements ClientModInitializer {
             providers.game(), providers.player(), providers.world(), providers.recipe()));
     tools = toolRegistry;
 
+    ClientLifecycleEvents.CLIENT_STOPPING.register(ignored -> stopMcpServer());
+    if (config.mcpEnabled()) {
+      startMcpServer(versions.threadVersion());
+    }
+
     LOGGER.info(versions.startupMessage());
     LOGGER.debug(
         "Thread configuration defaults initialized (MCP enabled: {})", config.mcpEnabled());
@@ -69,6 +79,27 @@ public final class ThreadFabricClient implements ClientModInitializer {
     // providers is safe here, but even a read-only dispatch must wait until initialization returns.
     LOGGER.debug(
         "Thread live providers and {} vanilla tools initialized", tools.descriptors().size());
+  }
+
+  private void startMcpServer(String threadVersion) {
+    try {
+      mcpServer = McpHttpServer.start(tools(), McpServerOptions.loopbackDefaults(threadVersion));
+      LOGGER.info("Thread MCP listener started at {}", mcpServer.endpoint());
+    } catch (IOException exception) {
+      // A local port conflict must not take down Minecraft. The error names the endpoint without
+      // serializing any game state, and a later configuration slice will make the port selectable.
+      LOGGER.error(
+          "Thread MCP listener could not bind to 127.0.0.1:{}",
+          McpServerOptions.DEFAULT_PORT,
+          exception);
+    }
+  }
+
+  private void stopMcpServer() {
+    if (mcpServer != null && mcpServer.running()) {
+      mcpServer.close();
+      LOGGER.info("Thread MCP listener stopped");
+    }
   }
 
   private static String requiredVersion(FabricLoader loader, String modId) {
@@ -85,5 +116,9 @@ public final class ThreadFabricClient implements ClientModInitializer {
 
   ToolRegistry tools() {
     return Objects.requireNonNull(tools, "tools have not been initialized");
+  }
+
+  McpHttpServer mcpServer() {
+    return Objects.requireNonNull(mcpServer, "MCP server is not running");
   }
 }

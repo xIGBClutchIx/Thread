@@ -74,7 +74,10 @@ Run the complete local quality gate with:
 ```
 
 Use `./gradlew spotlessApply` to format local changes. CI only runs `spotlessCheck`; it never
-rewrites source. Launch the development client with `./gradlew runClient`.
+rewrites source. Launch the development client with `./gradlew runClient`, or run the live
+provider and MCP verification with `./gradlew runClientGameTest`.
 
-Slice 0 intentionally contains no game-state tools or MCP server. It establishes the build,
-runtime bootstrap, package boundaries, and protocol decision that later slices build upon.
+The implementation through Slice 4 includes the ten read-only vanilla tools and a local MCP
+`2026-07-28` Streamable HTTP endpoint at `http://127.0.0.1:25580/mcp`. The endpoint is enabled by
+the current defaults, starts with the Fabric client, and stops during client shutdown. Persistent
+port/tool configuration and the final user-facing connection guide belong to Slices 5 and 6.

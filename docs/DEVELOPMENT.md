@@ -125,6 +125,10 @@ If the configured Gradle lifecycle makes some of these tasks redundant, that is 
 
 Codex should normally run `spotlessApply` before the final check when it has changed Java or other Spotless-managed files.
 
+The MCP adapter uses `com.sun.net.httpserver`, the supported API exported by the JDK's
+`jdk.httpserver` module. The architecture test confines any `com.sun` production import to that
+specific API under `transport.mcp`; other internal JDK namespaces remain forbidden.
+
 ## GitHub Actions
 
 V1 should include GitHub Actions under `.github/workflows/`.

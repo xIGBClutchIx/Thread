@@ -23,8 +23,7 @@ The MCP adapter owns:
 
 ## Protocol target
 
-The Slice 0 investigation was refreshed on 2026-08-24. Re-check the ecosystem before Slice 4 in
-case a compatible Java SDK has shipped.
+The Slice 0 investigation was refreshed immediately before Slice 4 on 2026-08-24.
 
 As of 2026-08-24:
 
@@ -37,7 +36,8 @@ As of 2026-08-24:
 
 ## Java SDK compatibility caveat
 
-As of 2026-08-19, the official MCP Java SDK active 2.0.x line reports support for the `2025-11-25` MCP specification, not `2026-07-28`.
+As of 2026-08-24, the official MCP Java SDK active 2.0.x line has released 2.0.1 but still reports
+support for the `2025-11-25` MCP specification, not `2026-07-28`.
 
 Therefore Slice 0 must make an explicit decision rather than assuming the Java SDK is current.
 
@@ -81,25 +81,45 @@ A sidecar could translate MCP <-> a private Thread local API, but it adds packag
 
 ## Selected V1 approach
 
-The released official Java SDK 2.0.0 was evaluated but is not selected for the V1 runtime. It
+The released official Java SDK 2.0.1 line was evaluated but is not selected for the V1 runtime. It
 implements the `2025-11-25` protocol era, including the initialization/session model that was
 removed by `2026-07-28`. A confirmed SDK issue also shows 2.0.0 returning HTTP 500 when an OpenAI
 client sends the current `server/discover` request.
 
-Slice 4 will therefore implement the minimal `2026-07-28` tools-only Streamable HTTP surface in
-`transport.mcp`. The adapter will cover `server/discover`, `tools/list`, and `tools/call`, with
+Slice 4 therefore implements the minimal `2026-07-28` tools-only Streamable HTTP surface in
+`transport.mcp`. The adapter covers `server/discover`, `tools/list`, and `tools/call`, with
 JSON-RPC/error translation and required header validation. It will not implement deprecated
 HTTP+SSE, the retired initialization/session flow, or unrelated MCP surfaces.
 
-Before that implementation begins, check whether a stable Java SDK release supports
-`2026-07-28` and the intended clients. If so, it may replace the planned wire adapter, but SDK
-types must remain confined to `transport.mcp` and core APIs must not change.
+Re-evaluate the SDK before changing the adapter. A stable release with verified `2026-07-28`
+interoperability may replace the narrow wire implementation without changing core APIs.
+
+## Slice 4 implementation
+
+- `McpHttpServer` uses the JDK `jdk.httpserver` module; Thread adds no MCP or HTTP runtime library.
+- The endpoint is `http://127.0.0.1:25580/mcp` by default and only accepts loopback listener
+  options.
+- Each request is an independent HTTP POST. There are no sessions, initialization calls, legacy
+  GET/SSE endpoints, or server-to-client feature surfaces.
+- `server/discover` advertises only the tools capability and includes Thread name/version metadata.
+- `tools/list` is derived directly from deterministic `ToolRegistry` descriptors, including input
+  schema, output schema, and read-only annotations.
+- `tools/call` invokes only `ToolRegistry.invoke`; transport code imports no Fabric or Minecraft
+  types.
+- Successful and tool-error results include text content plus structured JSON. Unknown tools and
+  malformed protocol requests use JSON-RPC errors.
+- The Fabric client entrypoint starts the listener after tool registration and closes it from
+  `ClientLifecycleEvents.CLIENT_STOPPING`.
+- Unit tests cover HTTP/protocol validation, structured mapping, disconnects, shutdown, and
+  same-port restart. The Fabric client game test invokes discovery, status, game info, and inventory
+  through the real HTTP listener from menu and loaded-world states.
 
 ## Transport and security
 
-- bind to `127.0.0.1`/loopback by default
-- V1 should preferably remain local-only
-- use bounded request sizes
+- bind only to `127.0.0.1`/loopback in V1
+- validate browser `Origin` values against loopback hosts
+- require the `2026-07-28` protocol and mirrored routing headers
+- cap request bodies at 1 MiB until Slice 5 makes the setting persistent
 - do not log complete inventories/world results at normal log levels
 - validate input schemas before reaching providers
 - enforce Thread's own query limits even if protocol/client validation exists
@@ -127,4 +147,4 @@ Those can be reconsidered when there is a concrete product use case.
 - MCP roadmap update, 2026-08-22: https://blog.modelcontextprotocol.io/posts/mcp-roadmap/
 - Official Java SDK: https://github.com/modelcontextprotocol/java-sdk
 - Java SDK changelog: https://github.com/modelcontextprotocol/java-sdk/blob/main/CHANGELOG.md
-- Java SDK 2.0.0/OpenAI discovery incompatibility: https://github.com/modelcontextprotocol/java-sdk/issues/1072
+- Java SDK 2.0.x/OpenAI discovery incompatibility: https://github.com/modelcontextprotocol/java-sdk/issues/1072

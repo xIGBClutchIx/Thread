@@ -3,11 +3,18 @@ package me.clutchy.thread.platform.fabric;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
+import me.clutchy.thread.transport.mcp.McpHttpServer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -28,6 +35,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .findFirst()
             .orElseThrow();
     ToolRegistry tools = entrypoint.tools();
+    McpHttpServer mcp = entrypoint.mcpServer();
 
     assertEquals(10, tools.descriptors().size(), "registered vanilla tool count");
     JsonObject menuStatus = invokeSuccessfully(context, tools, "minecraft.get_status", "{}");
@@ -44,6 +52,44 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .getAsJsonArray("tools")
             .size(),
         "live capability catalog");
+
+    assertTrue(mcp.running(), "MCP listener running");
+    JsonObject discovery =
+        mcpRequest(context, mcp.endpoint(), 1, "server/discover", null, null).body();
+    assertEquals(
+        "2026-07-28",
+        discovery
+            .getAsJsonObject("result")
+            .getAsJsonArray("supportedVersions")
+            .get(0)
+            .getAsString(),
+        "MCP protocol discovery");
+    JsonObject catalog = mcpRequest(context, mcp.endpoint(), 2, "tools/list", null, null).body();
+    assertEquals(
+        10,
+        catalog.getAsJsonObject("result").getAsJsonArray("tools").size(),
+        "MCP vanilla catalog");
+    assertEquals(
+        "MAIN_MENU",
+        mcpTool(context, mcp.endpoint(), 3, "minecraft.get_status", new JsonObject())
+            .get("state")
+            .getAsString(),
+        "MCP menu status");
+    assertEquals(
+        "26.2",
+        mcpTool(context, mcp.endpoint(), 4, "minecraft.get_game_info", new JsonObject())
+            .get("minecraftVersion")
+            .getAsString(),
+        "MCP live Minecraft version");
+
+    McpResponse missing =
+        mcpRequest(context, mcp.endpoint(), 5, "tools/call", "minecraft.missing", new JsonObject());
+    assertEquals(400, missing.status(), "unknown MCP tool status");
+    assertEquals(
+        -32_602,
+        missing.body().getAsJsonObject("error").get("code").getAsInt(),
+        "unknown MCP tool error");
+    assertTrue(mcp.running(), "invalid MCP call leaves listener running");
 
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
       singleplayer.getConnection().waitForChunksDownload();
@@ -97,7 +143,88 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
                       stack.get("itemId").getAsString().equals("minecraft:diamond")
                           && stack.get("count").getAsInt() == 3),
           "inventory preserves registry ID and count");
+
+      assertTrue(
+          mcpTool(context, mcp.endpoint(), 6, "minecraft.get_status", new JsonObject())
+              .get("supported")
+              .getAsBoolean(),
+          "MCP loaded-world support");
+      JsonObject mcpInventory =
+          mcpTool(context, mcp.endpoint(), 7, "minecraft.get_inventory", new JsonObject());
+      assertTrue(
+          mcpInventory.getAsJsonArray("slots").asList().stream()
+              .map(JsonElement::getAsJsonObject)
+              .map(slot -> slot.getAsJsonObject("stack"))
+              .anyMatch(
+                  stack ->
+                      stack.get("itemId").getAsString().equals("minecraft:diamond")
+                          && stack.get("count").getAsInt() == 3),
+          "MCP inventory preserves live registry ID and count");
     }
+  }
+
+  private static JsonObject mcpTool(
+      ClientGameTestContext context, URI endpoint, long id, String name, JsonObject arguments) {
+    McpResponse response = mcpRequest(context, endpoint, id, "tools/call", name, arguments);
+    if (response.status() != 200) {
+      throw new AssertionError(name + " MCP call failed: " + response.body());
+    }
+    JsonObject result = response.body().getAsJsonObject("result");
+    if (result.get("isError").getAsBoolean()) {
+      throw new AssertionError(name + " returned an MCP tool error: " + result);
+    }
+    return result.getAsJsonObject("structuredContent");
+  }
+
+  private static McpResponse mcpRequest(
+      ClientGameTestContext context,
+      URI endpoint,
+      long id,
+      String method,
+      String name,
+      JsonObject arguments) {
+    return awaitExternal(
+        context,
+        () -> {
+          JsonObject metadata = new JsonObject();
+          metadata.addProperty("io.modelcontextprotocol/protocolVersion", "2026-07-28");
+          metadata.add("io.modelcontextprotocol/clientCapabilities", new JsonObject());
+          JsonObject params = new JsonObject();
+          params.add("_meta", metadata);
+          if (name != null) {
+            params.addProperty("name", name);
+            params.add("arguments", arguments);
+          }
+          JsonObject requestBody = new JsonObject();
+          requestBody.addProperty("jsonrpc", "2.0");
+          requestBody.addProperty("id", id);
+          requestBody.addProperty("method", method);
+          requestBody.add("params", params);
+
+          HttpRequest.Builder request =
+              HttpRequest.newBuilder(endpoint)
+                  .timeout(Duration.ofSeconds(10))
+                  .header("Accept", "application/json, text/event-stream")
+                  .header("Content-Type", "application/json")
+                  .header("MCP-Protocol-Version", "2026-07-28")
+                  .header("Mcp-Method", method)
+                  .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()));
+          if (name != null) {
+            request.header("Mcp-Name", name);
+          }
+          try {
+            HttpResponse<String> response =
+                HttpClient.newHttpClient()
+                    .send(request.build(), HttpResponse.BodyHandlers.ofString());
+            return new McpResponse(
+                response.statusCode(), JsonParser.parseString(response.body()).getAsJsonObject());
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("MCP game-test request was interrupted", exception);
+          } catch (IOException exception) {
+            throw new IllegalStateException("MCP game-test request failed", exception);
+          }
+        });
   }
 
   private static JsonObject invokeSuccessfully(
@@ -143,4 +270,6 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       throw new AssertionError(description + ": expected " + expected + " but was " + actual);
     }
   }
+
+  private record McpResponse(int status, JsonObject body) {}
 }

@@ -3,10 +3,9 @@ package me.clutchy.thread.config;
 /**
  * Minimal user-facing configuration established by the repository foundation.
  *
- * <p>Slice 0 defines defaults only. Persistent loading, validation, and runtime application belong
- * to the later configuration slice.
+ * <p>Persistent loading and expanded transport settings belong to the later configuration slice.
  *
- * @param mcpEnabled whether the future MCP transport should start when it is implemented
+ * @param mcpEnabled whether the local MCP transport should start with the client
  */
 public record ThreadConfig(boolean mcpEnabled) {
   /**
