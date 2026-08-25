@@ -274,3 +274,29 @@ does not serialize raw NBT/components or resolve unopened loot tables.
 Fabric owns a small ordered block-entity inspector registry. Future mod integrations may register a
 higher-priority inspector without changing core models, tool handlers, or MCP transport. No
 third-party integration ships with this extension point.
+
+## D021: Craftability is a core service with deterministic allocation
+
+**Status:** Accepted
+
+`CraftingService` consumes the existing `PlayerProvider` and `RecipeProvider` contracts. The
+`minecraft.can_craft` and `minecraft.get_missing_ingredients` tools delegate to it and share one
+structured assessment contract; MCP contains no crafting comparison logic.
+
+Ingredient `itemIds` are the complete alternatives resolved by the recipe adapter, while `tagIds`
+retain source-tag provenance. For each recipe variant, a deterministic maximum-flow allocation
+assigns inventory units to ingredient groups. This maximizes satisfied requirements without
+allowing overlapping alternatives to claim the same units. Constrained groups sort before broader
+groups for stable explanations, identical groups merge defensively, and recipe IDs are not treated
+as unique; stable one-based variant ordinals identify returned entries.
+
+The assessment covers one execution of each represented recipe using the current 36-slot main
+inventory. It deliberately excludes equipment, nearby storage, recursive ingredient crafting,
+workstation/fuel feasibility, third-party recipe integrations, and crafting actions.
+
+Why:
+
+- the logic is reusable by future transports and enriched recipe providers;
+- explicit allocations make `available` and `missing` counts auditable;
+- maximum flow handles overlapping alternatives correctly where greedy sums cannot;
+- the narrow read-only scope preserves V1 session and safety boundaries.

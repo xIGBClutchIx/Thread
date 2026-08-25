@@ -18,7 +18,7 @@ without a prefix; the corresponding Git tag is exactly `vMAJOR.MINOR.PATCH`.
 Replace `v0.1.0` with the release tag. A mismatched tag intentionally fails.
 
 The two production tasks load `build/libs/thread-<version>.jar` as the actual mod and add only an
-isolated game-test harness. The enabled run performs discovery and all ten required live scenarios;
+isolated game-test harness. The enabled run performs discovery and all required live scenarios;
 the disabled run proves that the same mod starts without an MCP listener.
 
 ## Inspect the bundle

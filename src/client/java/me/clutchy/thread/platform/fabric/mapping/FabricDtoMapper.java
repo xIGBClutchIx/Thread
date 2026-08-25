@@ -1,13 +1,13 @@
 package me.clutchy.thread.platform.fabric.mapping;
 
 import java.util.List;
-import me.clutchy.thread.core.model.EntityClassification;
-import me.clutchy.thread.core.model.EntityInfo;
-import me.clutchy.thread.core.model.ItemComponentsInfo;
-import me.clutchy.thread.core.model.ItemDurabilityInfo;
-import me.clutchy.thread.core.model.ItemEnchantmentInfo;
-import me.clutchy.thread.core.model.ItemStackInfo;
-import me.clutchy.thread.core.model.Position;
+import me.clutchy.thread.core.model.item.ItemComponentsInfo;
+import me.clutchy.thread.core.model.item.ItemDurabilityInfo;
+import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
+import me.clutchy.thread.core.model.item.ItemStackInfo;
+import me.clutchy.thread.core.model.world.EntityClassification;
+import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.Position;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;

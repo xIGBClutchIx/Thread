@@ -357,8 +357,8 @@ Example result:
       "type": "minecraft:crafting_shaped",
       "result": {"itemId": "minecraft:diamond_pickaxe", "count": 1},
       "ingredients": [
-        {"items": ["minecraft:diamond"], "count": 3},
-        {"items": ["minecraft:stick"], "count": 2}
+        {"itemIds": ["minecraft:diamond"], "tagIds": [], "count": 3},
+        {"itemIds": ["minecraft:stick"], "tagIds": [], "count": 2}
       ]
     }
   ]
@@ -366,6 +366,87 @@ Example result:
 ```
 
 Minecraft recipe ingredients can represent alternatives/tags. The DTO must not falsely collapse alternatives into a single required item. If exact grouped counts are not always representable, preserve ingredient slots/groups instead of inventing certainty.
+
+`itemIds` contains the complete resolved item alternatives used for comparisons. `tagIds` retains
+the canonical source tags as provenance, so a tag-backed ingredient exposes both its current item
+members and the tag that supplied them.
+
+## `minecraft.can_craft`
+
+Purpose: determine whether the player's current main inventory satisfies at least one live recipe
+variant for the requested item. It assesses one recipe execution and performs no crafting action.
+
+Input:
+
+```json
+{
+  "itemId": "minecraft:diamond_pickaxe"
+}
+```
+
+Example result:
+
+```json
+{
+  "itemId": "minecraft:diamond_pickaxe",
+  "craftable": false,
+  "recipes": [
+    {
+      "variant": 1,
+      "recipeId": "minecraft:diamond_pickaxe",
+      "type": "minecraft:crafting_shaped",
+      "resultCount": 1,
+      "craftable": false,
+      "ingredients": [
+        {
+          "itemIds": ["minecraft:diamond"],
+          "tagIds": [],
+          "required": 3,
+          "available": 2,
+          "missing": 1,
+          "allocations": [
+            {"itemId": "minecraft:diamond", "count": 2}
+          ]
+        },
+        {
+          "itemIds": ["minecraft:stick"],
+          "tagIds": [],
+          "required": 2,
+          "available": 2,
+          "missing": 0,
+          "allocations": [
+            {"itemId": "minecraft:stick", "count": 2}
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+`craftable` is true when any returned variant is craftable. Every relevant recipe remains a list
+entry even when recipe IDs repeat. `variant` is a stable one-based ordinal assigned after canonical
+sorting and identifies an individual returned variant.
+
+`available` is the number actually allocated to that ingredient group, not a sum that another
+ingredient may also claim. `allocations` shows the deterministic item choices made from alternatives.
+The allocation maximizes satisfied requirements while consuming each inventory unit at most once.
+Identical ingredient groups are merged before assessment, even if a provider supplies duplicates.
+A supported lookup with no matching recipe returns `craftable: false` and an empty `recipes` array.
+
+## `minecraft.get_missing_ingredients`
+
+Purpose: explain shortages for every live recipe variant using the same fresh recipe/inventory
+assessment as `minecraft.can_craft`.
+
+Input and result use the same contract as `minecraft.can_craft`. Each ingredient remains present so
+clients can explain the complete requirement; entries with `missing` greater than zero are the
+unmet requirements. This prevents a missing-only projection from hiding how alternative items were
+allocated across overlapping ingredient groups.
+
+Both tools support shaped and shapeless recipes represented by the recipe provider. They inspect
+only the player's 36 main-inventory slots and do not inspect equipment, nearby storage, recursive
+ingredient recipes, crafting stations, or fuel.
 
 ## `minecraft.search_items`
 

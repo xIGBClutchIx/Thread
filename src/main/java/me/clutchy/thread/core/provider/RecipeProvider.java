@@ -1,8 +1,8 @@
 package me.clutchy.thread.core.provider;
 
 import java.util.List;
-import me.clutchy.thread.core.model.ItemSearchResult;
-import me.clutchy.thread.core.model.RecipeInfo;
+import me.clutchy.thread.core.model.item.ItemSearchResult;
+import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /** Supplies loader-neutral item and recipe data from the current running game instance. */

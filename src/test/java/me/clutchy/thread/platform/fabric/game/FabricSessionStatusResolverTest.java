@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import me.clutchy.thread.core.model.SessionState;
-import me.clutchy.thread.core.model.SessionStatus;
-import me.clutchy.thread.core.model.SessionStatusReason;
+import me.clutchy.thread.core.model.game.SessionState;
+import me.clutchy.thread.core.model.game.SessionStatus;
+import me.clutchy.thread.core.model.game.SessionStatusReason;
 import org.junit.jupiter.api.Test;
 
 class FabricSessionStatusResolverTest {

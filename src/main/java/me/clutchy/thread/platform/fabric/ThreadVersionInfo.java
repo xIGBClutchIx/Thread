@@ -1,7 +1,7 @@
 package me.clutchy.thread.platform.fabric;
 
 import java.util.Objects;
-import me.clutchy.thread.core.model.GameInfo;
+import me.clutchy.thread.core.model.game.GameInfo;
 
 /** Snapshot of runtime component versions used in Thread's startup log. */
 record ThreadVersionInfo(String threadVersion, String minecraftVersion, String loaderVersion) {

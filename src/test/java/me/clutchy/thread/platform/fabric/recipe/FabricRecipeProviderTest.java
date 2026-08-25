@@ -3,7 +3,7 @@ package me.clutchy.thread.platform.fabric.recipe;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import me.clutchy.thread.core.model.ItemSearchResult;
+import me.clutchy.thread.core.model.item.ItemSearchResult;
 import me.clutchy.thread.platform.fabric.testing.MinecraftTestBootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;

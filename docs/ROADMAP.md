@@ -102,7 +102,7 @@ Potential actions:
 - open a relevant screen
 - send a chat message
 
-Higher-risk actions such as moving items, crafting, commands, or world interaction would require explicit permissions, confirmations, multiplayer policy handling, and auditability.
+Higher-risk actions such as moving items, automatic crafting, commands, or world interaction would require explicit permissions, confirmations, multiplayer policy handling, and auditability.
 
 Read-only Thread should remain a valid mode permanently.
 

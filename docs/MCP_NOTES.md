@@ -115,7 +115,7 @@ interoperability may replace the narrow wire implementation without changing cor
   `ClientLifecycleEvents.CLIENT_STOPPING`.
 - Unit tests cover a real initialize-to-tool-list sequence, HTTP/protocol validation, structured
   mapping, disconnects, shutdown, and same-port restart. The Fabric client game test performs the
-  initialization sequence and all ten release scenarios through the real HTTP listener.
+  initialization sequence and all required release scenarios through the real HTTP listener.
 
 ## Slice 5 hardening
 

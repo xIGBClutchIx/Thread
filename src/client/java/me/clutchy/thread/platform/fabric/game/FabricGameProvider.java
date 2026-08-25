@@ -1,8 +1,8 @@
 package me.clutchy.thread.platform.fabric.game;
 
 import java.util.Objects;
-import me.clutchy.thread.core.model.GameInfo;
-import me.clutchy.thread.core.model.SessionStatus;
+import me.clutchy.thread.core.model.game.GameInfo;
+import me.clutchy.thread.core.model.game.SessionStatus;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import net.minecraft.client.Minecraft;

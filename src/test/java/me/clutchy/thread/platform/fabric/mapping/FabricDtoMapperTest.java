@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import me.clutchy.thread.core.model.ItemStackInfo;
+import me.clutchy.thread.core.model.item.ItemStackInfo;
 import me.clutchy.thread.platform.fabric.testing.MinecraftTestBootstrap;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentMap;

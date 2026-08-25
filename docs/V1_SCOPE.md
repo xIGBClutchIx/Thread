@@ -47,6 +47,7 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
 - vanilla recipe lookup
+- deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - vanilla item search
 
 ### Engineering baseline
@@ -110,7 +111,10 @@ From a clean install, an MCP client can discover Thread and correctly answer eac
 8. "How do I craft a diamond pickaxe?"
 9. "Do I have the materials for a diamond pickaxe?"
 
-For #9, Thread only needs to provide inventory and recipe data. The external model may perform the comparison in V1.
+For #9, Thread performs a deterministic comparison against the player's current main inventory.
+It reports each recipe variant independently with required, allocated, and missing counts. This is
+read-only analysis: Thread does not craft the item, recurse through intermediate recipes, or search
+nearby storage.
 
 ## Non-goals that protect the architecture
 

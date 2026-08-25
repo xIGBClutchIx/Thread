@@ -13,35 +13,37 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import me.clutchy.thread.core.context.ContextRegistry;
+import me.clutchy.thread.core.error.ToolError;
+import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.integration.GameIntegration;
 import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
-import me.clutchy.thread.core.model.BlockInfo;
-import me.clutchy.thread.core.model.BlockPosition;
-import me.clutchy.thread.core.model.EntityClassification;
-import me.clutchy.thread.core.model.EntityInfo;
-import me.clutchy.thread.core.model.EquipmentPosition;
-import me.clutchy.thread.core.model.EquipmentSlotInfo;
-import me.clutchy.thread.core.model.EquipmentSnapshot;
-import me.clutchy.thread.core.model.GameInfo;
-import me.clutchy.thread.core.model.InventorySlotInfo;
-import me.clutchy.thread.core.model.InventorySnapshot;
-import me.clutchy.thread.core.model.ItemComponentsInfo;
-import me.clutchy.thread.core.model.ItemDurabilityInfo;
-import me.clutchy.thread.core.model.ItemEnchantmentInfo;
-import me.clutchy.thread.core.model.ItemInfo;
-import me.clutchy.thread.core.model.ItemSearchResult;
-import me.clutchy.thread.core.model.ItemStackInfo;
-import me.clutchy.thread.core.model.NearbyEntityQuery;
-import me.clutchy.thread.core.model.NearbyEntityResult;
-import me.clutchy.thread.core.model.PlayerStatus;
-import me.clutchy.thread.core.model.Position;
-import me.clutchy.thread.core.model.RecipeInfo;
-import me.clutchy.thread.core.model.RecipeIngredientInfo;
-import me.clutchy.thread.core.model.SessionState;
-import me.clutchy.thread.core.model.SessionStatus;
-import me.clutchy.thread.core.model.SessionStatusReason;
+import me.clutchy.thread.core.model.game.GameInfo;
+import me.clutchy.thread.core.model.game.SessionState;
+import me.clutchy.thread.core.model.game.SessionStatus;
+import me.clutchy.thread.core.model.game.SessionStatusReason;
+import me.clutchy.thread.core.model.item.ItemComponentsInfo;
+import me.clutchy.thread.core.model.item.ItemDurabilityInfo;
+import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
+import me.clutchy.thread.core.model.item.ItemInfo;
+import me.clutchy.thread.core.model.item.ItemSearchResult;
+import me.clutchy.thread.core.model.item.ItemStackInfo;
+import me.clutchy.thread.core.model.player.EquipmentPosition;
+import me.clutchy.thread.core.model.player.EquipmentSlotInfo;
+import me.clutchy.thread.core.model.player.EquipmentSnapshot;
+import me.clutchy.thread.core.model.player.InventorySlotInfo;
+import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.player.PlayerStatus;
+import me.clutchy.thread.core.model.recipe.RecipeInfo;
+import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
+import me.clutchy.thread.core.model.world.BlockInfo;
+import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.EntityClassification;
+import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.NearbyEntityQuery;
+import me.clutchy.thread.core.model.world.NearbyEntityResult;
+import me.clutchy.thread.core.model.world.Position;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
@@ -57,10 +59,12 @@ import org.junit.jupiter.api.Test;
 class VanillaIntegrationTest {
   private static final List<String> V1_TOOL_IDS =
       List.of(
+          "minecraft.can_craft",
           "minecraft.get_capabilities",
           "minecraft.get_equipment",
           "minecraft.get_game_info",
           "minecraft.get_inventory",
+          "minecraft.get_missing_ingredients",
           "minecraft.get_nearby_entities",
           "minecraft.get_player",
           "minecraft.get_recipe",
@@ -145,6 +149,22 @@ class VanillaIntegrationTest {
         "minecraft:diamond_pickaxe",
         first(recipe, "recipes").getAsJsonObject("result").get("itemId").getAsString());
 
+    JsonObject craftable =
+        invoke(
+            catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
+    assertTrue(craftable.get("craftable").getAsBoolean());
+    assertTrue(first(craftable, "recipes").get("craftable").getAsBoolean());
+
+    JsonObject missing =
+        invoke(
+            catalog.tools(),
+            "minecraft.get_missing_ingredients",
+            "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
+    assertTrue(
+        first(missing, "recipes").getAsJsonArray("ingredients").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .allMatch(ingredient -> ingredient.get("missing").getAsInt() == 0));
+
     JsonObject search =
         invoke(
             catalog.tools(), "minecraft.search_items", "{\"query\":\"diamond pick\",\"limit\":10}");
@@ -184,7 +204,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        10, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        12, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -204,7 +224,32 @@ class VanillaIntegrationTest {
     assertInvalid(catalog.tools(), "minecraft.get_status", "{\"extra\":true}");
     assertInvalid(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":0,\"limit\":8}");
     assertInvalid(catalog.tools(), "minecraft.get_recipe", "{\"itemId\":\"not a registry id\"}");
+    assertInvalid(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"not a registry id\"}");
+    assertInvalid(
+        catalog.tools(), "minecraft.get_missing_ingredients", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.search_items", "{\"query\":\"\",\"limit\":0}");
+  }
+
+  @Test
+  void craftingToolsPreserveNoWorldAndMultiplayerFailures() {
+    assertToolFailure(
+        catalog(
+                new MenuGameProvider(),
+                new FailingPlayerProvider(),
+                new UnavailableRecipeProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
+                ignored -> true)
+            .tools(),
+        "minecraft.can_craft",
+        ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertToolFailure(
+        catalog(
+                new MultiplayerGameProvider(),
+                new FailingPlayerProvider(),
+                new UnavailableRecipeProvider(ToolErrorCode.UNSUPPORTED),
+                ignored -> true)
+            .tools(),
+        "minecraft.get_missing_ingredients",
+        ToolErrorCode.UNSUPPORTED);
   }
 
   @Test
@@ -226,7 +271,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(11, strings(capabilities, "tools").size());
+    assertEquals(13, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("example.echo"));
     assertEquals(
         List.of("example", "vanilla"),
@@ -262,11 +307,18 @@ class VanillaIntegrationTest {
 
   private static Catalog catalog(
       GameProvider game, PlayerProvider player, Predicate<ToolId> enabledTools) {
+    return catalog(game, player, new FakeRecipeProvider(), enabledTools);
+  }
+
+  private static Catalog catalog(
+      GameProvider game,
+      PlayerProvider player,
+      RecipeProvider recipes,
+      Predicate<ToolId> enabledTools) {
     ToolRegistry tools = new ToolRegistry();
     IntegrationRegistry integrations = new IntegrationRegistry(tools, new ContextRegistry());
     integrations.register(
-        new VanillaIntegration(
-            game, player, new FakeWorldProvider(), new FakeRecipeProvider(), enabledTools));
+        new VanillaIntegration(game, player, new FakeWorldProvider(), recipes, enabledTools));
     return new Catalog(tools, integrations);
   }
 
@@ -283,6 +335,14 @@ class VanillaIntegrationTest {
     ToolResult<JsonElement> result = tools.invoke(toolId, object(input));
     assertFalse(result.successful());
     assertEquals(me.clutchy.thread.core.error.ToolErrorCode.INVALID_INPUT, result.error().code());
+  }
+
+  private static void assertToolFailure(
+      ToolRegistry tools, String toolId, ToolErrorCode expectedCode) {
+    ToolResult<JsonElement> result =
+        tools.invoke(toolId, object("{\"itemId\":\"minecraft:diamond_pickaxe\"}"));
+    assertFalse(result.successful());
+    assertEquals(expectedCode, result.error().code());
   }
 
   private static JsonElement object(String json) {
@@ -332,6 +392,19 @@ class VanillaIntegrationTest {
     }
   }
 
+  private static final class MultiplayerGameProvider implements GameProvider {
+    @Override
+    public SessionStatus sessionStatus() {
+      return new SessionStatus(
+          SessionState.MULTIPLAYER, true, true, false, SessionStatusReason.MULTIPLAYER_UNSUPPORTED);
+    }
+
+    @Override
+    public GameInfo gameInfo() {
+      return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+    }
+  }
+
   private static class FakePlayerProvider implements PlayerProvider {
     private static final ItemStackInfo PICKAXE =
         new ItemStackInfo(
@@ -365,7 +438,10 @@ class VanillaIntegrationTest {
     public ToolResult<InventorySnapshot> inventory() {
       return ToolResult.success(
           new InventorySnapshot(
-              0, List.of(new InventorySlotInfo(0, item("minecraft:diamond", "Diamond", 3, 64)))));
+              0,
+              List.of(
+                  new InventorySlotInfo(0, item("minecraft:diamond", "Diamond", 3, 64)),
+                  new InventorySlotInfo(1, item("minecraft:stick", "Stick", 2, 64)))));
     }
 
     @Override
@@ -466,6 +542,24 @@ class VanillaIntegrationTest {
               limit,
               false,
               List.of(new ItemInfo("minecraft:diamond_pickaxe", "Diamond Pickaxe"))));
+    }
+  }
+
+  private static final class UnavailableRecipeProvider implements RecipeProvider {
+    private final ToolError error;
+
+    private UnavailableRecipeProvider(ToolErrorCode code) {
+      error = ToolError.of(code, "Unavailable for test.", true);
+    }
+
+    @Override
+    public ToolResult<List<RecipeInfo>> recipesFor(String itemId) {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<ItemSearchResult> searchItems(String query, int limit) {
+      throw new AssertionError("item search was not expected");
     }
   }
 

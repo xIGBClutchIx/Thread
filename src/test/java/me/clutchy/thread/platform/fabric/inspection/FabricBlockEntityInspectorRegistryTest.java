@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import me.clutchy.thread.core.model.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import me.clutchy.thread.platform.fabric.testing.MinecraftTestBootstrap;
 import net.minecraft.core.BlockPos;

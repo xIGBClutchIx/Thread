@@ -1,7 +1,7 @@
 package me.clutchy.thread.core.provider;
 
-import me.clutchy.thread.core.model.GameInfo;
-import me.clutchy.thread.core.model.SessionStatus;
+import me.clutchy.thread.core.model.game.GameInfo;
+import me.clutchy.thread.core.model.game.SessionStatus;
 
 /**
  * Supplies loader-neutral snapshots of application/session state and runtime versions.

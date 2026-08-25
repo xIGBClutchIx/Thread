@@ -11,26 +11,28 @@ import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.integration.GameIntegration;
 import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
-import me.clutchy.thread.core.model.BlockInfo;
-import me.clutchy.thread.core.model.CapabilitiesSnapshot;
-import me.clutchy.thread.core.model.EmptyInput;
-import me.clutchy.thread.core.model.EquipmentSnapshot;
-import me.clutchy.thread.core.model.GameInfo;
-import me.clutchy.thread.core.model.IntegrationCapability;
-import me.clutchy.thread.core.model.InventorySnapshot;
-import me.clutchy.thread.core.model.ItemSearchQuery;
-import me.clutchy.thread.core.model.ItemSearchResult;
-import me.clutchy.thread.core.model.NearbyEntityQuery;
-import me.clutchy.thread.core.model.NearbyEntityResult;
-import me.clutchy.thread.core.model.PlayerStatus;
-import me.clutchy.thread.core.model.RecipeLookupQuery;
-import me.clutchy.thread.core.model.RecipeLookupResult;
-import me.clutchy.thread.core.model.SessionStatus;
+import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
+import me.clutchy.thread.core.model.capability.IntegrationCapability;
+import me.clutchy.thread.core.model.crafting.CraftingResult;
+import me.clutchy.thread.core.model.game.GameInfo;
+import me.clutchy.thread.core.model.game.SessionStatus;
+import me.clutchy.thread.core.model.item.ItemSearchQuery;
+import me.clutchy.thread.core.model.item.ItemSearchResult;
+import me.clutchy.thread.core.model.player.EquipmentSnapshot;
+import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.player.PlayerStatus;
+import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
+import me.clutchy.thread.core.model.recipe.RecipeLookupResult;
+import me.clutchy.thread.core.model.world.BlockInfo;
+import me.clutchy.thread.core.model.world.NearbyEntityQuery;
+import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.serialization.JsonCodec;
+import me.clutchy.thread.core.service.CraftingService;
+import me.clutchy.thread.core.tool.EmptyInput;
 import me.clutchy.thread.core.tool.GameTool;
 import me.clutchy.thread.core.tool.ToolCapabilities;
 import me.clutchy.thread.core.tool.ToolDescriptor;
@@ -48,6 +50,7 @@ public final class VanillaIntegration implements GameIntegration {
   private final PlayerProvider player;
   private final WorldProvider world;
   private final RecipeProvider recipes;
+  private final CraftingService crafting;
   private final Predicate<ToolId> enabledTools;
 
   /** Creates the vanilla catalog over explicit loader-neutral providers. */
@@ -67,6 +70,7 @@ public final class VanillaIntegration implements GameIntegration {
     this.player = Objects.requireNonNull(player, "player");
     this.world = Objects.requireNonNull(world, "world");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
+    crafting = new CraftingService(player, recipes);
     this.enabledTools = Objects.requireNonNull(enabledTools, "enabledTools");
   }
 
@@ -95,6 +99,8 @@ public final class VanillaIntegration implements GameIntegration {
     register(context, getTargetBlock());
     register(context, getNearbyEntities());
     register(context, getRecipe());
+    register(context, canCraft());
+    register(context, getMissingIngredients());
     register(context, searchItems());
     register(context, getCapabilities(context));
   }
@@ -194,6 +200,30 @@ public final class VanillaIntegration implements GameIntegration {
         JsonCodec.of(RecipeLookupResult.class, VanillaToolSchemas.RECIPE_LOOKUP_RESULT),
         ToolCapabilities.supportedSingleplayer(),
         this::lookupRecipe);
+  }
+
+  private GameTool<RecipeLookupQuery, CraftingResult> canCraft() {
+    return tool(
+        "minecraft.can_craft",
+        "Determines whether the current main inventory can satisfy at least one live recipe for "
+            + "a canonical item ID. Use this for a direct yes-or-no answer backed by deterministic, "
+            + "non-overlapping allocations for each variant; no crafting action is performed.",
+        JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
+        JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
+        ToolCapabilities.supportedSingleplayer(),
+        crafting::assess);
+  }
+
+  private GameTool<RecipeLookupQuery, CraftingResult> getMissingIngredients() {
+    return tool(
+        "minecraft.get_missing_ingredients",
+        "Returns required, allocated, and missing item counts for every live recipe variant that "
+            + "produces a canonical item ID. Use this to explain shortages from missing counts "
+            + "above zero; alternatives never double-count inventory.",
+        JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
+        JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
+        ToolCapabilities.supportedSingleplayer(),
+        crafting::assess);
   }
 
   private GameTool<ItemSearchQuery, ItemSearchResult> searchItems() {

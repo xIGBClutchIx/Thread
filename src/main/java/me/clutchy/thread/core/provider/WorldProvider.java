@@ -1,7 +1,7 @@
 package me.clutchy.thread.core.provider;
 
-import me.clutchy.thread.core.model.NearbyEntityQuery;
-import me.clutchy.thread.core.model.NearbyEntityResult;
+import me.clutchy.thread.core.model.world.NearbyEntityQuery;
+import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /**

@@ -315,9 +315,47 @@ Observe the client tool trace where possible and verify it called Thread rather 
 - mod loads without another Thread component installed
 - MCP is disabled cleanly when configured off
 - MCP client discovers the V1 tools
-- all ten manual scenarios work
+- all required manual scenarios work
 - all tools are read-only
 - no arbitrary chunk loading/scanning occurs
 - no core dependency on Fabric or MCP has appeared
 - docs match implementation
 - V1 release artifact can be installed by another person without repository knowledge
+
+---
+
+## Slice 7: Deterministic crafting intelligence
+
+### Goal
+
+Let MCP clients ask whether the current player inventory can satisfy a live recipe and receive an
+exact, deterministic explanation of missing ingredients.
+
+### Work
+
+Add:
+
+- `minecraft.can_craft`
+- `minecraft.get_missing_ingredients`
+- a transport-independent `CraftingService` over the existing player and recipe providers
+- crafting assessment DTOs and explicit JSON schemas
+- deterministic allocation across overlapping item/tag alternatives
+
+Assess every recipe variant independently, including repeated recipe IDs and shaped/shapeless
+types represented by the recipe layer. Report stable variant ordinals plus required, allocated,
+available, and missing counts. Merge duplicate ingredient groups defensively.
+
+This slice remains read-only and single-player only. It does not craft items, recurse through
+intermediate recipes, inspect nearby storage, or add JEI/EMI/REI integration.
+
+### Acceptance criteria
+
+- at least one satisfied recipe makes the item craftable
+- every relevant recipe variant reports its own craftability and ingredient counts
+- alternative ingredients consume each inventory unit at most once across a variant
+- expanded tag alternatives retain their source tag IDs
+- craftable, missing, multiple-variant, shaped/shapeless, duplicate-requirement, empty-inventory,
+  no-recipe, no-world, and multiplayer cases have automated coverage
+- both tools are discoverable and callable through the unchanged MCP lifecycle
+- the packaged single-player game test proves a real diamond-pickaxe assessment through MCP
+- formatting, lint, unit/integration tests, clean build, and both packaged client tests pass

@@ -23,7 +23,7 @@ The model gets the answer by calling Thread tools. Thread does not inject large 
 1. **MCP first, not MCP-bound.** MCP is a transport adapter over internal tools.
 2. **Minecraft types stop at the platform boundary.** Core DTOs must not expose `ItemStack`, `PlayerEntity`, `BlockState`, or other loader/game types.
 3. **Single-player V1.** V1 only operates on integrated single-player worlds. Multiplayer and dedicated-server support require a separate trust, permission, privacy, and anti-cheat design.
-4. **Read-only V1.** No block breaking, inventory mutation, commands, crafting, movement, or world edits.
+4. **Read-only V1.** No block breaking, inventory mutation, commands, automatic crafting, movement, or world edits.
 5. **Explicit capability discovery.** Clients should be able to learn what this installation supports.
 6. **Bounded queries.** No arbitrary world scans, forced chunk loads, or unbounded result sets.
 7. **Correct threading.** Reads that require Minecraft state must run on the correct client/integrated-server thread.
@@ -59,6 +59,7 @@ Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 | 4 | MCP transport adapter over the tool registry |
 | 5 | Configuration, security boundaries, limits, and resilience |
 | 6 | End-to-end validation, packaging, docs, and V1 release readiness |
+| 7 | Deterministic inventory-to-recipe crafting intelligence |
 
 A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
@@ -95,7 +96,7 @@ url = "http://127.0.0.1:25580/mcp"
 
 Restart Codex and open a new task after changing its MCP configuration. Thread must be running in
 Minecraft before the client connects. Codex initializes the connection, receives Thread's server
-identity/instructions, and discovers ten read-only `minecraft.*` tools. Thread also retains the
+identity/instructions, and discovers twelve read-only `minecraft.*` tools. Thread also retains the
 stateless MCP `2026-07-28` discovery flow; neither flow creates protocol sessions.
 
 ## Configuration
@@ -137,7 +138,7 @@ normally, so this is a clean supported state rather than a startup failure.
   MCP client URL to match.
 - **Fabric reports incompatible mods:** use the exact Minecraft 26.2 build of Fabric API. A Fabric
   API build for another Minecraft version is not interchangeable.
-- **Gameplay tools return `UNSUPPORTED_SESSION`:** enter an integrated single-player world. Status
+- **Gameplay tools return `UNSUPPORTED`:** enter an integrated single-player world. Status
   and game-info discovery remain available in menus and unsupported multiplayer.
 - **A tool is missing:** check `enabledTools`; disabled tools are omitted from discovery.
 - **Configuration is rejected:** read the logged validation message, correct
@@ -148,13 +149,14 @@ See [Installation](docs/INSTALLATION.md) for the complete troubleshooting guide.
 ## Known V1 limitations
 
 - Fabric client only; no Forge/NeoForge or dedicated-server build.
-- Single-player and read-only. Multiplayer gameplay queries, commands, movement, crafting, and
+- Single-player and read-only. Multiplayer gameplay queries, commands, movement, automatic crafting, and
   world/inventory changes are intentionally rejected or absent.
 - Nearby-entity queries only inspect already-loaded state and never force-load chunks.
 - No authentication or remote binding. The server is intentionally restricted to loopback.
 - No third-party mod integrations or in-game assistant UI.
-- Recipe-material comparisons are performed by the MCP client from recipe and inventory snapshots;
-  Thread does not expose a separate crafting-planner tool.
+- `minecraft.can_craft` and `minecraft.get_missing_ingredients` compare one recipe execution with
+  the current 36-slot main inventory. They do not recurse through ingredient recipes, inspect
+  nearby storage, account for crafting stations/fuel, or perform crafting actions.
 
 ## Development and release
 

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,10 @@ class ArchitectureBoundaryTest {
   private static final Path PROJECT_ROOT = Path.of(System.getProperty("user.dir"));
   private static final List<Path> PRODUCTION_SOURCE_ROOTS =
       List.of(PROJECT_ROOT.resolve("src/main/java"), PROJECT_ROOT.resolve("src/client/java"));
+  private static final Path CORE_MODEL_ROOT =
+      PROJECT_ROOT.resolve("src/main/java/me/clutchy/thread/core/model");
+  private static final Set<String> MODEL_DOMAINS =
+      Set.of("capability", "crafting", "game", "item", "player", "recipe", "validation", "world");
 
   @Test
   void coreDoesNotImportPlatformOrTransportTypes() throws IOException {
@@ -74,6 +79,17 @@ class ArchitectureBoundaryTest {
   void packageInfoFilesAreNotUsed() throws IOException {
     for (Path source : productionJavaSources()) {
       assertFalse(source.getFileName().toString().equals("package-info.java"), source::toString);
+    }
+  }
+
+  @Test
+  void coreModelsUseDomainPackages() throws IOException {
+    try (Stream<Path> sources = Files.walk(CORE_MODEL_ROOT)) {
+      for (Path source : sources.filter(path -> path.toString().endsWith(".java")).toList()) {
+        Path relative = CORE_MODEL_ROOT.relativize(source);
+        assertTrue(relative.getNameCount() > 1, source::toString);
+        assertTrue(MODEL_DOMAINS.contains(relative.getName(0).toString()), source::toString);
+      }
     }
   }
 

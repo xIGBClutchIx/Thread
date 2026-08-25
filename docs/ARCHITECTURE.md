@@ -19,6 +19,7 @@
                   | Tool Registry     |
                   | Context Registry  |
                   | Integration Reg.  |
+                  | Crafting Service  |
                   | DTOs / Errors     |
                   +---------+---------+
                             |
@@ -76,6 +77,38 @@ Immutable, serialization-friendly values such as:
 Registry IDs such as `minecraft:iron_ingot` are preferred over display names as canonical identifiers.
 Inventory, equipment, recipe results, and safe container inspection share `ItemStackInfo`; selected
 component fields are explicit and bounded rather than a generic Minecraft component/NBT mirror.
+
+Thread groups model types by the game domain they describe:
+
+- `model.capability`: capability and integration snapshots
+- `model.crafting`: craftability, allocation, and shortage results
+- `model.game`: runtime and session state
+- `model.item`: item identity, stacks, components, and search
+- `model.player`: player status, inventory, and equipment
+- `model.recipe`: recipe lookup and ingredient data
+- `model.world`: positions, blocks, block entities, and nearby entities
+- `model.validation`: shared constructor validation for model records
+
+Tool-only request types such as `EmptyInput` belong in `core.tool`.
+
+### Services
+
+`CraftingService` is a transport-independent application service over `PlayerProvider` and
+`RecipeProvider`. It reads detached recipe and main-inventory snapshots, assesses every recipe
+variant independently, and returns `model.crafting` DTOs. Tool handlers only delegate to this
+service; MCP never performs recipe comparison.
+
+The service treats each ingredient group's `itemIds` as the complete resolved alternatives. A
+source tag remains in `tagIds` as provenance, while the Fabric recipe adapter expands its current
+members into `itemIds`. A deterministic maximum-flow allocation assigns each inventory unit to at
+most one ingredient requirement. This prevents overlapping alternatives from double-counting the
+same stack and gives constrained groups priority without sacrificing the maximum satisfied count.
+Identical ingredient groups are merged defensively, and recipe variants receive stable one-based
+ordinals after canonical sorting; recipe IDs are not assumed unique.
+
+The current assessment covers one execution of a represented recipe using only the player's 36
+main-inventory slots. It does not inspect equipment or nearby storage, check workstations/fuel,
+recurse into intermediate recipes, or perform crafting actions.
 
 ### Providers
 
@@ -177,7 +210,7 @@ public interface GameIntegration {
 
 Future integrations can register tools/providers/context without changing MCP code.
 
-The built-in `VanillaIntegration` owns the ten V1 `minecraft.*` tools. Fabric startup supplies its
+The built-in `VanillaIntegration` owns the twelve V1 `minecraft.*` tools. Fabric startup supplies its
 loader-neutral providers, then activates it through `IntegrationRegistry`. The capabilities tool
 reads `ToolRegistry` and `IntegrationRegistry` at invocation time so discovery reflects actual
 registrations rather than a parallel hard-coded feature list.
@@ -331,12 +364,21 @@ The exact Gradle source-set layout can vary, but keep boundaries obvious:
 thread/
   core/
     model/
+      capability/
+      crafting/
+      game/
+      item/
+      player/
+      recipe/
+      validation/
+      world/
     tool/
     context/
     integration/
       vanilla/
     provider/
     serialization/
+    service/
     error/
   platform/
     fabric/
@@ -360,11 +402,20 @@ The V1 implementation uses `me.clutchy.thread` as its Java root:
 me.clutchy.thread
   core
     model
+      capability
+      crafting
+      game
+      item
+      player
+      recipe
+      validation
+      world
     tool
     context
     integration
     provider
     serialization
+    service
     error
   platform.fabric
     game
@@ -381,6 +432,7 @@ Packages are added only when a slice gives them behavior; empty marker classes a
 packages grow:
 
 - `core` cannot import Fabric, Minecraft, or MCP types;
+- model source files must live in one of the documented domain packages;
 - MCP SDK types can only appear below `transport.mcp`;
 - `transport.mcp` cannot import Fabric or Minecraft types directly.
 

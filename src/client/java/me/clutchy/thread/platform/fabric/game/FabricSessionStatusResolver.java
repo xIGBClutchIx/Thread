@@ -1,8 +1,8 @@
 package me.clutchy.thread.platform.fabric.game;
 
-import me.clutchy.thread.core.model.SessionState;
-import me.clutchy.thread.core.model.SessionStatus;
-import me.clutchy.thread.core.model.SessionStatusReason;
+import me.clutchy.thread.core.model.game.SessionState;
+import me.clutchy.thread.core.model.game.SessionStatus;
+import me.clutchy.thread.core.model.game.SessionStatusReason;
 
 /** Pure session-state mapping kept separate from Minecraft's mutable client object. */
 final class FabricSessionStatusResolver {

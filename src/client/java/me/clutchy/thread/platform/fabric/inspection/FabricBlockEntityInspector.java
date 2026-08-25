@@ -1,7 +1,7 @@
 package me.clutchy.thread.platform.fabric.inspection;
 
 import java.util.Optional;
-import me.clutchy.thread.core.model.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**

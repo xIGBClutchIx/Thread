@@ -11,6 +11,23 @@ import java.util.List;
 import java.util.Map;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
+import me.clutchy.thread.core.model.game.SessionState;
+import me.clutchy.thread.core.model.game.SessionStatus;
+import me.clutchy.thread.core.model.item.ItemComponentsInfo;
+import me.clutchy.thread.core.model.item.ItemDurabilityInfo;
+import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
+import me.clutchy.thread.core.model.item.ItemStackInfo;
+import me.clutchy.thread.core.model.player.EquipmentPosition;
+import me.clutchy.thread.core.model.player.EquipmentSlotInfo;
+import me.clutchy.thread.core.model.player.EquipmentSnapshot;
+import me.clutchy.thread.core.model.player.InventorySlotInfo;
+import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
+import me.clutchy.thread.core.model.world.EntityClassification;
+import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.Position;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
 
@@ -143,6 +160,9 @@ class CoreModelTest {
     assertEquals(List.of("minecraft:birch_planks", "minecraft:oak_planks"), ingredient.itemIds());
     assertEquals(List.of("minecraft:planks"), ingredient.tagIds());
     assertEquals(2, ingredient.count());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new RecipeIngredientInfo(List.of(), List.of("minecraft:planks"), 1));
   }
 
   @Test

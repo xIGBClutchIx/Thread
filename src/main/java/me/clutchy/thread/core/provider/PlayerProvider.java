@@ -1,10 +1,10 @@
 package me.clutchy.thread.core.provider;
 
 import java.util.Optional;
-import me.clutchy.thread.core.model.BlockInfo;
-import me.clutchy.thread.core.model.EquipmentSnapshot;
-import me.clutchy.thread.core.model.InventorySnapshot;
-import me.clutchy.thread.core.model.PlayerStatus;
+import me.clutchy.thread.core.model.player.EquipmentSnapshot;
+import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.player.PlayerStatus;
+import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /**

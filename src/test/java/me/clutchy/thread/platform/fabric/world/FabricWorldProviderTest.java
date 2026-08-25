@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import me.clutchy.thread.core.error.ToolErrorCode;
-import me.clutchy.thread.core.model.NearbyEntityQuery;
+import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.platform.fabric.game.FabricProviderLimits;
 import org.junit.jupiter.api.Test;
 

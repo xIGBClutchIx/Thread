@@ -2,8 +2,8 @@ package me.clutchy.thread.core.integration.vanilla;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import me.clutchy.thread.core.model.BlockEntityInfo;
-import me.clutchy.thread.core.model.InventorySnapshot;
+import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.serialization.JsonSchema;
 
 final class VanillaToolSchemas {
@@ -89,6 +89,24 @@ final class VanillaToolSchemas {
           property("type", registryId()),
           property("result", ITEM_STACK),
           property("ingredients", array(RECIPE_INGREDIENT)));
+  private static final JsonObject INGREDIENT_ALLOCATION =
+      object(property("itemId", registryId()), property("count", integer(1, null)));
+  private static final JsonObject INGREDIENT_AVAILABILITY =
+      object(
+          property("itemIds", array(registryId())),
+          property("tagIds", array(registryId())),
+          property("required", integer(1, null)),
+          property("available", integer(0, null)),
+          property("missing", integer(0, null)),
+          property("allocations", array(INGREDIENT_ALLOCATION)));
+  private static final JsonObject RECIPE_CRAFTABILITY =
+      object(
+          property("variant", integer(1, null)),
+          property("recipeId", registryId()),
+          property("type", registryId()),
+          property("resultCount", integer(1, null)),
+          property("craftable", bool()),
+          property("ingredients", array(INGREDIENT_AVAILABILITY)));
   private static final JsonObject INTEGRATION_CAPABILITY =
       object(
           property("id", string(1, 64, INTEGRATION_ID_PATTERN)),
@@ -151,6 +169,12 @@ final class VanillaToolSchemas {
       schema(object(property("itemId", string(1, 256, REGISTRY_ID_PATTERN))));
   static final JsonSchema RECIPE_LOOKUP_RESULT =
       schema(object(property("itemId", registryId()), property("recipes", array(RECIPE_INFO))));
+  static final JsonSchema CRAFTING_RESULT =
+      schema(
+          object(
+              property("itemId", registryId()),
+              property("craftable", bool()),
+              property("recipes", array(RECIPE_CRAFTABILITY))));
   static final JsonSchema ITEM_SEARCH_QUERY =
       schema(object(property("query", string(1, 128, null)), property("limit", integer(1, null))));
   static final JsonSchema ITEM_SEARCH_RESULT =
