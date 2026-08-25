@@ -275,9 +275,32 @@ Minecraft implementation types on the owning logical thread. They must return Th
 not expose raw Minecraft, third-party, NBT, or component objects. Runtime exceptions and linkage
 errors from optional recipe/enrichment contributions are isolated per contributor.
 
+The first shipped optional adapter is JEI. Its flow is:
+
+```text
+JEI IJeiRuntime / recipe layouts
+    -> platform.fabric.integration.jei
+    -> IntegrationRecipeProvider
+    -> CompositeRecipeProvider
+    -> CraftingService / CraftingPlanner
+    -> existing minecraft.* tools
+```
+
+`FabricIntegrationLoader` supplies only the client-thread executor, fixed provider limits, and DTO
+mapper after discovery has accepted the candidate. This small platform constructor-injection layer
+was the first real capability the no-argument proof loader could not provide; core integration
+contracts did not change. All `mezz.jei` imports remain below `platform.fabric.integration.jei`.
+
+JEI exposes `IJeiRuntime` only through its plugin lifecycle. `ThreadJeiPlugin` therefore keeps one
+private lifecycle bridge that is cleared by `onRuntimeUnavailable`; the integration's recipe
+provider reads it only on Minecraft's client thread. Layout conversion accepts stable, single-item
+output recipes with fully item-backed consumed inputs, preserves item alternatives/tag provenance,
+and skips unrepresentable layouts. Base vanilla reads still run first, retaining the central
+single-player guard and fallback behavior.
+
 Future integrations may define additional typed extension points and metadata keys. The framework
-does not yet implement JEI, EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other
-third-party behavior.
+does not implement EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other third-party
+behavior.
 
 ## Platform boundary
 

@@ -105,6 +105,17 @@ class ArchitectureBoundaryTest {
     assertFalse(contents.contains("ServiceLoader"), catalog::toString);
   }
 
+  @Test
+  void jeiApiTypesStayInsideTheJeiFabricIntegration() throws IOException {
+    for (Path source : productionJavaSources()) {
+      String contents = Files.readString(source, StandardCharsets.UTF_8);
+      if (contents.contains("import mezz.jei.")) {
+        assertTrue(
+            normalizedPath(source).contains("/platform/fabric/integration/jei/"), source::toString);
+      }
+    }
+  }
+
   private static List<Path> productionJavaSources() throws IOException {
     try (Stream<Path> roots = PRODUCTION_SOURCE_ROOTS.stream()) {
       return roots

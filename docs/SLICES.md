@@ -447,3 +447,44 @@ FTB Quests, Create, Mekanism, or other substantial mod support.
 - the packaged game test proves the registry initializes with vanilla behavior unchanged
 - architecture boundaries, formatting, lint, unit/integration tests, clean build, and both packaged
   client tests pass
+
+---
+
+## Slice 10: Optional JEI recipe integration
+
+### Goal
+
+Prove the optional integration framework against one supported third-party recipe viewer while
+letting the existing recipe and crafting tools understand safe modpack-aware recipes.
+
+### Work
+
+Add:
+
+- a metadata-only `jei` candidate for JEI `30.26.0.182` through compatible `30.x` Fabric builds
+- a Fabric integration loader that injects only the client-thread executor, provider limits, and
+  DTO mapper after candidate discovery
+- a JEI lifecycle bridge and bounded recipe-layout adapter isolated under
+  `platform.fabric.integration.jei`
+- conversion of stable single-item-output, item-input recipes with alternatives, counts, and tag
+  provenance into the existing Thread recipe model
+- safe skipping for missing IDs, custom/non-item inputs, ambiguous or multiple outputs, malformed
+  layouts, and excessive result/slot/alternative counts
+- packaged tests for JEI present, absent, and installed-but-disabled behavior
+
+The adapter contributes only an `IntegrationRecipeProvider`; it adds no MCP tools and does not
+change MCP transport. The guarded vanilla provider runs first. JEI runtime or layout failures are
+isolated so supported single-player vanilla behavior remains available.
+
+### Acceptance criteria
+
+- supported JEI activates after enabled/presence/version checks and appears in capabilities
+- absent or disabled JEI leaves startup, the thirteen tools, and vanilla recipes unchanged
+- no JEI implementation class is resolved by Thread when the candidate is absent or disabled
+- JEI API types stay within the JEI integration package and never enter core DTOs/services or MCP
+- supported modified recipes preserve stable IDs, variants, item alternatives, counts, and tags
+- unsupported recipe types/layouts are skipped without invented data or failed vanilla queries
+- `get_recipe`, `can_craft`, `get_missing_ingredients`, and the recursive planner consume the same
+  contributed recipes without duplicate JEI-specific tools
+- normal, MCP-disabled, JEI-present, and JEI-disabled packaged client tests pass
+- formatting, lint, unit/integration tests, clean build, and release artifact checks pass

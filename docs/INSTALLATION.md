@@ -10,8 +10,9 @@ checksum; source and game-test JARs are not installable artifacts.
 | Minecraft | 26.2 |
 | Java | 25 |
 | Fabric Loader | 0.19.3 or newer |
-| Fabric API | 0.154.0+26.2 or newer for Minecraft 26.2 |
+| Fabric API | 0.155.0+26.2 or newer for Minecraft 26.2 |
 | Thread | 0.1.0 |
+| JEI | Optional: 30.26.0.182 through compatible 30.x Fabric builds |
 
 Fabric API versions for a different Minecraft release are incompatible even when their numeric
 version is newer.
@@ -23,6 +24,12 @@ version is newer.
 3. Verify the checksum.
 4. Copy `thread-0.1.0.jar` into the instance's `mods` folder beside Fabric API.
 5. Start the client. No second Thread component, library, or server mod is required.
+
+For modpack-aware recipes, also install a supported Fabric build of JEI. Thread detects JEI at
+startup and exposes it as integration ID `jei` through `minecraft.get_capabilities`. Without JEI,
+all recipe and crafting tools continue to use the vanilla recipe manager. To leave JEI installed
+but disable Thread's adapter, add `"jei"` to `disabledIntegrations` in `config/thread.json` and
+restart the client.
 
 PowerShell:
 
@@ -83,6 +90,8 @@ complete schema and defaults are in the [README](../README.md#configuration).
 - If a gameplay call fails outside a world or in multiplayer, call `minecraft.get_status` first.
   Multiplayer gameplay access is intentionally unsupported in V1.
 - If a tool is absent, inspect `enabledTools`. An empty array exposes no tools.
+- If JEI recipes do not appear, confirm `minecraft.get_capabilities` includes integration `jei`,
+  use JEI `30.26.0.182` or a compatible `30.x` build, and check `disabledIntegrations`.
 - If Fabric reports an incompatible dependency, make sure every mod targets Minecraft 26.2 and
   remove duplicate Fabric API JARs from the instance.
 

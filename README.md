@@ -44,7 +44,8 @@ Read in this order when implementing:
 7. [`docs/MCP_NOTES.md`](docs/MCP_NOTES.md)
 8. [`docs/ROADMAP.md`](docs/ROADMAP.md)
 9. [`docs/DECISIONS.md`](docs/DECISIONS.md)
-10. [`docs/MULTIPLAYER_FUTURE.md`](docs/MULTIPLAYER_FUTURE.md)
+10. [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)
+11. [`docs/MULTIPLAYER_FUTURE.md`](docs/MULTIPLAYER_FUTURE.md)
 
 Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 
@@ -62,19 +63,25 @@ Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 | 7 | Deterministic inventory-to-recipe crafting intelligence |
 | 8 | Bounded recursive crafting plans with cycle-safe explanations |
 | 9 | Optional mod integration discovery, isolation, and typed contribution framework |
+| 10 | Optional JEI recipe integration through the existing crafting tools |
 
 A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
 ## Install
 
 Thread 0.1.0 requires Minecraft 26.2, Java 25, Fabric Loader 0.19.3 or newer, and Fabric API
-0.154.0+26.2 or newer for Minecraft 26.2.
+0.155.0+26.2 or newer for Minecraft 26.2. JEI is optional; Thread supports JEI
+`30.26.0.182` through compatible `30.x` releases when it is installed.
 
 1. Install the required Minecraft, Fabric Loader, and Fabric API versions.
 2. Download `thread-0.1.0.jar` and `thread-0.1.0.jar.sha256` from the matching GitHub release.
 3. Verify the checksum, then copy only `thread-0.1.0.jar` into the instance's `mods` folder.
 4. Launch Minecraft and confirm the log contains `Thread 0.1.0 initialized` and
    `Thread MCP listener started at http://127.0.0.1:25580/mcp`.
+
+To include modpack-aware recipes, install JEI `30.26.0.182` or a newer compatible `30.x` Fabric
+build in the same instance. Thread remains fully functional with vanilla recipe behavior when JEI
+is absent or when `"jei"` is listed in `disabledIntegrations`.
 
 PowerShell checksum verification:
 
@@ -159,8 +166,10 @@ See [Installation](docs/INSTALLATION.md) for the complete troubleshooting guide.
   world/inventory changes are intentionally rejected or absent.
 - Nearby-entity queries only inspect already-loaded state and never force-load chunks.
 - No authentication or remote binding. The server is intentionally restricted to loopback.
-- The optional integration framework is present, but no third-party mod integration or in-game
-  assistant UI ships yet.
+- JEI is the only recipe-viewer integration. REI and EMI are not queried, and recipe layouts with
+  non-item inputs, multiple outputs, missing stable IDs, or other data Thread cannot represent are
+  skipped safely.
+- No in-game assistant UI ships yet.
 - `minecraft.can_craft` and `minecraft.get_missing_ingredients` compare one recipe execution with
   the current 36-slot main inventory.
 - `minecraft.get_crafting_plan` recursively explains intermediate recipes and final raw shortages
@@ -178,7 +187,9 @@ The Gradle Wrapper is the supported build entry point. Run the complete local qu
 
 Run the live development test with `./gradlew runClientGameTest`. Run the clean-install proof against
 the packaged mod with `./gradlew runProductionClientGameTest`, and verify disabled MCP startup with
-`./gradlew runMcpDisabledProductionClientGameTest`. `./gradlew releaseBundle` writes the validated
+`./gradlew runMcpDisabledProductionClientGameTest`. The packaged JEI checks are
+`./gradlew runJeiProductionClientGameTest` and
+`./gradlew runJeiDisabledProductionClientGameTest`. `./gradlew releaseBundle` writes the validated
 runtime JAR and SHA-256 file to `build/release/`.
 
 V1 uses semantic versions in `gradle.properties` and matching `vMAJOR.MINOR.PATCH` Git tags. A tag

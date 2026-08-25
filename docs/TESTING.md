@@ -61,6 +61,8 @@ Cover:
   cross-branch materials, deterministic variants and repeated IDs, direct/indirect/tag cycles,
   cyclic-versus-safe variants, maximum depth, empty inventory, no recipes, and session failures
 - optional recipe-provider merging with base session failures remaining authoritative
+- JEI layout conversion for stable variants, item/tag alternatives, counts, unavailable runtime,
+  and safe rejection of non-item inputs
 
 ## Architecture tests
 
@@ -113,8 +115,8 @@ supported-world states. Separate unit tests preserve no-world and multiplayer re
 nearby-entity radius/result caps.
 
 The same packaged test also verifies that the integration registry initializes with only the
-required `vanilla` integration when no optional candidate is shipped, and that its generated
-capability metadata reflects all thirteen committed tools. Core tests use a reflective test-only
+required `vanilla` integration when JEI is absent, and that its generated capability metadata
+reflects all thirteen committed tools. Core tests use a reflective test-only
 proof integration to cover conditional activation, tool/context/recipe/typed-extension
 contributions, metadata reporting, atomic failure rollback, duplicate IDs, stable ordering, and
 classloading/linkage isolation. Fabric unit tests verify block, block-entity, and entity enrichment
@@ -124,6 +126,16 @@ order plus per-contributor runtime failure isolation.
 `./gradlew runProductionClientGameTest` instead loads the installable runtime JAR plus an isolated
 game-test JAR; production classes do not leak in through the harness. The game-test source set is
 never packaged in the runtime mod.
+
+`./gradlew runJeiProductionClientGameTest` adds the pinned full JEI runtime and a game-test-only JEI
+plugin. That plugin registers two stable modified recipe variants for a barrier and a second-level
+structure-void recipe absent from Minecraft's recipe manager. The test proves JEI capability
+metadata, recipe alternatives/variants, direct craftability, missing counts, recursive planning,
+and MCP recipe access through the packaged Thread JAR.
+
+`./gradlew runJeiDisabledProductionClientGameTest` installs the same JEI runtime but writes an
+isolated Thread config containing `disabledIntegrations: ["jei"]`. It proves only `vanilla` becomes
+active and the game-test-only JEI recipe does not enter Thread's vanilla fallback.
 
 ## Threading tests
 
@@ -206,6 +218,6 @@ Do not tag V1 unless:
 - docs reflect actual behavior
 - tag/release workflow can produce the installable V1 JAR from a clean checkout
 
-The local release-equivalent gate is documented in [RELEASE.md](RELEASE.md). It adds both packaged
-client runs, the tag/version check, runtime artifact inspection, and checksum generation to the
-normal quality gate.
+The local release-equivalent gate is documented in [RELEASE.md](RELEASE.md). It adds all four
+packaged client runs, the tag/version check, runtime artifact inspection, and checksum generation
+to the normal quality gate.

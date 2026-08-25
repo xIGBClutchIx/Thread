@@ -41,15 +41,16 @@ Possible work:
 Theme: understand the actual modpack rather than generic recipes.
 
 The metadata-first integration framework already provides safe discovery and typed contribution
-points. V2 makes it user-visible by shipping real third-party integrations.
+points. Slice 10 made it user-visible with the first optional JEI recipe integration. V2 expands
+modpack awareness without moving third-party types into core.
 
 Priority candidates:
 
-1. EMI / JEI / REI recipe data
-2. FTB Quests
-3. storage systems such as Applied Energistics 2 / Refined Storage
-4. Create
-5. Mekanism
+1. FTB Quests
+2. storage systems such as Applied Energistics 2 / Refined Storage
+3. Create
+4. Mekanism
+5. another recipe viewer only if it adds proven coverage beyond JEI
 
 Examples:
 

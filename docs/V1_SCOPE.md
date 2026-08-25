@@ -15,7 +15,7 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Minecraft Java Edition
 - Fabric only
 - Java implementation
-- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2
+- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.155.0+26.2
 - Local MCP access only by default
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
@@ -48,7 +48,7 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - current dimension and position
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
-- vanilla recipe lookup
+- vanilla recipe lookup plus optional supported JEI item recipes
 - deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - deterministic recursive crafting plans with bounded cycle/depth handling
 - vanilla item search
@@ -90,7 +90,7 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - command execution
 - remote/public MCP hosting
 - account/authentication systems
-- JEI/REI/EMI integration
+- REI/EMI integration
 - FTB Quests integration
 - Create/Mekanism/AE2/etc. integrations
 - broad chest/container scanning
@@ -100,8 +100,8 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - long-term player memory
 - voice input/output
 
-V1 includes the integration framework and a test-only proof integration. It still ships no JEI,
-EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other substantial third-party support.
+V1 includes the integration framework and one optional JEI recipe adapter. It still ships no EMI,
+REI, FTB Quests, Create, Mekanism, storage-network, or other substantial third-party support.
 
 ## V1 success criteria
 
@@ -123,7 +123,8 @@ reports each recipe variant independently with required, allocated, and missing 
 Thread recursively plans intermediate recipes with one shared inventory ledger and reports final raw
 shortages plus structured cycle/depth/work-limit issues. Both are read-only analyses: Thread does not
 craft items, search nearby storage, model workstation/fuel feasibility, or globally optimize every
-recipe combination.
+recipe combination. When supported JEI is active, the same tools also consider safe item-only JEI
+recipes without changing their contracts.
 
 ## Non-goals that protect the architecture
 

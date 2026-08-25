@@ -552,8 +552,10 @@ path, so the same item can validly appear in separate branches. The production m
 step, explored-branch, and scaled-quantity ceilings provide additional bounds. A non-cyclic variant
 is preferred over a cyclic one under the deterministic selection order.
 
-The planner does not inspect equipment or nearby storage, model crafting stations/fuel, integrate
-JEI/EMI/REI, perform automatic crafting, or mutate the game.
+The planner does not inspect equipment or nearby storage, model crafting stations/fuel, perform
+automatic crafting, or mutate the game. It remains unaware of recipe-viewer APIs; when the optional
+JEI integration is active, supported JEI recipes arrive through the same `RecipeProvider` contract
+as vanilla recipes. REI and EMI are not integrated.
 
 ## `minecraft.search_items`
 
@@ -624,6 +626,10 @@ Registry-owned `thread.*` entries describe actual contributions and, for optiona
 target mod/version requirement that passed discovery. Integration-owned metadata uses its own
 namespace. Disabled, absent, incompatible, or failed integrations never appear as active
 capabilities and their classes are not resolved before presence/compatibility checks.
+
+With supported JEI active, this list includes integration ID `jei`, contract version `1.0.0`,
+target-mod/version metadata, recipe-provider contribution metadata, and the adapter's safe recipe
+model/unsupported policy. The tool list remains the same thirteen `minecraft.*` tools.
 
 ## Tool descriptions
 

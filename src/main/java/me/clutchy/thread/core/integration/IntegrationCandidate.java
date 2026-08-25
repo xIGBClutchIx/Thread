@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * @param id stable integration ID expected from the loaded implementation
  * @param targetModId mod whose presence enables the candidate
  * @param versionRequirement loader-specific version predicate evaluated by the environment
- * @param implementationClassName no-argument {@link ThreadIntegration} implementation class
+ * @param implementationClassName loader-constructed {@link ThreadIntegration} implementation class
  */
 public record IntegrationCandidate(
     IntegrationId id,

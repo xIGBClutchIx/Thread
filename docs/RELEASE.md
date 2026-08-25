@@ -12,14 +12,15 @@ without a prefix; the corresponding Git tag is exactly `vMAJOR.MINOR.PATCH`.
 5. Run the clean local release gate:
 
 ```powershell
-./gradlew.bat clean spotlessCheck check build runProductionClientGameTest runMcpDisabledProductionClientGameTest releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
+./gradlew.bat clean spotlessCheck check build runProductionClientGameTest runMcpDisabledProductionClientGameTest runJeiProductionClientGameTest runJeiDisabledProductionClientGameTest releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
 ```
 
 Replace `v0.1.0` with the release tag. A mismatched tag intentionally fails.
 
-The two production tasks load `build/libs/thread-<version>.jar` as the actual mod and add only an
-isolated game-test harness. The enabled run performs discovery and all required live scenarios;
-the disabled run proves that the same mod starts without an MCP listener.
+The four production tasks load `build/libs/thread-<version>.jar` as the actual mod and add only an
+isolated game-test harness. The normal run proves JEI absence, the MCP-disabled run proves a clean
+no-listener state, the JEI run adds the pinned full runtime plus modified test recipes, and the
+JEI-disabled run proves an installed recipe viewer cannot bypass Thread configuration.
 
 ## Inspect the bundle
 
@@ -43,6 +44,6 @@ source or game-test content. Independently verify the checksum before tagging.
 5. Download the workflow artifact and confirm its checksum matches the GitHub release files.
 6. Complete [the manual MCP smoke test](MANUAL_SMOKE_TEST.md) against the downloaded JAR.
 
-The tag workflow repeats the clean quality gate and both packaged-client tests, rejects a tag/version
+The tag workflow repeats the clean quality gate and all packaged-client tests, rejects a tag/version
 mismatch, creates the JAR/checksum bundle, uploads it as a workflow artifact, and creates or updates
 the GitHub release. No Modrinth, CurseForge, Maven, or other registry publication is performed.

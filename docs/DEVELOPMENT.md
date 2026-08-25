@@ -212,7 +212,7 @@ gradlew.bat
 A release workflow may be added in Slice 6 rather than Slice 0.
 
 Slice 6 implements this as `.github/workflows/release.yml`. It accepts only `v*` tags, verifies the
-tag exactly matches `mod_version`, runs the normal clean gate and both packaged-client game tests,
+tag exactly matches `mod_version`, runs the normal clean gate and all packaged-client game tests,
 then publishes the validated runtime JAR and SHA-256 checksum. `docs/RELEASE.md` is the operative
 developer checklist.
 

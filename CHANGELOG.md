@@ -10,6 +10,12 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
   plans across thirteen read-only tools.
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
+- Optional JEI `30.x` recipe integration for supported modified recipes, alternatives, stable
+  variants, craftability, missing ingredients, and recursive plans.
+
+### Changed
+
+- Raised the Minecraft 26.2 Fabric API minimum to `0.155.0+26.2`, matching the supported JEI line.
 
 ## 0.1.0 - 2026-08-24
 

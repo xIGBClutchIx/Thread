@@ -351,3 +351,29 @@ The lifecycle stays deliberately small. Integrations have a registration callbac
 start, stop, reload, event bus, or background-task system exists until an implemented integration
 proves one is required. This slice ships a test-only proof integration and no substantial
 third-party mod integration.
+
+## D024: JEI is the first recipe-viewer integration
+
+**Status:** Accepted
+
+Slice 10 supports JEI `30.26.0.182` through compatible `30.x` Fabric builds for Minecraft 26.2.
+JEI was selected because its current Fabric line publishes a separate API artifact, supplies a
+public runtime recipe lookup/layout API, and aligns with Thread's Java 25, Fabric Loader 0.19.3, and
+Minecraft 26.2 baseline. Fabric API moves from `0.154.0+26.2` to JEI's required
+`0.155.0+26.2`; JEI itself remains compile-only and optional for Thread.
+
+`JeiIntegration` contributes recipe definitions through `IntegrationRecipeProvider`. Existing
+`get_recipe`, craftability, missing-ingredient, and recursive-plan services use them automatically;
+there is no parallel JEI tool or MCP behavior. Core crafting classes have no JEI dependency.
+
+JEI's public Fabric plugin lifecycle is the only supported way to receive `IJeiRuntime`, so a
+private adapter-local bridge is the deliberate exception to the preference for injected state. It
+is cleared when JEI invalidates the runtime, queried only on the client thread, and never exposed to
+core. The platform integration loader injects the executor, mapper, and existing safety limits only
+after metadata-first discovery succeeds.
+
+Thread accepts only layouts it can represent truthfully: a stable ID, one item output, and consumed
+item-stack inputs with consistent counts. Alternatives and source tags are retained; custom
+ingredient types, multiple or ambiguous outputs, missing IDs, malformed layouts, and excessive
+results are skipped. A successful guarded vanilla result remains authoritative fallback whenever
+JEI is absent, disabled, unavailable, or fails at runtime.

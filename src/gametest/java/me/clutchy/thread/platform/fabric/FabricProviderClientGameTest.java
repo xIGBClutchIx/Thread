@@ -29,6 +29,8 @@ import net.minecraft.world.phys.BlockHitResult;
 @SuppressWarnings("UnstableApiUsage")
 public final class FabricProviderClientGameTest implements FabricClientGameTest {
   private static final String EXPECT_MCP_DISABLED = "thread.gametest.expectMcpDisabled";
+  private static final String EXPECT_JEI = "thread.gametest.expectJei";
+  private static final String EXPECT_JEI_DISABLED = "thread.gametest.expectJeiDisabled";
 
   @Override
   public void runTest(ClientGameTestContext context) {
@@ -41,15 +43,30 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .findFirst()
             .orElseThrow();
     ToolRegistry tools = entrypoint.tools();
-    assertEquals(1, entrypoint.integrations().integrations().size(), "active integration count");
+    boolean expectJei = Boolean.getBoolean(EXPECT_JEI);
+    boolean expectJeiDisabled = Boolean.getBoolean(EXPECT_JEI_DISABLED);
     assertEquals(
-        "vanilla",
+        expectJei ? 2 : 1,
+        entrypoint.integrations().integrations().size(),
+        "active integration count");
+    assertEquals(
+        expectJei ? "jei" : "vanilla",
         entrypoint.integrations().integrations().getFirst().id().value(),
-        "active vanilla integration");
+        "first active integration");
     assertEquals(
         "13",
-        entrypoint.integrations().integrations().getFirst().metadata().get("thread.tool_count"),
+        entrypoint.integrations().integrations().stream()
+            .filter(integration -> integration.id().value().equals("vanilla"))
+            .findFirst()
+            .orElseThrow()
+            .metadata()
+            .get("thread.tool_count"),
         "vanilla contribution metadata");
+    assertTrue(
+        !expectJeiDisabled
+            || entrypoint.integrations().integrations().stream()
+                .noneMatch(integration -> integration.id().value().equals("jei")),
+        "disabled JEI integration remains inactive");
     if (Boolean.getBoolean(EXPECT_MCP_DISABLED)) {
       assertTrue(!entrypoint.mcpRunning(), "MCP remains stopped when configured off");
       assertEquals(13, tools.descriptors().size(), "tools initialize independently of MCP");
@@ -150,18 +167,19 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer.getServer().runCommand("give @a minecraft:diamond 3");
       singleplayer.getServer().runCommand("give @a minecraft:stick 2");
       singleplayer.getServer().runCommand("give @a minecraft:oak_log 1");
+      singleplayer.getServer().runCommand("give @a minecraft:dirt 1");
       singleplayer.getServer().runCommand("summon minecraft:minecart 2 100 0");
       singleplayer
           .getServer()
           .runCommand("summon minecraft:zombie 4 100 0 {NoAI:1b,Silent:1b,Invulnerable:1b}");
-      // Fabric API 0.154 predates the connection-level packet drain helper. Waiting for the
-      // command's observable client state keeps the test deterministic without depending on a
-      // newer game-test convenience API.
+      // Waiting for the command's observable client state keeps this packaged test deterministic
+      // without depending on a game-test packet-drain convenience API.
       context.waitFor(
           client ->
               hasInventoryStack(client, Items.DIAMOND, 3)
                   && hasInventoryStack(client, Items.STICK, 2)
                   && hasInventoryStack(client, Items.OAK_LOG, 1)
+                  && hasInventoryStack(client, Items.DIRT, 1)
                   && client.player != null
                   && client.player.getMainHandItem().is(Items.DIAMOND_PICKAXE));
       context.waitFor(FabricProviderClientGameTest::targetsKnownFurnace);
@@ -190,10 +208,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
               tools,
               "minecraft.get_missing_ingredients",
               "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
-      assertTrue(
-          recipeIngredients(directMissing).stream()
-              .allMatch(ingredient -> ingredient.get("missing").getAsInt() == 0),
-          "direct missing ingredient counts");
+      assertTrue(directMissing.get("craftable").getAsBoolean(), "direct missing ingredient counts");
       JsonObject directPlan =
           invokeSuccessfully(
               context,
@@ -213,6 +228,17 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           "recursive plan final step");
       assertTrue(directPlan.getAsJsonArray("missingMaterials").isEmpty(), "no raw shortages");
       assertTrue(directPlan.getAsJsonArray("issues").isEmpty(), "no planning safety issues");
+
+      if (expectJei) {
+        verifyJeiRecipes(context, tools);
+      } else if (expectJeiDisabled) {
+        JsonObject disabledRecipes =
+            invokeSuccessfully(
+                context, tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:barrier\"}");
+        assertTrue(
+            disabledRecipes.getAsJsonArray("recipes").isEmpty(),
+            "disabled JEI recipes do not enter the vanilla fallback");
+      }
 
       JsonObject search =
           invokeSuccessfully(
@@ -349,10 +375,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       JsonObject mcpMissing =
           mcpTool(
               context, mcp.endpoint(), 14, "minecraft.get_missing_ingredients", recipeArguments);
-      assertTrue(
-          recipeIngredients(mcpMissing).stream()
-              .allMatch(ingredient -> ingredient.get("missing").getAsInt() == 0),
-          "MCP missing ingredient counts");
+      assertTrue(mcpMissing.get("craftable").getAsBoolean(), "MCP missing ingredient counts");
 
       JsonObject planArguments = new JsonObject();
       planArguments.addProperty("itemId", "minecraft:crafting_table");
@@ -378,7 +401,63 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       JsonObject mcpCapabilities =
           mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
       assertEquals(13, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+      assertEquals(
+          expectJei,
+          mcpCapabilities.getAsJsonArray("integrations").asList().stream()
+              .map(JsonElement::getAsJsonObject)
+              .anyMatch(integration -> integration.get("id").getAsString().equals("jei")),
+          "MCP capability JEI activation");
+      if (expectJei) {
+        JsonObject jeiRecipeArguments = new JsonObject();
+        jeiRecipeArguments.addProperty("itemId", "minecraft:barrier");
+        JsonObject jeiRecipe =
+            mcpTool(context, mcp.endpoint(), 18, "minecraft.get_recipe", jeiRecipeArguments);
+        assertEquals(2, jeiRecipe.getAsJsonArray("recipes").size(), "MCP JEI recipe variants");
+      }
     }
+  }
+
+  private static void verifyJeiRecipes(ClientGameTestContext context, ToolRegistry tools) {
+    JsonObject recipes =
+        invokeSuccessfully(
+            context, tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:barrier\"}");
+    assertEquals(2, recipes.getAsJsonArray("recipes").size(), "JEI recipe variants");
+    JsonObject firstRecipe = recipes.getAsJsonArray("recipes").get(0).getAsJsonObject();
+    assertEquals(
+        "thread:jei_barrier_from_earth",
+        firstRecipe.get("recipeId").getAsString(),
+        "stable JEI recipe ordering");
+    assertEquals(
+        2,
+        firstRecipe
+            .getAsJsonArray("ingredients")
+            .get(0)
+            .getAsJsonObject()
+            .getAsJsonArray("itemIds")
+            .size(),
+        "JEI ingredient alternatives");
+
+    JsonObject craftability =
+        invokeSuccessfully(
+            context, tools, "minecraft.can_craft", "{\"itemId\":\"minecraft:barrier\"}");
+    assertTrue(craftability.get("craftable").getAsBoolean(), "JEI recipe craftability");
+    JsonObject missing =
+        invokeSuccessfully(
+            context,
+            tools,
+            "minecraft.get_missing_ingredients",
+            "{\"itemId\":\"minecraft:barrier\"}");
+    assertTrue(missing.get("craftable").getAsBoolean(), "JEI recipe missing ingredient counts");
+    JsonObject plan =
+        invokeSuccessfully(
+            context,
+            tools,
+            "minecraft.get_crafting_plan",
+            "{\"itemId\":\"minecraft:structure_void\"}");
+    assertTrue(plan.get("craftable").getAsBoolean(), "JEI recursive crafting plan");
+    assertTrue(plan.getAsJsonArray("steps").size() >= 2, "JEI recursive intermediate step");
+    assertTrue(plan.getAsJsonArray("missingMaterials").isEmpty(), "JEI plan raw shortages");
+    assertTrue(plan.getAsJsonArray("issues").isEmpty(), "JEI plan safety limits");
   }
 
   private static JsonObject mcpTool(
