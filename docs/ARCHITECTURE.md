@@ -228,6 +228,7 @@ Do not hide unsafe cross-thread reads behind `synchronized`.
 facing dependency is `ToolRegistry`:
 
 ```text
+HTTP initialize      -> transport-owned server identity/capabilities/instructions
 HTTP server/discover -> transport-owned server metadata
 HTTP tools/list      -> ToolRegistry.descriptors()
 HTTP tools/call      -> ToolRegistry.invoke(...)
@@ -239,8 +240,10 @@ transport workers; provider-owned `GameThreadExecutor` implementations remain re
 marshalling live reads onto Minecraft's logical threads.
 
 V1 starts one `127.0.0.1` listener after built-in tool registration and closes it from the Fabric
-client-stopping event. The wire surface is stateless: it does not implement the retired MCP
-initialization/session flow or legacy HTTP+SSE.
+client-stopping event. The same POST endpoint accepts Codex's initialization sequence and the
+stateless `2026-07-28` discovery sequence. Initialization returns identity, tool capabilities, and
+instructions, then accepts `notifications/initialized`; it does not create session state or mint a
+`Mcp-Session-Id`. Legacy HTTP+SSE remains unsupported.
 
 ## Client vs logical server state
 

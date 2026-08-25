@@ -84,7 +84,7 @@ See [Installation](docs/INSTALLATION.md) for Linux/macOS verification and launch
 
 ## Connect an MCP client
 
-Thread exposes the stateless MCP `2026-07-28` Streamable HTTP endpoint at
+Thread exposes an MCP Streamable HTTP endpoint at
 `http://127.0.0.1:25580/mcp`. A Codex configuration example is:
 
 ```toml
@@ -94,8 +94,9 @@ url = "http://127.0.0.1:25580/mcp"
 ```
 
 Restart Codex and open a new task after changing its MCP configuration. Thread must be running in
-Minecraft before the client connects. Clients discover ten read-only `minecraft.*` tools; no
-`initialize` handshake or session ID is used.
+Minecraft before the client connects. Codex initializes the connection, receives Thread's server
+identity/instructions, and discovers ten read-only `minecraft.*` tools. Thread also retains the
+stateless MCP `2026-07-28` discovery flow; neither flow creates protocol sessions.
 
 ## Configuration
 

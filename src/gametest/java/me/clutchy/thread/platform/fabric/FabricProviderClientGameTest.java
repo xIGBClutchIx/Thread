@@ -66,6 +66,22 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         "live capability catalog");
 
     assertTrue(mcp.running(), "MCP listener running");
+    JsonObject initialize = mcpInitialize(context, mcp.endpoint(), 0).body();
+    assertEquals(
+        "2026-07-28",
+        initialize.getAsJsonObject("result").get("protocolVersion").getAsString(),
+        "MCP initialize protocol");
+    assertEquals(
+        "Thread",
+        initialize
+            .getAsJsonObject("result")
+            .getAsJsonObject("serverInfo")
+            .get("name")
+            .getAsString(),
+        "MCP initialize server identity");
+    McpResponse initialized = mcpInitialized(context, mcp.endpoint());
+    assertEquals(202, initialized.status(), "MCP initialized notification");
+    assertTrue(initialized.body() == null, "MCP initialized notification has no response body");
     JsonObject discovery =
         mcpRequest(context, mcp.endpoint(), 1, "server/discover", null, null).body();
     assertEquals(
@@ -276,11 +292,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     return awaitExternal(
         context,
         () -> {
-          JsonObject metadata = new JsonObject();
-          metadata.addProperty("io.modelcontextprotocol/protocolVersion", "2026-07-28");
-          metadata.add("io.modelcontextprotocol/clientCapabilities", new JsonObject());
           JsonObject params = new JsonObject();
-          params.add("_meta", metadata);
           if (name != null) {
             params.addProperty("name", name);
             params.add("arguments", arguments);
@@ -290,31 +302,65 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           requestBody.addProperty("id", id);
           requestBody.addProperty("method", method);
           requestBody.add("params", params);
-
-          HttpRequest.Builder request =
-              HttpRequest.newBuilder(endpoint)
-                  .timeout(Duration.ofSeconds(10))
-                  .header("Accept", "application/json, text/event-stream")
-                  .header("Content-Type", "application/json")
-                  .header("MCP-Protocol-Version", "2026-07-28")
-                  .header("Mcp-Method", method)
-                  .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()));
-          if (name != null) {
-            request.header("Mcp-Name", name);
-          }
-          try {
-            HttpResponse<String> response =
-                HttpClient.newHttpClient()
-                    .send(request.build(), HttpResponse.BodyHandlers.ofString());
-            return new McpResponse(
-                response.statusCode(), JsonParser.parseString(response.body()).getAsJsonObject());
-          } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("MCP game-test request was interrupted", exception);
-          } catch (IOException exception) {
-            throw new IllegalStateException("MCP game-test request failed", exception);
-          }
+          return mcpPost(endpoint, requestBody, "2026-07-28");
         });
+  }
+
+  private static McpResponse mcpInitialize(ClientGameTestContext context, URI endpoint, long id) {
+    return awaitExternal(
+        context,
+        () -> {
+          JsonObject params = new JsonObject();
+          params.addProperty("protocolVersion", "2026-07-28");
+          params.add("capabilities", new JsonObject());
+          JsonObject clientInfo = new JsonObject();
+          clientInfo.addProperty("name", "Thread packaged game test");
+          clientInfo.addProperty("version", "1.0.0");
+          params.add("clientInfo", clientInfo);
+          JsonObject requestBody = new JsonObject();
+          requestBody.addProperty("jsonrpc", "2.0");
+          requestBody.addProperty("id", id);
+          requestBody.addProperty("method", "initialize");
+          requestBody.add("params", params);
+          return mcpPost(endpoint, requestBody, null);
+        });
+  }
+
+  private static McpResponse mcpInitialized(ClientGameTestContext context, URI endpoint) {
+    return awaitExternal(
+        context,
+        () -> {
+          JsonObject notification = new JsonObject();
+          notification.addProperty("jsonrpc", "2.0");
+          notification.addProperty("method", "notifications/initialized");
+          return mcpPost(endpoint, notification, "2026-07-28");
+        });
+  }
+
+  private static McpResponse mcpPost(URI endpoint, JsonObject requestBody, String protocolVersion) {
+    HttpRequest.Builder request =
+        HttpRequest.newBuilder(endpoint)
+            .timeout(Duration.ofSeconds(10))
+            .header("Accept", "application/json, text/event-stream")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()));
+    if (protocolVersion != null) {
+      request.header("MCP-Protocol-Version", protocolVersion);
+    }
+    try {
+      HttpResponse<String> response =
+          HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
+      JsonObject body =
+          response.body().isBlank()
+              ? null
+              : JsonParser.parseString(response.body()).getAsJsonObject();
+      return new McpResponse(response.statusCode(), body);
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("MCP game-test request was interrupted", exception);
+    } catch (IOException exception) {
+      throw new IllegalStateException("MCP game-test request failed", exception);
+    }
   }
 
   private static JsonObject invokeSuccessfully(

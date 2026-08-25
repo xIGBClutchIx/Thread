@@ -52,9 +52,9 @@ url = "http://127.0.0.1:25580/mcp"
 ```
 
 Restart Codex and create a new task so it attaches the newly configured server. Start Minecraft
-with Thread before using the tools. The endpoint supports independent MCP `2026-07-28` POSTs for
-`server/discover`, `tools/list`, and `tools/call`; it does not use the retired initialization
-handshake or sessions.
+with Thread before using the tools. The endpoint supports the Codex Streamable HTTP sequence
+`initialize` -> `notifications/initialized` -> `tools/list`/`tools/call`, as well as independent MCP
+`2026-07-28` `server/discover` requests. It does not create protocol sessions.
 
 ## Confirm the installation
 

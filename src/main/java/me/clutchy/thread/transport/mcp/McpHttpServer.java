@@ -21,13 +21,17 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import me.clutchy.thread.core.tool.ToolRegistry;
 
-/** Loopback-only MCP 2026-07-28 Streamable HTTP server backed by a {@link ToolRegistry}. */
+/**
+ * Loopback-only MCP Streamable HTTP server backed by a {@link ToolRegistry}.
+ *
+ * <p>The endpoint accepts both the current stateless discovery flow and the initialization flow
+ * used by Codex without introducing protocol sessions or a second transport endpoint.
+ */
 public final class McpHttpServer implements AutoCloseable {
   /** The single MCP Streamable HTTP endpoint path. */
   public static final String ENDPOINT_PATH = "/mcp";
 
   private static final String JSON_MEDIA_TYPE = "application/json";
-  private static final String SESSION_ID_HEADER = "Mcp-Session-Id";
   private static final String SSE_MEDIA_TYPE = "text/event-stream";
   private static final System.Logger LOGGER = System.getLogger(McpHttpServer.class.getName());
 
@@ -128,9 +132,6 @@ public final class McpHttpServer implements AutoCloseable {
     if (!validOrigin(exchange.getRequestHeaders().getFirst("Origin"))) {
       return rpc.invalidRequest("Forbidden Origin").withStatus(403);
     }
-    if (exchange.getRequestHeaders().containsKey(SESSION_ID_HEADER)) {
-      return rpc.invalidRequest("Mcp-Session-Id is not supported by MCP 2026-07-28");
-    }
     if (!mediaType(exchange.getRequestHeaders().getFirst("Content-Type")).equals(JSON_MEDIA_TYPE)) {
       return rpc.invalidRequest("Content-Type must be application/json").withStatus(415);
     }
@@ -161,16 +162,11 @@ public final class McpHttpServer implements AutoCloseable {
     if (!parsed.isJsonObject()) {
       return rpc.invalidRequest("Request body must be one JSON-RPC object");
     }
-    McpRequestHeaders headers =
-        new McpRequestHeaders(
-            exchange.getRequestHeaders().getFirst("MCP-Protocol-Version"),
-            exchange.getRequestHeaders().getFirst("Mcp-Method"),
-            exchange.getRequestHeaders().getFirst("Mcp-Name"));
-    return rpc.handle(parsed.getAsJsonObject(), headers);
+    return rpc.handle(
+        parsed.getAsJsonObject(), exchange.getRequestHeaders().getFirst("MCP-Protocol-Version"));
   }
 
   private static void write(HttpExchange exchange, McpHttpResponse response) throws IOException {
-    exchange.getResponseHeaders().set("MCP-Protocol-Version", McpJsonRpcHandler.PROTOCOL_VERSION);
     exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
     if (!response.hasBody()) {
       exchange.sendResponseHeaders(response.status(), -1);

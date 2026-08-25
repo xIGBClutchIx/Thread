@@ -113,13 +113,13 @@ Verify:
 `ToolRegistry`. It verifies:
 
 - discovery identity/version/capability metadata
+- real `initialize` -> `notifications/initialized` -> `tools/list` over HTTP
 - tool list metadata, deterministic registry mapping, and input/output schemas
 - structured success and tool-error results
 - unknown methods/tools and malformed JSON-RPC requests
-- protocol version and mirrored `Mcp-Method`/`Mcp-Name` validation
-- required per-request capabilities metadata, response identity stamps, and cache hints
-- rejection of the retired initialization, session-header, and cancellation-notification flow
-- Base64-encoded MCP names
+- standard post-initialization protocol-version validation without custom mirrored fields
+- response identity stamps and discovery/list cache hints
+- session-header tolerance without creating or echoing session IDs
 - loopback Origin, content type, request size, and listener bind enforcement
 - bounded concurrent request rejection without queueing more tool work
 - repeated independent clients, idempotent shutdown, and same-port restart
@@ -127,9 +127,10 @@ Verify:
 Do not require Minecraft for most MCP tests.
 
 The Fabric client game test additionally starts the production listener at
-`http://127.0.0.1:25580/mcp`. It performs `server/discover` and `tools/list`, verifies all ten
-release scenarios through real HTTP `tools/call` requests, and confirms an invalid MCP call does
-not stop the listener. Normal client shutdown must log that the listener stopped.
+`http://127.0.0.1:25580/mcp`. It performs the Codex initialization sequence before
+`server/discover` and `tools/list`, verifies all ten release scenarios through real HTTP
+`tools/call` requests, and confirms an invalid MCP call does not stop the listener. Normal client
+shutdown must log that the listener stopped.
 
 `./gradlew runMcpDisabledProductionClientGameTest` writes an isolated config with MCP disabled,
 loads the packaged runtime JAR, proves no listener was started, and verifies that normal Thread tool

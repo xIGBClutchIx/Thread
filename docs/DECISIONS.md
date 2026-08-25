@@ -99,15 +99,17 @@ Prefer making public/remote exposure impossible or clearly opt-in until a real a
 Validated on 2026-08-24:
 
 - the current MCP specification is `2026-07-28` and uses a stateless request/response core;
-- current Streamable HTTP requires per-request protocol metadata and routing headers;
-- the official Java SDK 2.0.1 line still targets `2025-11-25` and its earlier
-  initialization/session model;
-- a confirmed SDK issue shows 2.0.0 failing current OpenAI `server/discover` requests with HTTP 500.
+- Codex's Streamable HTTP client initializes servers and consumes server instructions from the
+  initialization response;
+- the MCP versioning specification permits a server to expose stateless and initialization-based
+  flows on the same endpoint;
+- the official Java SDK is still unnecessary for Thread's narrow tools-only surface.
 
-Thread does not build V1 code around the obsolete protocol lifecycle. Slice 4 implements
-the minimal current tools-only surface inside `transport.mcp`: `server/discover`, `tools/list`, and
-`tools/call`, plus protocol/header validation and structured error mapping. Legacy HTTP+SSE and the
-retired initialization/session flow will not be implemented.
+Thread implements a narrow dual-flow tools surface inside `transport.mcp`: `initialize`,
+`notifications/initialized`, `server/discover`, `tools/list`, and `tools/call`, plus standard
+protocol-version validation and structured error mapping. Initialization is transport compatibility,
+not a stateful Thread session: no session ID is minted or required. Legacy HTTP+SSE is not
+implemented.
 
 The adapter uses the JDK HTTP server, binds only to loopback, and has no MCP SDK dependency. A
 stable Java SDK release with verified `2026-07-28` interoperability may replace it later without

@@ -81,15 +81,14 @@ A sidecar could translate MCP <-> a private Thread local API, but it adds packag
 
 ## Selected V1 approach
 
-The released official Java SDK 2.0.1 line was evaluated but is not selected for the V1 runtime. It
-implements the `2025-11-25` protocol era, including the initialization/session model that was
-removed by `2026-07-28`. A confirmed SDK issue also shows 2.0.0 returning HTTP 500 when an OpenAI
-client sends the current `server/discover` request.
+The released official Java SDK is not selected for the V1 runtime. Thread's tools-only surface is
+small enough to implement with the JDK HTTP server and Gson already supplied by Minecraft.
 
-Slice 4 therefore implements the minimal `2026-07-28` tools-only Streamable HTTP surface in
-`transport.mcp`. The adapter covers `server/discover`, `tools/list`, and `tools/call`, with
-JSON-RPC/error translation and required header validation. It will not implement deprecated
-HTTP+SSE, the retired initialization/session flow, or unrelated MCP surfaces.
+The initial Slice 4 implementation exposed only the stateless `2026-07-28` flow. Live Codex
+verification showed that Codex opens Streamable HTTP servers with `initialize` and therefore loaded
+zero tools when Thread rejected that method. Thread now implements both supported openings on the
+same endpoint: Codex's `initialize`/`notifications/initialized` sequence and stateless
+`server/discover`. Both converge on the same `tools/list` and `tools/call` handlers.
 
 Re-evaluate the SDK before changing the adapter. A stable release with verified `2026-07-28`
 interoperability may replace the narrow wire implementation without changing core APIs.
@@ -99,11 +98,12 @@ interoperability may replace the narrow wire implementation without changing cor
 - `McpHttpServer` uses the JDK `jdk.httpserver` module; Thread adds no MCP or HTTP runtime library.
 - The endpoint is `http://127.0.0.1:25580/mcp` by default and only accepts loopback listener
   options.
-- Each request is an independent HTTP POST. There are no sessions, initialization calls, legacy
-  GET/SSE endpoints, or server-to-client feature surfaces.
-- Requests carrying the retired `Mcp-Session-Id` header are rejected. The modern HTTP cancellation
-  signal is closing the in-flight response stream, so Thread does not accept the retired
-  `notifications/cancelled` POST.
+- Each message is an independent HTTP POST. `initialize` returns protocol version, server identity,
+  tools capability, and instructions; `notifications/initialized` returns HTTP 202.
+- Initialization does not create server-side session state. `Mcp-Session-Id` is ignored and never
+  minted or echoed. Legacy GET/SSE endpoints and server-to-client feature surfaces are absent.
+- Ordinary initialized requests require the standard `MCP-Protocol-Version` header. They do not
+  require custom `Mcp-Method`, `Mcp-Name`, or per-request protocol `_meta` mirrors.
 - `server/discover` advertises only the tools capability and includes Thread name/version metadata.
 - `tools/list` is derived directly from deterministic `ToolRegistry` descriptors, including input
   schema, output schema, and read-only annotations.
@@ -113,9 +113,9 @@ interoperability may replace the narrow wire implementation without changing cor
   malformed protocol requests use JSON-RPC errors.
 - The Fabric client entrypoint starts the listener after tool registration and closes it from
   `ClientLifecycleEvents.CLIENT_STOPPING`.
-- Unit tests cover HTTP/protocol validation, structured mapping, disconnects, shutdown, and
-  same-port restart. The Fabric client game test invokes discovery, status, game info, and inventory
-  through the real HTTP listener from menu and loaded-world states.
+- Unit tests cover a real initialize-to-tool-list sequence, HTTP/protocol validation, structured
+  mapping, disconnects, shutdown, and same-port restart. The Fabric client game test performs the
+  initialization sequence and all ten release scenarios through the real HTTP listener.
 
 ## Slice 5 hardening
 
@@ -136,7 +136,8 @@ interoperability may replace the narrow wire implementation without changing cor
 
 - bind only to `127.0.0.1`/loopback in V1
 - validate browser `Origin` values against loopback hosts
-- require the `2026-07-28` protocol and mirrored routing headers
+- accept negotiated `2026-07-28` or initialization-era `2025-11-25` protocol headers
+- do not depend on nonstandard mirrored method/name or per-request protocol metadata
 - cap request bodies at the configured value (1 MiB by default, with a fixed 8 MiB hard ceiling)
 - bound concurrent requests (8 by default, with a fixed ceiling of 32)
 - do not log complete inventories/world results at normal log levels

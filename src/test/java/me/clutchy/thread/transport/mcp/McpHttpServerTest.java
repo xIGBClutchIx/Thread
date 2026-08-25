@@ -15,9 +15,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
@@ -130,94 +128,96 @@ class McpHttpServerTest {
   }
 
   @Test
-  void validatesMirroredHeadersAndProtocolVersion() throws Exception {
+  void initializesThenListsToolsAgainstRealHttpServer() throws Exception {
     try (McpHttpServer server =
         McpHttpServer.start(registryWithEchoTool(), McpServerOptions.ephemeral("test"))) {
-      JsonObject list = request(11, "tools/list");
-      HttpResponse<String> missingMethod =
-          send(server.endpoint(), list.toString(), VERSION, null, null, null, null);
-      assertEquals(400, missingMethod.statusCode());
-      assertEquals(McpJsonRpcHandler.HEADER_MISMATCH, errorCode(missingMethod));
+      JsonObject initialize = initializeRequest(11, VERSION);
+      HttpResponse<String> initializedResponse =
+          send(server.endpoint(), initialize.toString(), null, null, null);
 
-      HttpResponse<String> mismatchedVersion =
-          send(server.endpoint(), list.toString(), "2025-11-25", "tools/list", null, null, null);
-      assertEquals(McpJsonRpcHandler.HEADER_MISMATCH, errorCode(mismatchedVersion));
+      assertEquals(200, initializedResponse.statusCode());
+      JsonObject initializeResult = body(initializedResponse).getAsJsonObject("result");
+      assertEquals(VERSION, initializeResult.get("protocolVersion").getAsString());
+      assertEquals(
+          "Thread", initializeResult.getAsJsonObject("serverInfo").get("name").getAsString());
+      assertEquals(
+          "test", initializeResult.getAsJsonObject("serverInfo").get("version").getAsString());
+      assertTrue(initializeResult.getAsJsonObject("capabilities").has("tools"));
+      assertTrue(
+          initializeResult.get("instructions").getAsString().contains("minecraft.get_status"));
 
-      JsonObject unsupported = request(12, "tools/list", "2099-01-01");
-      HttpResponse<String> unsupportedResponse =
+      HttpResponse<String> notification =
           send(
               server.endpoint(),
-              unsupported.toString(),
-              "2099-01-01",
-              "tools/list",
-              null,
+              notification("notifications/initialized").toString(),
+              VERSION,
               null,
               null);
-      assertEquals(400, unsupportedResponse.statusCode());
-      assertEquals(McpJsonRpcHandler.UNSUPPORTED_PROTOCOL_VERSION, errorCode(unsupportedResponse));
-      assertEquals(
-          VERSION,
-          body(unsupportedResponse)
-              .getAsJsonObject("error")
-              .getAsJsonObject("data")
-              .getAsJsonArray("supported")
-              .get(0)
-              .getAsString());
+      assertEquals(202, notification.statusCode());
+      assertTrue(notification.body().isEmpty());
 
-      JsonObject call = request(13, "tools/call");
-      call.getAsJsonObject("params").addProperty("name", "test.echo");
-      call.getAsJsonObject("params").add("arguments", object("message", "encoded"));
-      HttpResponse<String> mismatchedName =
-          send(server.endpoint(), call.toString(), VERSION, "tools/call", "test.other", null, null);
-      assertEquals(McpJsonRpcHandler.HEADER_MISMATCH, errorCode(mismatchedName));
-
-      String encodedName =
-          "=?base64?"
-              + Base64.getEncoder().encodeToString("test.echo".getBytes(StandardCharsets.UTF_8))
-              + "?=";
-      HttpResponse<String> encoded =
-          send(server.endpoint(), call.toString(), VERSION, "tools/call", encodedName, null, null);
-      assertEquals(200, encoded.statusCode());
+      JsonObject list = request(12, "tools/list");
+      list.remove("params");
+      assertFalse(list.has("params"));
+      HttpResponse<String> listed = post(server.endpoint(), list);
+      assertEquals(200, listed.statusCode());
+      assertEquals(1, body(listed).getAsJsonObject("result").getAsJsonArray("tools").size());
     }
   }
 
   @Test
-  void requiresModernMetadataOnEveryRequest() throws Exception {
+  void validatesStandardProtocolVersionHeaderAfterInitialization() throws Exception {
     try (McpHttpServer server =
         McpHttpServer.start(registryWithEchoTool(), McpServerOptions.ephemeral("test"))) {
-      JsonObject missingVersion = request(14, "tools/list");
-      missingVersion
-          .getAsJsonObject("params")
-          .getAsJsonObject("_meta")
-          .remove(McpJsonRpcHandler.PROTOCOL_VERSION_META);
-      HttpResponse<String> versionResponse =
+      JsonObject list = request(14, "tools/list");
+      HttpResponse<String> missingHeader =
+          send(server.endpoint(), list.toString(), null, null, null);
+      assertEquals(400, missingHeader.statusCode());
+      assertEquals(-32_600, errorCode(missingHeader));
+
+      HttpResponse<String> unsupported =
+          send(server.endpoint(), list.toString(), "2099-01-01", null, null);
+      assertEquals(400, unsupported.statusCode());
+      assertEquals(McpJsonRpcHandler.UNSUPPORTED_PROTOCOL_VERSION, errorCode(unsupported));
+      JsonArray supported =
+          body(unsupported)
+              .getAsJsonObject("error")
+              .getAsJsonObject("data")
+              .getAsJsonArray("supported");
+      assertTrue(
+          supported.asList().stream().anyMatch(version -> version.getAsString().equals(VERSION)));
+      assertTrue(
+          supported.asList().stream()
+              .anyMatch(
+                  version ->
+                      version
+                          .getAsString()
+                          .equals(McpJsonRpcHandler.INITIALIZATION_PROTOCOL_VERSION)));
+    }
+  }
+
+  @Test
+  void negotiatesInitializationEraProtocolForCodexClients() throws Exception {
+    try (McpHttpServer server =
+        McpHttpServer.start(registryWithEchoTool(), McpServerOptions.ephemeral("test"))) {
+      String protocolVersion = McpJsonRpcHandler.INITIALIZATION_PROTOCOL_VERSION;
+      HttpResponse<String> initialize =
           send(
               server.endpoint(),
-              missingVersion.toString(),
-              VERSION,
-              "tools/list",
+              initializeRequest(15, protocolVersion).toString(),
               null,
               null,
               null);
-      assertEquals(400, versionResponse.statusCode());
-      assertEquals(McpJsonRpcHandler.HEADER_MISMATCH, errorCode(versionResponse));
+      assertEquals(200, initialize.statusCode());
+      assertEquals(
+          protocolVersion,
+          body(initialize).getAsJsonObject("result").get("protocolVersion").getAsString());
 
-      JsonObject missingCapabilities = request(15, "tools/list");
-      missingCapabilities
-          .getAsJsonObject("params")
-          .getAsJsonObject("_meta")
-          .remove(McpJsonRpcHandler.CLIENT_CAPABILITIES_META);
-      HttpResponse<String> capabilitiesResponse = post(server.endpoint(), missingCapabilities);
-      assertEquals(400, capabilitiesResponse.statusCode());
-      assertEquals(-32_602, errorCode(capabilitiesResponse));
-
-      JsonObject call = request(16, "tools/call");
-      call.getAsJsonObject("params").addProperty("name", "test.echo");
-      call.getAsJsonObject("params").add("arguments", object("message", "missing header"));
-      HttpResponse<String> nameResponse =
-          send(server.endpoint(), call.toString(), VERSION, "tools/call", null, null, null);
-      assertEquals(400, nameResponse.statusCode());
-      assertEquals(McpJsonRpcHandler.HEADER_MISMATCH, errorCode(nameResponse));
+      HttpResponse<String> listed =
+          send(
+              server.endpoint(), request(16, "tools/list").toString(), protocolVersion, null, null);
+      assertEquals(200, listed.statusCode());
+      assertEquals(1, body(listed).getAsJsonObject("result").getAsJsonArray("tools").size());
     }
   }
 
@@ -235,18 +235,11 @@ class McpHttpServerTest {
     try (McpHttpServer server = McpHttpServer.start(registryWithEchoTool(), limited)) {
       JsonObject list = request(17, "tools/list");
       HttpResponse<String> hostileOrigin =
-          send(
-              server.endpoint(),
-              list.toString(),
-              VERSION,
-              "tools/list",
-              null,
-              "https://attacker.example",
-              null);
+          send(server.endpoint(), list.toString(), VERSION, "https://attacker.example", null);
       assertEquals(403, hostileOrigin.statusCode());
 
       HttpResponse<String> wrongContentType =
-          send(server.endpoint(), list.toString(), VERSION, "tools/list", null, null, "text/plain");
+          send(server.endpoint(), list.toString(), VERSION, null, "text/plain");
       assertEquals(415, wrongContentType.statusCode());
 
       HttpRequest incompleteAccept =
@@ -255,7 +248,6 @@ class McpHttpServerTest {
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
               .header("MCP-Protocol-Version", VERSION)
-              .header("Mcp-Method", "tools/list")
               .POST(HttpRequest.BodyPublishers.ofString(list.toString()))
               .build();
       assertEquals(
@@ -265,12 +257,10 @@ class McpHttpServerTest {
               .statusCode());
 
       String oversized = "{\"padding\":\"" + "x".repeat(300) + "\"}";
-      HttpResponse<String> tooLarge =
-          send(server.endpoint(), oversized, VERSION, "tools/list", null, null, null);
+      HttpResponse<String> tooLarge = send(server.endpoint(), oversized, VERSION, null, null);
       assertEquals(413, tooLarge.statusCode());
 
-      HttpResponse<String> malformed =
-          send(server.endpoint(), "{", VERSION, "tools/list", null, null, null);
+      HttpResponse<String> malformed = send(server.endpoint(), "{", VERSION, null, null);
       assertEquals(400, malformed.statusCode());
       assertEquals(-32_700, errorCode(malformed));
 
@@ -290,14 +280,7 @@ class McpHttpServerTest {
         McpHttpServer.start(registryWithEchoTool(), McpServerOptions.ephemeral("test"))) {
       JsonObject list = request(18, "tools/list");
       HttpResponse<String> response =
-          send(
-              server.endpoint(),
-              list.toString(),
-              VERSION,
-              "tools/list",
-              null,
-              "http://localhost:1234",
-              null);
+          send(server.endpoint(), list.toString(), VERSION, "http://localhost:1234", null);
 
       assertEquals(200, response.statusCode());
       assertTrue(server.running());
@@ -305,21 +288,10 @@ class McpHttpServerTest {
   }
 
   @Test
-  void rejectsRetiredHandshakeSessionAndCancellationFlow() throws Exception {
+  void ignoresSessionHeaderAndRejectsUnknownNotificationsWithoutAResponseBody() throws Exception {
     try (McpHttpServer server =
         McpHttpServer.start(registryWithEchoTool(), McpServerOptions.ephemeral("test"))) {
-      HttpResponse<String> initialize = post(server.endpoint(), request(19, "initialize"));
-      assertEquals(404, initialize.statusCode());
-      assertEquals(-32_601, errorCode(initialize));
-
-      JsonObject initialized = request(20, "notifications/initialized");
-      initialized.remove("id");
-      HttpResponse<String> initializedResponse = post(server.endpoint(), initialized);
-      assertEquals(404, initializedResponse.statusCode());
-      assertTrue(initializedResponse.body().isEmpty());
-
-      JsonObject cancelled = request(21, "notifications/cancelled");
-      cancelled.remove("id");
+      JsonObject cancelled = notification("notifications/cancelled");
       HttpResponse<String> cancelledResponse = post(server.endpoint(), cancelled);
       assertEquals(404, cancelledResponse.statusCode());
       assertTrue(cancelledResponse.body().isEmpty());
@@ -331,14 +303,12 @@ class McpHttpServerTest {
               .header("Accept", "application/json, text/event-stream")
               .header("Content-Type", "application/json")
               .header("MCP-Protocol-Version", VERSION)
-              .header("Mcp-Method", "tools/list")
               .header("Mcp-Session-Id", "retired-session")
               .POST(HttpRequest.BodyPublishers.ofString(list.toString()))
               .build();
       HttpResponse<String> sessionResponse =
           HttpClient.newHttpClient().send(sessionRequest, HttpResponse.BodyHandlers.ofString());
-      assertEquals(400, sessionResponse.statusCode());
-      assertEquals(-32_600, errorCode(sessionResponse));
+      assertEquals(200, sessionResponse.statusCode());
       assertTrue(sessionResponse.headers().firstValue("Mcp-Session-Id").isEmpty());
 
       assertEquals(200, post(server.endpoint(), request(23, "tools/list")).statusCode());
@@ -428,15 +398,7 @@ class McpHttpServerTest {
   }
 
   private static JsonObject request(long id, String method) {
-    return request(id, method, VERSION);
-  }
-
-  private static JsonObject request(long id, String method, String protocolVersion) {
-    JsonObject metadata = new JsonObject();
-    metadata.addProperty(McpJsonRpcHandler.PROTOCOL_VERSION_META, protocolVersion);
-    metadata.add(McpJsonRpcHandler.CLIENT_CAPABILITIES_META, new JsonObject());
     JsonObject params = new JsonObject();
-    params.add("_meta", metadata);
     JsonObject request = new JsonObject();
     request.addProperty("jsonrpc", "2.0");
     request.addProperty("id", id);
@@ -445,20 +407,37 @@ class McpHttpServerTest {
     return request;
   }
 
+  private static JsonObject initializeRequest(long id, String protocolVersion) {
+    JsonObject request = request(id, "initialize");
+    JsonObject params = request.getAsJsonObject("params");
+    params.addProperty("protocolVersion", protocolVersion);
+    params.add("capabilities", new JsonObject());
+    params.add("clientInfo", object("name", "Thread integration test", "version", "1.0.0"));
+    return request;
+  }
+
+  private static JsonObject notification(String method) {
+    JsonObject notification = request(0, method);
+    notification.remove("id");
+    return notification;
+  }
+
   private static JsonObject object(String name, String value) {
     JsonObject object = new JsonObject();
     object.addProperty(name, value);
     return object;
   }
 
+  private static JsonObject object(
+      String firstName, String firstValue, String secondName, String secondValue) {
+    JsonObject object = object(firstName, firstValue);
+    object.addProperty(secondName, secondValue);
+    return object;
+  }
+
   private static HttpResponse<String> post(URI endpoint, JsonObject request)
       throws IOException, InterruptedException {
-    JsonObject params = request.getAsJsonObject("params");
-    String method = request.get("method").getAsString();
-    String name = params.has("name") ? params.get("name").getAsString() : null;
-    String protocol =
-        params.getAsJsonObject("_meta").get(McpJsonRpcHandler.PROTOCOL_VERSION_META).getAsString();
-    return send(endpoint, request.toString(), protocol, method, name, null, null);
+    return send(endpoint, request.toString(), VERSION, null, null);
   }
 
   private static CompletableFuture<HttpResponse<String>> postAsync(
@@ -475,13 +454,7 @@ class McpHttpServerTest {
   }
 
   private static HttpResponse<String> send(
-      URI endpoint,
-      String body,
-      String protocolVersion,
-      String method,
-      String name,
-      String origin,
-      String contentType)
+      URI endpoint, String body, String protocolVersion, String origin, String contentType)
       throws IOException, InterruptedException {
     HttpRequest.Builder request =
         HttpRequest.newBuilder(endpoint)
@@ -491,12 +464,6 @@ class McpHttpServerTest {
             .POST(HttpRequest.BodyPublishers.ofString(body));
     if (protocolVersion != null) {
       request.header("MCP-Protocol-Version", protocolVersion);
-    }
-    if (method != null) {
-      request.header("Mcp-Method", method);
-    }
-    if (name != null) {
-      request.header("Mcp-Name", name);
     }
     if (origin != null) {
       request.header("Origin", origin);
