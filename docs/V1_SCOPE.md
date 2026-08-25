@@ -32,6 +32,8 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - tool registry
 - context registry
 - integration registry
+- optional-mod candidate discovery with absent-mod-safe class loading
+- transactional tool/context/recipe/enrichment contributions
 - structured errors
 - capability discovery
 - explicit limits
@@ -97,6 +99,9 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - semantic embeddings/vector databases
 - long-term player memory
 - voice input/output
+
+V1 includes the integration framework and a test-only proof integration. It still ships no JEI,
+EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other substantial third-party support.
 
 ## V1 success criteria
 

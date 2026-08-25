@@ -212,29 +212,72 @@ Dynamic state such as inventory should be requested through tools rather than co
 
 ### Integration registry
 
-V1 contains only the built-in vanilla integration, but the extension point exists now.
+Thread ships a clean optional-integration framework while still containing only the built-in
+vanilla gameplay integration. No substantial third-party mod support ships in this slice.
 
 Conceptually:
 
 ```java
-public interface GameIntegration {
-    String id();
+public interface ThreadIntegration {
+    IntegrationId id();
+    String version();
+    String description();
     void register(IntegrationContext context);
 }
 ```
 
-Future integrations can register tools/providers/context without changing MCP code.
+`IntegrationContext` is a transactional contribution surface. An integration may register only the
+pieces it implements:
+
+- read-only `GameTool` values;
+- bounded `ContextProvider` values;
+- additional `IntegrationRecipeProvider` values;
+- typed core- or platform-owned extension contributions;
+- bounded integration-specific capability metadata.
+
+The callback has no speculative startup/shutdown lifecycle. Contributions become visible only
+after the callback and all duplicate/contract validation succeeds. A failed callback therefore
+cannot leave a partial tool, context, recipe provider, or enrichment registration behind.
+
+Optional integrations are declared as `IntegrationCandidate` metadata containing a stable
+integration ID, target mod ID, compatible version requirement, and implementation **class name**.
+Fabric Loader metadata is checked in this order:
+
+1. the integration is enabled by configuration;
+2. the target mod is loaded;
+3. the installed version is compatible;
+4. only then is the implementation class resolved and constructed.
+
+The catalog must not import an optional implementation or use its class literal. This ordering is
+what prevents an absent optional API from causing verification, linkage, or startup failures.
+Unavailable, disabled, incompatible, construction-failing, and registration-failing candidates are
+reported as isolated activation outcomes; discovery continues with the next stable ID.
 
 The built-in `VanillaIntegration` owns the thirteen V1 `minecraft.*` tools. Fabric startup supplies its
-loader-neutral providers, then activates it through `IntegrationRegistry`. The capabilities tool
-reads `ToolRegistry` and `IntegrationRegistry` at invocation time so discovery reflects actual
-registrations rather than a parallel hard-coded feature list.
+loader-neutral providers, then activates it as a required integration through
+`IntegrationRegistry`. The capabilities tool reads the live tool and integration registries at
+invocation time. Active integrations expose stable IDs, versions, contribution/target-mod metadata,
+and their own bounded metadata rather than a parallel hard-coded feature list.
 
-Fabric also owns an ordered block-entity inspector registry. Vanilla furnace and container
-inspectors produce bounded `BlockEntityInfo` values; later Fabric integrations may register a
-higher-priority inspector for a recognized mod block entity. This extension point remains at the
-platform edge because inspectors receive Minecraft block-entity types. Provider, core, tool, and
-MCP contracts expose Thread DTOs.
+`IntegrationExtensionRegistry` is type-safe but platform-neutral: an extension point owns a stable
+ID plus its contribution contract. Contributions are returned in integration-ID order, preserving
+declaration order within one integration. The implemented points are:
+
+- `thread.recipe_provider`: adds detached recipe definitions after the guarded vanilla provider
+  succeeds. Optional provider failures are ignored so vanilla recipe behavior and session guards
+  remain authoritative.
+- `fabric.block_entity_inspector`: produces bounded structured data for a recognized block entity.
+- `fabric.block_enricher`: enriches an already-detached target-block snapshot.
+- `fabric.entity_enricher`: enriches an already-detached nearby-entity snapshot.
+
+The three Fabric points remain at the platform edge because their contributor contracts receive
+Minecraft implementation types on the owning logical thread. They must return Thread DTOs and may
+not expose raw Minecraft, third-party, NBT, or component objects. Runtime exceptions and linkage
+errors from optional recipe/enrichment contributions are isolated per contributor.
+
+Future integrations may define additional typed extension points and metadata keys. The framework
+does not yet implement JEI, EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other
+third-party behavior.
 
 ## Platform boundary
 

@@ -22,6 +22,7 @@ import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.tool.ToolResult;
 import me.clutchy.thread.platform.fabric.game.FabricProviderSupport;
 import me.clutchy.thread.platform.fabric.game.FabricSessionGuard;
+import me.clutchy.thread.platform.fabric.inspection.FabricBlockEnricherRegistry;
 import me.clutchy.thread.platform.fabric.inspection.FabricBlockEntityInspectorRegistry;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import me.clutchy.thread.platform.fabric.threading.MinecraftThreadExecutor;
@@ -48,6 +49,7 @@ public final class FabricPlayerProvider implements PlayerProvider {
   private final FabricSessionGuard sessionGuard;
   private final FabricDtoMapper mapper;
   private final FabricBlockEntityInspectorRegistry blockEntityInspectors;
+  private final FabricBlockEnricherRegistry blockEnrichers;
   private final Duration gameThreadTimeout;
 
   public FabricPlayerProvider(
@@ -56,6 +58,7 @@ public final class FabricPlayerProvider implements PlayerProvider {
       FabricSessionGuard sessionGuard,
       FabricDtoMapper mapper,
       FabricBlockEntityInspectorRegistry blockEntityInspectors,
+      FabricBlockEnricherRegistry blockEnrichers,
       Duration gameThreadTimeout) {
     this.client = Objects.requireNonNull(client, "client");
     this.clientThread = Objects.requireNonNull(clientThread, "clientThread");
@@ -63,6 +66,7 @@ public final class FabricPlayerProvider implements PlayerProvider {
     this.mapper = Objects.requireNonNull(mapper, "mapper");
     this.blockEntityInspectors =
         Objects.requireNonNull(blockEntityInspectors, "blockEntityInspectors");
+    this.blockEnrichers = Objects.requireNonNull(blockEnrichers, "blockEnrichers");
     this.gameThreadTimeout = Objects.requireNonNull(gameThreadTimeout, "gameThreadTimeout");
   }
 
@@ -186,16 +190,17 @@ public final class FabricPlayerProvider implements PlayerProvider {
     }
     BlockState state = level.getBlockState(position);
     var blockEntity = level.getBlockEntity(position);
+    BlockInfo base =
+        new BlockInfo(
+            BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(),
+            state.getBlock().getName().getString(),
+            new BlockPosition(position.getX(), position.getY(), position.getZ()),
+            properties(state),
+            context.distance(),
+            blockEntity != null,
+            blockEntity == null ? null : blockEntityInspectors.inspect(blockEntity));
     return ToolResult.success(
-        Optional.of(
-            new BlockInfo(
-                BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(),
-                state.getBlock().getName().getString(),
-                new BlockPosition(position.getX(), position.getY(), position.getZ()),
-                properties(state),
-                context.distance(),
-                blockEntity != null,
-                blockEntity == null ? null : blockEntityInspectors.inspect(blockEntity))));
+        Optional.of(blockEnrichers.enrich(level, position, state, blockEntity, base)));
   }
 
   static boolean isValidBlockTarget(HitResult hitResult) {

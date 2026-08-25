@@ -61,6 +61,7 @@ Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 | 6 | End-to-end validation, packaging, docs, and V1 release readiness |
 | 7 | Deterministic inventory-to-recipe crafting intelligence |
 | 8 | Bounded recursive crafting plans with cycle-safe explanations |
+| 9 | Optional mod integration discovery, isolation, and typed contribution framework |
 
 A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
@@ -112,6 +113,7 @@ Thread creates `config/thread.json` on first client startup. Every field other t
   "mcpBindHost": "127.0.0.1",
   "mcpPort": 25580,
   "enabledTools": ["minecraft.*"],
+  "disabledIntegrations": [],
   "maxEntityRadius": 64.0,
   "maxEntityResults": 128,
   "maxItemSearchResults": 64,
@@ -127,6 +129,9 @@ capability results. V1 accepts only the explicit loopback hosts `127.0.0.1`, `lo
 Thread also applies hard ceilings to every configurable safety limit. Invalid existing files are
 preserved for correction, logged without their contents, and replaced in memory by safe defaults
 for that launch.
+
+`disabledIntegrations` accepts exact stable integration IDs. Thread checks this list before target
+mod/version detection and before resolving an optional integration implementation class.
 
 Set `"mcpEnabled": false` to run Thread without opening a listener. The rest of the mod initializes
 normally, so this is a clean supported state rather than a startup failure.
@@ -154,7 +159,8 @@ See [Installation](docs/INSTALLATION.md) for the complete troubleshooting guide.
   world/inventory changes are intentionally rejected or absent.
 - Nearby-entity queries only inspect already-loaded state and never force-load chunks.
 - No authentication or remote binding. The server is intentionally restricted to loopback.
-- No third-party mod integrations or in-game assistant UI.
+- The optional integration framework is present, but no third-party mod integration or in-game
+  assistant UI ships yet.
 - `minecraft.can_craft` and `minecraft.get_missing_ingredients` compare one recipe execution with
   the current 36-slot main inventory.
 - `minecraft.get_crafting_plan` recursively explains intermediate recipes and final raw shortages

@@ -16,6 +16,23 @@ The goal is not to maximize tooling. The goal is to make changes from humans or 
 - Avoid hidden global state when explicit wiring is practical.
 - Keep Minecraft/Fabric and MCP-specific types behind their documented boundaries.
 
+## Optional integration development
+
+- Declare optional integrations with `IntegrationCandidate` metadata and an implementation class
+  name string. Do not import the implementation into `FabricIntegrationCatalog`, use its class
+  literal, or discover optional implementations eagerly with `ServiceLoader`.
+- Keep optional third-party API imports below the integration/platform implementation package.
+  Core contracts, DTOs, providers, tools, and MCP transport must remain free of those types.
+- Use only the contribution methods the integration needs. Do not add empty lifecycle interfaces or
+  force tools, contexts, recipes, block/entity enrichment, and metadata into every implementation.
+- Treat `register` as a startup transaction. Do not retain `IntegrationContext`; do not create
+  background threads or register external callbacks unless an integration-specific requirement has
+  been designed and tested.
+- Put Minecraft-facing enrichment contracts at the Fabric edge and return detached Thread DTOs.
+  Never return raw NBT, component maps, Minecraft objects, or optional-mod objects.
+- Add tests proving target-mod absence, incompatible versions, disabled configuration, class/linkage
+  failure, contribution failure isolation, capability metadata, and unchanged vanilla behavior.
+
 ## Comments and Javadocs
 
 Thread should be documented, but comments must add information rather than narrate syntax.

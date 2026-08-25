@@ -15,10 +15,13 @@ import java.util.function.Predicate;
 import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
-import me.clutchy.thread.core.integration.GameIntegration;
-import me.clutchy.thread.core.integration.IntegrationContext;
+import me.clutchy.thread.core.integration.IntegrationCandidate;
+import me.clutchy.thread.core.integration.IntegrationEnvironment;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
+import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
+import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
+import me.clutchy.thread.core.integration.testing.ProofIntegration;
 import me.clutchy.thread.core.model.game.GameInfo;
 import me.clutchy.thread.core.model.game.SessionState;
 import me.clutchy.thread.core.model.game.SessionStatus;
@@ -48,7 +51,6 @@ import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
-import me.clutchy.thread.core.testing.TestJsonContracts;
 import me.clutchy.thread.core.tool.ToolAvailability;
 import me.clutchy.thread.core.tool.ToolDescriptor;
 import me.clutchy.thread.core.tool.ToolId;
@@ -298,14 +300,90 @@ class VanillaIntegrationTest {
   @Test
   void capabilitiesAreDerivedFromLiveRegistrations() {
     Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
-    catalog.integrations().register(new ExampleIntegration());
+    IntegrationCandidate proofCandidate =
+        new IntegrationCandidate(
+            IntegrationId.of("proof"), "proof-mod", ">=2", ProofIntegration.class.getName());
+    catalog
+        .integrations()
+        .discover(
+            List.of(proofCandidate),
+            new IntegrationEnvironment() {
+              @Override
+              public Optional<String> loadedModVersion(String modId) {
+                return Optional.of("2.0");
+              }
+
+              @Override
+              public boolean versionCompatible(String modId, String versionRequirement) {
+                return true;
+              }
+            },
+            ignored -> true,
+            new ReflectiveIntegrationLoader(ProofIntegration.class.getClassLoader()));
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
     assertEquals(14, strings(capabilities, "tools").size());
-    assertTrue(strings(capabilities, "tools").contains("example.echo"));
+    assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
-        List.of("example", "vanilla"),
+        List.of("proof", "vanilla"),
+        capabilities.getAsJsonArray("integrations").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(value -> value.get("id").getAsString())
+            .toList());
+    JsonObject proof =
+        capabilities.getAsJsonArray("integrations").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .filter(value -> value.get("id").getAsString().equals("proof"))
+            .findFirst()
+            .orElseThrow();
+    assertTrue(
+        proof.getAsJsonArray("metadata").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .anyMatch(
+                entry ->
+                    entry.get("key").getAsString().equals("proof.mode")
+                        && entry.get("value").getAsString().equals("test")));
+    assertTrue(
+        proof.getAsJsonArray("metadata").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .anyMatch(
+                entry ->
+                    entry.get("key").getAsString().equals("thread.target_mod")
+                        && entry.get("value").getAsString().equals("proof-mod")));
+  }
+
+  @Test
+  void absentOptionalIntegrationLeavesVanillaCapabilitiesIntact() {
+    Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
+    catalog
+        .integrations()
+        .discover(
+            List.of(
+                new IntegrationCandidate(
+                    IntegrationId.of("absent"),
+                    "absent-mod",
+                    ">=1",
+                    "missing.optional.Integration")),
+            new IntegrationEnvironment() {
+              @Override
+              public Optional<String> loadedModVersion(String modId) {
+                return Optional.empty();
+              }
+
+              @Override
+              public boolean versionCompatible(String modId, String versionRequirement) {
+                throw new AssertionError("an absent mod must not reach version matching");
+              }
+            },
+            ignored -> true,
+            new ReflectiveIntegrationLoader(getClass().getClassLoader()));
+
+    JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
+
+    assertEquals(13, strings(capabilities, "tools").size());
+    assertEquals(
+        List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
             .map(JsonElement::getAsJsonObject)
             .map(value -> value.get("id").getAsString())
@@ -347,7 +425,8 @@ class VanillaIntegrationTest {
       RecipeProvider recipes,
       Predicate<ToolId> enabledTools) {
     ToolRegistry tools = new ToolRegistry();
-    IntegrationRegistry integrations = new IntegrationRegistry(tools, new ContextRegistry());
+    IntegrationRegistry integrations =
+        new IntegrationRegistry(tools, new ContextRegistry(), new IntegrationExtensionRegistry());
     integrations.register(
         new VanillaIntegration(game, player, new FakeWorldProvider(), recipes, enabledTools));
     return new Catalog(tools, integrations);
@@ -619,28 +698,6 @@ class VanillaIntegrationTest {
     @Override
     public ToolResult<ItemSearchResult> searchItems(String query, int limit) {
       throw new AssertionError("item search was not expected");
-    }
-  }
-
-  private static final class ExampleIntegration implements GameIntegration {
-    @Override
-    public IntegrationId id() {
-      return IntegrationId.of("example");
-    }
-
-    @Override
-    public String version() {
-      return "2";
-    }
-
-    @Override
-    public String description() {
-      return "Test-only dynamic integration.";
-    }
-
-    @Override
-    public void register(IntegrationContext context) {
-      context.tools().register(TestJsonContracts.echoTool("example.echo"));
     }
   }
 

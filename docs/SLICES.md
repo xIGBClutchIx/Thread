@@ -73,7 +73,7 @@ Implement:
 - `GameTool` abstraction
 - `ToolRegistry`
 - `ContextProvider` / `ContextRegistry`
-- `GameIntegration` / `IntegrationRegistry`
+- `ThreadIntegration` / `IntegrationRegistry`
 - provider contracts for game, player, world, and recipes
 - capability metadata foundation
 - serialization/schema strategy used by tools
@@ -360,8 +360,6 @@ intermediate recipes, inspect nearby storage, or add JEI/EMI/REI integration.
 - the packaged single-player game test proves a real diamond-pickaxe assessment through MCP
 - formatting, lint, unit/integration tests, clean build, and both packaged client tests pass
 
----
-
 ## Slice 8: Bounded recursive crafting plans
 
 ### Goal
@@ -405,3 +403,47 @@ nearby storage, model workstation/fuel feasibility, or add JEI/EMI/REI integrati
 - the tool is discoverable and callable through the unchanged MCP lifecycle
 - the packaged single-player test plans a crafting table recursively from a real oak log through MCP
 - formatting, lint, unit/integration tests, clean build, and both packaged client tests pass
+
+---
+
+## Slice 9: Optional mod integration framework
+
+### Goal
+
+Let Thread activate compatible optional mod integrations without importing third-party APIs into
+core or resolving absent integration classes during startup.
+
+### Work
+
+Add:
+
+- `ThreadIntegration` and a transactional `IntegrationContext`
+- metadata-only `IntegrationCandidate` discovery over loader-neutral mod/version checks
+- class-name-based loading only after enabled, present, and compatible checks pass
+- typed extension registration for tools, contexts, recipe providers, Fabric block/block-entity
+  enrichment, Fabric entity enrichment, and bounded capability metadata
+- deterministic integration/contribution ordering and duplicate rejection
+- isolated activation and runtime contribution failures
+- a test-only reflective proof integration
+
+The built-in vanilla integration remains required and owns the existing thirteen tools. Optional
+recipe providers augment successful guarded vanilla recipe results; they cannot replace session
+guards. Minecraft-facing enrichment points remain in Fabric packages and return detached Thread
+DTOs. This slice adds no generic lifecycle beyond startup registration and ships no JEI, EMI, REI,
+FTB Quests, Create, Mekanism, or other substantial mod support.
+
+### Acceptance criteria
+
+- present compatible integrations activate; absent, disabled, and incompatible candidates skip
+  without class loading
+- duplicate IDs, constructor/linkage failures, and registration failures do not partially commit or
+  stop healthy optional candidates
+- tools, contexts, recipe providers, typed platform extensions, and metadata can be contributed
+  independently
+- active integration IDs, versions, contribution metadata, and target-mod metadata appear through
+  `minecraft.get_capabilities`
+- recipe, block, block-entity, and entity contribution failures preserve vanilla behavior
+- optional implementation classes are referenced by name only from the discovery catalog
+- the packaged game test proves the registry initializes with vanilla behavior unchanged
+- architecture boundaries, formatting, lint, unit/integration tests, clean build, and both packaged
+  client tests pass

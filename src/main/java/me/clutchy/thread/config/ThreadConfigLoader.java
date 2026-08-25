@@ -33,6 +33,7 @@ public final class ThreadConfigLoader {
           "mcpBindHost",
           "mcpPort",
           "enabledTools",
+          "disabledIntegrations",
           "maxEntityRadius",
           "maxEntityResults",
           "maxItemSearchResults",
@@ -107,6 +108,7 @@ public final class ThreadConfigLoader {
         optionalString(object, "mcpBindHost", defaults.mcpBindHost()),
         optionalInt(object, "mcpPort", defaults.mcpPort()),
         optionalStrings(object, "enabledTools", defaults.enabledTools()),
+        optionalStrings(object, "disabledIntegrations", defaults.disabledIntegrations()),
         optionalDouble(object, "maxEntityRadius", defaults.maxEntityRadius()),
         optionalInt(object, "maxEntityResults", defaults.maxEntityResults()),
         optionalInt(object, "maxItemSearchResults", defaults.maxItemSearchResults()),
@@ -124,6 +126,9 @@ public final class ThreadConfigLoader {
     JsonArray enabledTools = new JsonArray();
     config.enabledTools().forEach(enabledTools::add);
     object.add("enabledTools", enabledTools);
+    JsonArray disabledIntegrations = new JsonArray();
+    config.disabledIntegrations().forEach(disabledIntegrations::add);
+    object.add("disabledIntegrations", disabledIntegrations);
     object.addProperty("maxEntityRadius", config.maxEntityRadius());
     object.addProperty("maxEntityResults", config.maxEntityResults());
     object.addProperty("maxItemSearchResults", config.maxItemSearchResults());

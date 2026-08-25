@@ -33,18 +33,21 @@ public final class FabricWorldProvider implements WorldProvider {
   private final FabricSessionGuard sessionGuard;
   private final FabricProviderLimits limits;
   private final FabricDtoMapper mapper;
+  private final FabricEntityEnricherRegistry entityEnrichers;
 
   public FabricWorldProvider(
       Minecraft client,
       GameThreadExecutor clientThread,
       FabricSessionGuard sessionGuard,
       FabricProviderLimits limits,
-      FabricDtoMapper mapper) {
+      FabricDtoMapper mapper,
+      FabricEntityEnricherRegistry entityEnrichers) {
     this.client = Objects.requireNonNull(client, "client");
     this.clientThread = Objects.requireNonNull(clientThread, "clientThread");
     this.sessionGuard = Objects.requireNonNull(sessionGuard, "sessionGuard");
     this.limits = Objects.requireNonNull(limits, "limits");
     this.mapper = Objects.requireNonNull(mapper, "mapper");
+    this.entityEnrichers = Objects.requireNonNull(entityEnrichers, "entityEnrichers");
   }
 
   @Override
@@ -101,7 +104,10 @@ public final class FabricWorldProvider implements WorldProvider {
     List<EntityInfo> entities =
         loadedEntities.stream()
             .limit(query.limit())
-            .map(entity -> mapper.entity(entity, Math.sqrt(entity.distanceToSqr(player))))
+            .map(
+                entity ->
+                    entityEnrichers.enrich(
+                        entity, mapper.entity(entity, Math.sqrt(entity.distanceToSqr(player)))))
             .toList();
     return ToolResult.success(
         new NearbyEntityResult(query.radius(), query.limit(), truncated, entities));

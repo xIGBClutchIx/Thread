@@ -10,6 +10,8 @@ final class VanillaToolSchemas {
   private static final String REGISTRY_ID_PATTERN = "^[a-z0-9_.-]+:[a-z0-9/._-]+$";
   private static final String TOOL_ID_PATTERN = "^[a-z][a-z0-9_-]*(?:\\.[a-z][a-z0-9_-]*)+$";
   private static final String INTEGRATION_ID_PATTERN = "^[a-z][a-z0-9_-]*$";
+  private static final String INTEGRATION_METADATA_KEY_PATTERN =
+      "^[a-z][a-z0-9_-]*(?:\\.[a-z][a-z0-9_-]*)+$";
 
   private static final JsonObject POSITION =
       object(property("x", number()), property("y", number()), property("z", number()));
@@ -125,10 +127,15 @@ final class VanillaToolSchemas {
           property("itemId", registryId()),
           property("required", integer(1, null)),
           property("path", boundedArray(registryId(), 1, 33)));
+  private static final JsonObject INTEGRATION_METADATA_ENTRY =
+      object(
+          property("key", string(1, 128, INTEGRATION_METADATA_KEY_PATTERN)),
+          property("value", string(1, 256, null)));
   private static final JsonObject INTEGRATION_CAPABILITY =
       object(
           property("id", string(1, 64, INTEGRATION_ID_PATTERN)),
-          property("version", string(1, 128, null)));
+          property("version", string(1, 128, null)),
+          property("metadata", boundedArray(INTEGRATION_METADATA_ENTRY, 0, 32)));
 
   static final JsonSchema EMPTY_INPUT = schema(object());
   static final JsonSchema SESSION_STATUS =

@@ -605,12 +605,25 @@ Example result:
     "minecraft.get_inventory"
   ],
   "integrations": [
-    {"id": "vanilla", "version": "1"}
+    {
+      "id": "vanilla",
+      "version": "1",
+      "metadata": [
+        {"key": "thread.tool_count", "value": "13"}
+      ]
+    }
   ]
 }
 ```
 
-Derive this from actual registrations/configuration rather than maintaining a second hard-coded list.
+Derive this from actual registrations/configuration rather than maintaining a second hard-coded
+list. Only active integrations appear. Each integration includes a stable ID, its integration
+contract version, and up to 32 sorted metadata entries with bounded keys and values.
+
+Registry-owned `thread.*` entries describe actual contributions and, for optional candidates, the
+target mod/version requirement that passed discovery. Integration-owned metadata uses its own
+namespace. Disabled, absent, incompatible, or failed integrations never appear as active
+capabilities and their classes are not resolved before presence/compatibility checks.
 
 ## Tool descriptions
 

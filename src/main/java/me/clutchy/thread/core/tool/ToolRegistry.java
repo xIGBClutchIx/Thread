@@ -37,6 +37,11 @@ public final class ToolRegistry {
     return tools.values().stream().map(RegisteredTool::descriptor).toList();
   }
 
+  /** Returns whether an exact validated tool ID is registered. */
+  public boolean contains(ToolId toolId) {
+    return tools.containsKey(Objects.requireNonNull(toolId, "toolId"));
+  }
+
   /**
    * Invokes a tool from an untrusted transport-provided identifier.
    *

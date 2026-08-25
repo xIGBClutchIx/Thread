@@ -2,6 +2,15 @@
 
 All notable user-visible changes to Thread are recorded here. Releases follow semantic versioning.
 
+## Unreleased
+
+### Added
+
+- Deterministic direct craftability, missing-ingredient analysis, and bounded recursive crafting
+  plans across thirteen read-only tools.
+- Optional mod integration discovery with absent-mod-safe class loading, transactional
+  contributions, typed recipe/block/entity extension points, and active integration metadata.
+
 ## 0.1.0 - 2026-08-24
 
 ### Added

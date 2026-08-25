@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import me.clutchy.thread.core.integration.IntegrationId;
+import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
+import me.clutchy.thread.platform.fabric.integration.FabricIntegrationExtensionPoints;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import me.clutchy.thread.platform.fabric.testing.MinecraftTestBootstrap;
 import net.minecraft.core.BlockPos;
@@ -24,8 +27,9 @@ import org.junit.jupiter.api.Test;
 
 class FabricBlockEntityInspectorRegistryTest {
   private final FabricDtoMapper mapper = new FabricDtoMapper();
+  private final IntegrationExtensionRegistry extensions = new IntegrationExtensionRegistry();
   private final FabricBlockEntityInspectorRegistry inspectors =
-      FabricBlockEntityInspectorRegistry.vanilla(mapper);
+      FabricBlockEntityInspectorRegistry.vanilla(mapper, extensions);
 
   @BeforeAll
   static void bootstrapMinecraftRegistries() {
@@ -69,7 +73,9 @@ class FabricBlockEntityInspectorRegistryTest {
 
   @Test
   void laterIntegrationInspectorTakesPriorityOverVanillaFallbacks() {
-    inspectors.register(
+    extensions.register(
+        IntegrationId.of("example"),
+        FabricIntegrationExtensionPoints.BLOCK_ENTITY_INSPECTOR,
         blockEntity ->
             blockEntity instanceof FurnaceBlockEntity
                 ? Optional.of(
@@ -82,5 +88,22 @@ class FabricBlockEntityInspectorRegistryTest {
 
     assertEquals("example:machine", result.typeId());
     assertEquals("32", result.state().get("speed"));
+  }
+
+  @Test
+  void failedOptionalInspectorFallsBackToVanillaInspection() {
+    extensions.register(
+        IntegrationId.of("broken"),
+        FabricIntegrationExtensionPoints.BLOCK_ENTITY_INSPECTOR,
+        blockEntity -> {
+          throw new NoClassDefFoundError("optional machine API");
+        });
+    FurnaceBlockEntity furnace =
+        new FurnaceBlockEntity(BlockPos.ZERO, Blocks.FURNACE.defaultBlockState());
+
+    BlockEntityInfo result = inspectors.inspect(furnace);
+
+    assertEquals("minecraft:furnace", result.typeId());
+    assertEquals("furnace", result.state().get("kind"));
   }
 }

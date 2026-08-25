@@ -40,6 +40,7 @@ class ThreadConfigLoaderTest {
           "mcpBindHost": "localhost",
           "mcpPort": 24444,
           "enabledTools": ["minecraft.get_status"],
+          "disabledIntegrations": ["example"],
           "maxEntityRadius": 24.0,
           "maxEntityResults": 12,
           "maxItemSearchResults": 10,
@@ -61,6 +62,7 @@ class ThreadConfigLoaderTest {
     assertEquals(250, config.gameThreadTimeoutMillis());
     assertEquals(2, config.maxConcurrentRequests());
     assertEquals(1, config.enabledTools().size());
+    assertEquals(java.util.List.of("example"), config.disabledIntegrations());
   }
 
   @Test

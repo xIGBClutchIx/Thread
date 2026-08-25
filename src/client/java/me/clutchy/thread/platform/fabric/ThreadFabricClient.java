@@ -2,23 +2,33 @@ package me.clutchy.thread.platform.fabric;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import me.clutchy.thread.config.ThreadConfig;
 import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.context.ContextRegistry;
+import me.clutchy.thread.core.integration.IntegrationActivation;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
+import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
+import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
+import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
+import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.platform.fabric.game.FabricGameProvider;
 import me.clutchy.thread.platform.fabric.game.FabricProviderLimits;
 import me.clutchy.thread.platform.fabric.game.FabricSessionGuard;
+import me.clutchy.thread.platform.fabric.inspection.FabricBlockEnricherRegistry;
 import me.clutchy.thread.platform.fabric.inspection.FabricBlockEntityInspectorRegistry;
+import me.clutchy.thread.platform.fabric.integration.FabricIntegrationCatalog;
+import me.clutchy.thread.platform.fabric.integration.FabricIntegrationEnvironment;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import me.clutchy.thread.platform.fabric.player.FabricPlayerProvider;
 import me.clutchy.thread.platform.fabric.recipe.FabricRecipeProvider;
 import me.clutchy.thread.platform.fabric.threading.MinecraftThreadExecutor;
+import me.clutchy.thread.platform.fabric.world.FabricEntityEnricherRegistry;
 import me.clutchy.thread.platform.fabric.world.FabricWorldProvider;
 import me.clutchy.thread.transport.mcp.McpHttpServer;
 import me.clutchy.thread.transport.mcp.McpServerOptions;
@@ -38,6 +48,7 @@ public final class ThreadFabricClient implements ClientModInitializer {
 
   private FabricProviderBundle providers;
   private ToolRegistry tools;
+  private IntegrationRegistry integrations;
   private McpHttpServer mcpServer;
 
   @Override
@@ -57,8 +68,17 @@ public final class ThreadFabricClient implements ClientModInitializer {
         FabricProviderLimits.configured(
             config.maxEntityRadius(), config.maxEntityResults(), config.maxItemSearchResults());
     FabricDtoMapper mapper = new FabricDtoMapper();
+    IntegrationExtensionRegistry extensionRegistry = new IntegrationExtensionRegistry();
     FabricBlockEntityInspectorRegistry blockEntityInspectors =
-        FabricBlockEntityInspectorRegistry.vanilla(mapper);
+        FabricBlockEntityInspectorRegistry.vanilla(mapper, extensionRegistry);
+    FabricBlockEnricherRegistry blockEnrichers = new FabricBlockEnricherRegistry(extensionRegistry);
+    FabricEntityEnricherRegistry entityEnrichers =
+        new FabricEntityEnricherRegistry(extensionRegistry);
+    RecipeProvider recipeProvider =
+        new CompositeRecipeProvider(
+            new FabricRecipeProvider(
+                client, clientThread, sessionGuard, limits, mapper, gameThreadTimeout),
+            extensionRegistry);
 
     providers =
         new FabricProviderBundle(
@@ -69,14 +89,15 @@ public final class ThreadFabricClient implements ClientModInitializer {
                 sessionGuard,
                 mapper,
                 blockEntityInspectors,
+                blockEnrichers,
                 gameThreadTimeout),
-            new FabricWorldProvider(client, clientThread, sessionGuard, limits, mapper),
-            new FabricRecipeProvider(
-                client, clientThread, sessionGuard, limits, mapper, gameThreadTimeout));
+            new FabricWorldProvider(
+                client, clientThread, sessionGuard, limits, mapper, entityEnrichers),
+            recipeProvider);
 
     ToolRegistry toolRegistry = new ToolRegistry();
     IntegrationRegistry integrationRegistry =
-        new IntegrationRegistry(toolRegistry, new ContextRegistry());
+        new IntegrationRegistry(toolRegistry, new ContextRegistry(), extensionRegistry);
     integrationRegistry.register(
         new VanillaIntegration(
             providers.game(),
@@ -84,7 +105,14 @@ public final class ThreadFabricClient implements ClientModInitializer {
             providers.world(),
             providers.recipe(),
             config::toolEnabled));
+    List<IntegrationActivation> optionalIntegrations =
+        integrationRegistry.discover(
+            FabricIntegrationCatalog.candidates(),
+            new FabricIntegrationEnvironment(loader),
+            config::integrationEnabled,
+            new ReflectiveIntegrationLoader(ThreadFabricClient.class.getClassLoader()));
     tools = toolRegistry;
+    integrations = integrationRegistry;
 
     ClientLifecycleEvents.CLIENT_STOPPING.register(ignored -> stopMcpServer());
     if (config.mcpEnabled()) {
@@ -97,6 +125,10 @@ public final class ThreadFabricClient implements ClientModInitializer {
     // providers is safe here, but even a read-only dispatch must wait until initialization returns.
     LOGGER.debug(
         "Thread live providers and {} vanilla tools initialized", tools.descriptors().size());
+    LOGGER.debug(
+        "Thread integrations initialized ({} active, {} optional candidates)",
+        integrations.integrations().size(),
+        optionalIntegrations.size());
   }
 
   private void startMcpServer(ThreadConfig config, String threadVersion) {
@@ -153,6 +185,10 @@ public final class ThreadFabricClient implements ClientModInitializer {
 
   ToolRegistry tools() {
     return Objects.requireNonNull(tools, "tools have not been initialized");
+  }
+
+  IntegrationRegistry integrations() {
+    return Objects.requireNonNull(integrations, "integrations have not been initialized");
   }
 
   McpHttpServer mcpServer() {

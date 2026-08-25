@@ -6,8 +6,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
+import me.clutchy.thread.platform.fabric.integration.FabricIntegrationExtensionPoints;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.Container;
@@ -17,33 +19,45 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** Ordered registry of safe block-entity inspectors used by the Fabric player provider. */
 public final class FabricBlockEntityInspectorRegistry {
+  private static final System.Logger LOGGER =
+      System.getLogger(FabricBlockEntityInspectorRegistry.class.getName());
+
   private final List<FabricBlockEntityInspector> inspectors = new ArrayList<>();
   private final FabricDtoMapper mapper;
+  private final IntegrationExtensionRegistry extensions;
 
-  private FabricBlockEntityInspectorRegistry(FabricDtoMapper mapper) {
+  private FabricBlockEntityInspectorRegistry(
+      FabricDtoMapper mapper, IntegrationExtensionRegistry extensions) {
     this.mapper = Objects.requireNonNull(mapper, "mapper");
+    this.extensions = Objects.requireNonNull(extensions, "extensions");
     inspectors.add(this::inspectFurnace);
     inspectors.add(this::inspectContainer);
   }
 
   /** Creates the vanilla registry with furnace and generic container inspection. */
-  public static FabricBlockEntityInspectorRegistry vanilla(FabricDtoMapper mapper) {
-    return new FabricBlockEntityInspectorRegistry(mapper);
-  }
-
-  /**
-   * Registers a higher-priority inspector.
-   *
-   * <p>Later integrations take precedence over vanilla fallbacks, allowing a mod-specific inspector
-   * to enrich a container-like machine without changing the core or MCP layers.
-   */
-  public void register(FabricBlockEntityInspector inspector) {
-    inspectors.add(0, Objects.requireNonNull(inspector, "inspector"));
+  public static FabricBlockEntityInspectorRegistry vanilla(
+      FabricDtoMapper mapper, IntegrationExtensionRegistry extensions) {
+    return new FabricBlockEntityInspectorRegistry(mapper, extensions);
   }
 
   /** Returns selected state, falling back to identity-only data for unknown block entities. */
   public BlockEntityInfo inspect(BlockEntity blockEntity) {
     Objects.requireNonNull(blockEntity, "blockEntity");
+    for (FabricBlockEntityInspector inspector :
+        extensions.contributions(FabricIntegrationExtensionPoints.BLOCK_ENTITY_INSPECTOR)) {
+      try {
+        Optional<BlockEntityInfo> inspection =
+            Objects.requireNonNull(inspector.inspect(blockEntity), "block entity inspection");
+        if (inspection.isPresent()) {
+          return inspection.orElseThrow();
+        }
+      } catch (RuntimeException | LinkageError exception) {
+        LOGGER.log(
+            System.Logger.Level.WARNING,
+            "Optional block-entity inspector failed ({0})",
+            exception.getClass().getName());
+      }
+    }
     for (FabricBlockEntityInspector inspector : List.copyOf(inspectors)) {
       Optional<BlockEntityInfo> inspection = inspector.inspect(blockEntity);
       if (inspection.isPresent()) {

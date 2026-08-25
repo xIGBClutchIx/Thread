@@ -93,6 +93,18 @@ class ArchitectureBoundaryTest {
     }
   }
 
+  @Test
+  void optionalIntegrationCatalogUsesClassNamesInsteadOfClassLiterals() throws IOException {
+    Path catalog =
+        PROJECT_ROOT.resolve(
+            "src/client/java/me/clutchy/thread/platform/fabric/integration/"
+                + "FabricIntegrationCatalog.java");
+    String contents = Files.readString(catalog, StandardCharsets.UTF_8);
+
+    assertFalse(contents.contains(".class"), catalog::toString);
+    assertFalse(contents.contains("ServiceLoader"), catalog::toString);
+  }
+
   private static List<Path> productionJavaSources() throws IOException {
     try (Stream<Path> roots = PRODUCTION_SOURCE_ROOTS.stream()) {
       return roots

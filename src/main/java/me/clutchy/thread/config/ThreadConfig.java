@@ -3,6 +3,7 @@ package me.clutchy.thread.config;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.tool.ToolId;
 
 /**
@@ -15,6 +16,7 @@ import me.clutchy.thread.core.tool.ToolId;
  * @param mcpBindHost loopback host used by the local MCP transport
  * @param mcpPort TCP port used by the local MCP transport
  * @param enabledTools exact tool IDs or namespace wildcards such as {@code minecraft.*}
+ * @param disabledIntegrations exact stable optional integration IDs to skip before class loading
  * @param maxEntityRadius maximum accepted nearby-entity radius
  * @param maxEntityResults maximum returned nearby entities
  * @param maxItemSearchResults maximum returned item-search matches
@@ -27,6 +29,7 @@ public record ThreadConfig(
     String mcpBindHost,
     int mcpPort,
     List<String> enabledTools,
+    List<String> disabledIntegrations,
     double maxEntityRadius,
     int maxEntityResults,
     int maxItemSearchResults,
@@ -55,6 +58,7 @@ public record ThreadConfig(
     mcpBindHost = normalizeLoopbackHost(mcpBindHost);
     requireRange(mcpPort, 1, 65_535, "mcpPort");
     enabledTools = normalizeSelectors(enabledTools);
+    disabledIntegrations = normalizeIntegrationIds(disabledIntegrations);
     requireRange(maxEntityRadius, 0.0D, HARD_MAX_ENTITY_RADIUS, "maxEntityRadius");
     requireRange(maxEntityResults, 1, HARD_MAX_ENTITY_RESULTS, "maxEntityResults");
     requireRange(maxItemSearchResults, 1, HARD_MAX_ITEM_SEARCH_RESULTS, "maxItemSearchResults");
@@ -74,7 +78,17 @@ public record ThreadConfig(
    */
   public static ThreadConfig defaults() {
     return new ThreadConfig(
-        true, "127.0.0.1", 25_580, List.of("minecraft.*"), 64.0D, 128, 64, 1024 * 1024, 5_000L, 8);
+        true,
+        "127.0.0.1",
+        25_580,
+        List.of("minecraft.*"),
+        List.of(),
+        64.0D,
+        128,
+        64,
+        1024 * 1024,
+        5_000L,
+        8);
   }
 
   /** Returns whether an exact tool ID is enabled by the configured selectors. */
@@ -86,6 +100,12 @@ public record ThreadConfig(
                 selector.equals(value)
                     || (selector.endsWith(".*")
                         && value.startsWith(selector.substring(0, selector.length() - 1))));
+  }
+
+  /** Returns whether optional integration discovery may activate the stable ID. */
+  public boolean integrationEnabled(IntegrationId integrationId) {
+    String value = Objects.requireNonNull(integrationId, "integrationId").value();
+    return !disabledIntegrations.contains(value);
   }
 
   private static List<String> normalizeSelectors(List<String> selectors) {
@@ -104,6 +124,19 @@ public record ThreadConfig(
       return;
     }
     ToolId.of(selector);
+  }
+
+  private static List<String> normalizeIntegrationIds(List<String> integrationIds) {
+    Objects.requireNonNull(integrationIds, "disabledIntegrations");
+    return integrationIds.stream()
+        .map(
+            integrationId ->
+                requireText(integrationId, "disabledIntegrations entry").toLowerCase(Locale.ROOT))
+        .map(IntegrationId::of)
+        .map(IntegrationId::value)
+        .distinct()
+        .sorted()
+        .toList();
   }
 
   private static String requireText(String value, String name) {

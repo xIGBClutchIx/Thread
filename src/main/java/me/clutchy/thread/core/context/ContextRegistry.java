@@ -35,6 +35,11 @@ public final class ContextRegistry {
     return providers.values().stream().map(RegisteredContext::descriptor).toList();
   }
 
+  /** Returns whether an exact validated context ID is registered. */
+  public boolean contains(ContextId contextId) {
+    return providers.containsKey(Objects.requireNonNull(contextId, "contextId"));
+  }
+
   /** Reads and serializes one context value. */
   public ToolResult<JsonElement> read(ContextId contextId) {
     Objects.requireNonNull(contextId, "contextId");

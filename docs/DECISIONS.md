@@ -324,3 +324,30 @@ step count, and canonical order. This prefers a non-cyclic branch and produces r
 without exponential global optimization. Recipe definitions alone may be cached. Planning remains
 read-only and excludes automatic crafting, nearby storage, station/fuel feasibility, and third-party
 recipe integrations.
+
+## D023: Optional integrations use metadata-first discovery and transactional contributions
+
+**Status:** Accepted
+
+Optional integrations are declared by stable ID, target mod ID, version requirement, and
+implementation class-name string. Thread evaluates enabled configuration, Fabric Loader mod
+presence, and version compatibility before the class loader sees the implementation name. The
+catalog does not import optional implementations, use class literals, or use eager `ServiceLoader`
+discovery.
+
+`ThreadIntegration.register` receives one transactional `IntegrationContext`. It may contribute
+read-only tools, bounded contexts, additional recipe definitions, typed platform extensions, and
+bounded capability metadata. Successful callbacks commit as one startup unit; callback, duplicate,
+metadata, linkage, or construction failures leave no partial registration and do not stop later
+optional candidates.
+
+Core owns the generic typed extension registry. Fabric owns extension contracts that require
+Minecraft types: block-entity inspection, target-block enrichment, and nearby-entity enrichment.
+Those contributors run on the provider's existing logical-thread path and return detached Thread
+DTOs. Optional recipe/enrichment failures are isolated at invocation time so vanilla results and
+central session guards remain authoritative.
+
+The lifecycle stays deliberately small. Integrations have a registration callback only; no generic
+start, stop, reload, event bus, or background-task system exists until an implemented integration
+proves one is required. This slice ships a test-only proof integration and no substantial
+third-party mod integration.

@@ -40,7 +40,8 @@ Possible work:
 
 Theme: understand the actual modpack rather than generic recipes.
 
-Integration framework becomes user-visible.
+The metadata-first integration framework already provides safe discovery and typed contribution
+points. V2 makes it user-visible by shipping real third-party integrations.
 
 Priority candidates:
 

@@ -8,11 +8,12 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
-import me.clutchy.thread.core.integration.GameIntegration;
 import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
+import me.clutchy.thread.core.integration.ThreadIntegration;
 import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
 import me.clutchy.thread.core.model.capability.IntegrationCapability;
+import me.clutchy.thread.core.model.capability.IntegrationMetadataEntry;
 import me.clutchy.thread.core.model.crafting.CraftingPlan;
 import me.clutchy.thread.core.model.crafting.CraftingResult;
 import me.clutchy.thread.core.model.game.GameInfo;
@@ -44,7 +45,7 @@ import me.clutchy.thread.core.tool.ToolResult;
 /**
  * Built-in integration that installs Thread's complete transport-neutral vanilla V1 tool catalog.
  */
-public final class VanillaIntegration implements GameIntegration {
+public final class VanillaIntegration implements ThreadIntegration {
   private static final IntegrationId ID = IntegrationId.of("vanilla");
   private static final String VERSION = "1";
 
@@ -292,13 +293,19 @@ public final class VanillaIntegration implements GameIntegration {
 
   private CapabilitiesSnapshot capabilities(IntegrationContext context) {
     List<String> toolIds =
-        context.tools().descriptors().stream()
-            .map(ToolDescriptor::id)
-            .map(Object::toString)
-            .toList();
+        context.activeTools().stream().map(ToolDescriptor::id).map(Object::toString).toList();
     List<IntegrationCapability> activeIntegrations =
-        context.integrations().integrations().stream()
-            .map(info -> new IntegrationCapability(info.id().toString(), info.version()))
+        context.activeIntegrations().stream()
+            .map(
+                info ->
+                    new IntegrationCapability(
+                        info.id().toString(),
+                        info.version(),
+                        info.metadata().entrySet().stream()
+                            .map(
+                                entry ->
+                                    new IntegrationMetadataEntry(entry.getKey(), entry.getValue()))
+                            .toList()))
             .toList();
     return new CapabilitiesSnapshot(
         game.gameInfo().threadVersion(), true, toolIds, activeIntegrations);
@@ -310,7 +317,7 @@ public final class VanillaIntegration implements GameIntegration {
 
   private void register(IntegrationContext context, GameTool<?, ?> tool) {
     if (enabledTools.test(tool.id())) {
-      context.tools().register(tool);
+      context.registerTool(tool);
     }
   }
 

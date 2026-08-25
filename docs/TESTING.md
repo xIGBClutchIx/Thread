@@ -44,6 +44,11 @@ Cover:
 - living/non-living entity health and classification invariants
 - block state and safe block-entity serialization
 - capability discovery
+- integration discovery for present, absent, disabled, incompatible, duplicate, and failed
+  candidates
+- transactional tool/context/recipe/typed-extension contributions and stable registration order
+- absent optional integration classes never reaching the class loader
+- integration metadata in capability discovery
 - session status transitions and preflight behavior
 - disabled tool behavior
 - query limit clamping
@@ -55,6 +60,7 @@ Cover:
 - recursive crafting plans for simple and deep dependencies, partial inventory, repeated
   cross-branch materials, deterministic variants and repeated IDs, direct/indirect/tag cycles,
   cyclic-versus-safe variants, maximum depth, empty inventory, no recipes, and session failures
+- optional recipe-provider merging with base session failures remaining authoritative
 
 ## Architecture tests
 
@@ -67,6 +73,8 @@ Examples:
 - `core` must not import MCP SDK packages
 - tool implementations must not import MCP SDK packages
 - MCP transport must not import Fabric/Minecraft classes directly
+- optional integration catalogs must use implementation class-name strings, not class literals or
+  eager `ServiceLoader` discovery
 
 This can be done with module separation, dependency analysis, or lightweight source/package checks. Prefer the simplest reliable mechanism.
 
@@ -103,6 +111,14 @@ craftability/missing-ingredient results, a recursive crafting-table plan from an
 capability discovery, and MCP calls from both menu and
 supported-world states. Separate unit tests preserve no-world and multiplayer rejection plus
 nearby-entity radius/result caps.
+
+The same packaged test also verifies that the integration registry initializes with only the
+required `vanilla` integration when no optional candidate is shipped, and that its generated
+capability metadata reflects all thirteen committed tools. Core tests use a reflective test-only
+proof integration to cover conditional activation, tool/context/recipe/typed-extension
+contributions, metadata reporting, atomic failure rollback, duplicate IDs, stable ordering, and
+classloading/linkage isolation. Fabric unit tests verify block, block-entity, and entity enrichment
+order plus per-contributor runtime failure isolation.
 
 `./gradlew runClientGameTest` runs this proof against development outputs.
 `./gradlew runProductionClientGameTest` instead loads the installable runtime JAR plus an isolated

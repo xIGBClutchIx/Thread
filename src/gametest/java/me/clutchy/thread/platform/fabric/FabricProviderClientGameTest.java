@@ -41,6 +41,15 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .findFirst()
             .orElseThrow();
     ToolRegistry tools = entrypoint.tools();
+    assertEquals(1, entrypoint.integrations().integrations().size(), "active integration count");
+    assertEquals(
+        "vanilla",
+        entrypoint.integrations().integrations().getFirst().id().value(),
+        "active vanilla integration");
+    assertEquals(
+        "13",
+        entrypoint.integrations().integrations().getFirst().metadata().get("thread.tool_count"),
+        "vanilla contribution metadata");
     if (Boolean.getBoolean(EXPECT_MCP_DISABLED)) {
       assertTrue(!entrypoint.mcpRunning(), "MCP remains stopped when configured off");
       assertEquals(13, tools.descriptors().size(), "tools initialize independently of MCP");
