@@ -130,9 +130,39 @@ Example result:
 
 Do not include identity/account identifiers unless a future use case explicitly requires them.
 
+## Shared item shape
+
+Inventory, equipment, recipe results, and inspected block-entity contents use the same non-empty
+item shape. `displayName` is the localized base name; `customName` is separate. Durability is null
+for non-damageable items, and enchantments sort by canonical registry ID. `components` contains a
+fixed set of selected values. Thread does not serialize arbitrary component or NBT data.
+
+```json
+{
+  "itemId": "minecraft:diamond_pickaxe",
+  "displayName": "Diamond Pickaxe",
+  "customName": "Workhorse",
+  "count": 1,
+  "maxCount": 1,
+  "durability": {"remaining": 1500, "maximum": 1561, "damage": 61},
+  "enchantments": [
+    {"enchantmentId": "minecraft:efficiency", "level": 5}
+  ],
+  "components": {
+    "rarity": null,
+    "unbreakable": false,
+    "repairCost": 2,
+    "lore": ["Mining tool"],
+    "potionId": null,
+    "storedItemStacks": 0
+  }
+}
+```
+
 ## `minecraft.get_inventory`
 
-Purpose: return the local player's inventory snapshot.
+Purpose: return the local player's main-inventory snapshot without duplicating held or armor
+equipment.
 
 Input: none.
 
@@ -144,16 +174,23 @@ Example result:
   "slots": [
     {
       "slot": 0,
-      "itemId": "minecraft:diamond_pickaxe",
-      "count": 1,
-      "maxCount": 1,
-      "displayName": "Diamond Pickaxe"
+      "stack": {
+        "itemId": "minecraft:diamond_pickaxe",
+        "displayName": "Diamond Pickaxe",
+        "customName": null,
+        "count": 1,
+        "maxCount": 1,
+        "durability": {"remaining": 1561, "maximum": 1561, "damage": 0},
+        "enchantments": [],
+        "components": null
+      }
     }
   ]
 }
 ```
 
-Empty slots may be omitted or represented explicitly. Pick one convention and test it.
+Slots cover the 36 main inventory positions (`0` through `35`). Empty positions are omitted.
+Query held and armor positions through `minecraft.get_equipment`.
 
 ## `minecraft.get_equipment`
 
@@ -165,14 +202,42 @@ Example result:
 
 ```json
 {
-  "mainHand": {"itemId": "minecraft:diamond_pickaxe", "count": 1},
-  "offHand": null,
-  "head": {"itemId": "minecraft:iron_helmet", "count": 1},
-  "chest": null,
-  "legs": null,
-  "feet": null
+  "slots": [
+    {
+      "slot": "MAIN_HAND",
+      "item": {
+        "itemId": "minecraft:diamond_pickaxe",
+        "displayName": "Diamond Pickaxe",
+        "customName": null,
+        "count": 1,
+        "maxCount": 1,
+        "durability": {"remaining": 1561, "maximum": 1561, "damage": 0},
+        "enchantments": [],
+        "components": null
+      }
+    },
+    {"slot": "OFF_HAND", "item": null},
+    {
+      "slot": "HEAD",
+      "item": {
+        "itemId": "minecraft:iron_helmet",
+        "displayName": "Iron Helmet",
+        "customName": null,
+        "count": 1,
+        "maxCount": 1,
+        "durability": {"remaining": 165, "maximum": 165, "damage": 0},
+        "enchantments": [],
+        "components": null
+      }
+    },
+    {"slot": "CHEST", "item": null},
+    {"slot": "LEGS", "item": null},
+    {"slot": "FEET", "item": null}
+  ]
 }
 ```
+
+Every response contains each of the six positions once. Empty positions use `item: null`.
 
 ## `minecraft.get_target_block`
 
@@ -184,17 +249,44 @@ Example result:
 
 ```json
 {
-  "blockId": "minecraft:blast_furnace",
+  "blockId": "minecraft:furnace",
+  "displayName": "Furnace",
   "position": {"x": 153, "y": 67, "z": -379},
   "properties": {
     "facing": "north",
     "lit": "false"
   },
-  "distance": 3.4
+  "distance": 3.4,
+  "blockEntityPresent": true,
+  "blockEntity": {
+    "typeId": "minecraft:furnace",
+    "inventorySize": 3,
+    "items": [
+      {
+        "slot": "input",
+        "item": {
+          "itemId": "minecraft:iron_ore",
+          "displayName": "Iron Ore",
+          "customName": null,
+          "count": 3,
+          "maxCount": 64,
+          "durability": null,
+          "enchantments": [],
+          "components": null
+        }
+      }
+    ],
+    "state": {"kind": "furnace"}
+  }
 }
 ```
 
-V1 does not need to dump block entity inventories or NBT.
+The provider reads the block and its block entity from loaded integrated-server state.
+Vanilla furnaces expose named `input`, `fuel`, and `output` positions; other vanilla containers use
+numeric positions. Empty positions are omitted and at most 64 item positions are inspected. An
+unopened loot container reports its loot-table identity without resolving or reading contents.
+Unknown block entities still report identity without raw NBT. Fabric integrations can register a
+higher-priority safe inspector for richer mod-specific state later.
 
 When the normal client raycast has no valid block target, Thread returns a structured `NOT_FOUND`
 tool error rather than inventing block data.
@@ -224,14 +316,23 @@ Example result:
   "entities": [
     {
       "entityType": "minecraft:zombie",
+      "displayName": "Zombie",
+      "customName": null,
       "distance": 8.4,
-      "position": {"x": 160.0, "y": 67.0, "z": -380.0}
+      "position": {"x": 160.0, "y": 67.0, "z": -380.0},
+      "living": true,
+      "health": 20.0,
+      "maxHealth": 20.0,
+      "classification": "HOSTILE"
     }
   ]
 }
 ```
 
-Do not return full entity NBT in V1.
+Living entities include health and max health. Non-living entities use null for both fields.
+Classification is nullable. Fabric assigns it to Minecraft's hostile enemy, passive animal/ambient
+creature/villager, and neutral-mob families. Thread does not infer labels for other entities or
+return entity NBT.
 
 ## `minecraft.get_recipe`
 

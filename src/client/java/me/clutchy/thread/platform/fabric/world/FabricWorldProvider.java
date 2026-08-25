@@ -19,7 +19,6 @@ import me.clutchy.thread.platform.fabric.game.FabricSessionGuard;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
@@ -102,12 +101,7 @@ public final class FabricWorldProvider implements WorldProvider {
     List<EntityInfo> entities =
         loadedEntities.stream()
             .limit(query.limit())
-            .map(
-                entity ->
-                    new EntityInfo(
-                        BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString(),
-                        Math.sqrt(entity.distanceToSqr(player)),
-                        mapper.position(entity)))
+            .map(entity -> mapper.entity(entity, Math.sqrt(entity.distanceToSqr(player))))
             .toList();
     return ToolResult.success(
         new NearbyEntityResult(query.radius(), query.limit(), truncated, entities));

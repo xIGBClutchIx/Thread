@@ -11,7 +11,8 @@ import me.clutchy.thread.core.tool.ToolResult;
  */
 public interface WorldProvider {
   /**
-   * Returns nearby entities from already-loaded state, bounded by the supplied radius and limit.
+   * Returns detached nearby entity identity, position, health, and reliable behavior context from
+   * already-loaded state, bounded by the supplied radius and limit.
    */
   ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query);
 }

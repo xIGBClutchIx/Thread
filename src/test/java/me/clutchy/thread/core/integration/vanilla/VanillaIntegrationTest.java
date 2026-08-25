@@ -19,11 +19,17 @@ import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
 import me.clutchy.thread.core.model.BlockInfo;
 import me.clutchy.thread.core.model.BlockPosition;
+import me.clutchy.thread.core.model.EntityClassification;
 import me.clutchy.thread.core.model.EntityInfo;
+import me.clutchy.thread.core.model.EquipmentPosition;
+import me.clutchy.thread.core.model.EquipmentSlotInfo;
 import me.clutchy.thread.core.model.EquipmentSnapshot;
 import me.clutchy.thread.core.model.GameInfo;
 import me.clutchy.thread.core.model.InventorySlotInfo;
 import me.clutchy.thread.core.model.InventorySnapshot;
+import me.clutchy.thread.core.model.ItemComponentsInfo;
+import me.clutchy.thread.core.model.ItemDurabilityInfo;
+import me.clutchy.thread.core.model.ItemEnchantmentInfo;
 import me.clutchy.thread.core.model.ItemInfo;
 import me.clutchy.thread.core.model.ItemSearchResult;
 import me.clutchy.thread.core.model.ItemStackInfo;
@@ -104,18 +110,32 @@ class VanillaIntegrationTest {
             .getAsString());
 
     JsonObject equipment = invoke(catalog.tools(), "minecraft.get_equipment", "{}");
+    JsonObject mainHand = equipmentSlot(equipment, "MAIN_HAND").getAsJsonObject("item");
+    assertEquals("minecraft:diamond_pickaxe", mainHand.get("itemId").getAsString());
+    assertEquals("Workhorse", mainHand.get("customName").getAsString());
+    assertEquals(1500, mainHand.getAsJsonObject("durability").get("remaining").getAsInt());
     assertEquals(
-        "minecraft:diamond_pickaxe",
-        equipment.getAsJsonObject("mainHand").get("itemId").getAsString());
-    assertTrue(equipment.get("head").isJsonNull());
+        "minecraft:efficiency",
+        mainHand
+            .getAsJsonArray("enchantments")
+            .get(0)
+            .getAsJsonObject()
+            .get("enchantmentId")
+            .getAsString());
+    assertTrue(equipmentSlot(equipment, "HEAD").get("item").isJsonNull());
 
     JsonObject target = invoke(catalog.tools(), "minecraft.get_target_block", "{}");
     assertEquals("minecraft:stone", target.get("blockId").getAsString());
+    assertEquals("Stone", target.get("displayName").getAsString());
+    assertFalse(target.get("blockEntityPresent").getAsBoolean());
 
     JsonObject entities =
         invoke(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":16,\"limit\":8}");
     assertEquals(16, entities.get("radius").getAsDouble());
     assertEquals("minecraft:zombie", first(entities, "entities").get("entityType").getAsString());
+    assertTrue(first(entities, "entities").get("living").getAsBoolean());
+    assertEquals(20, first(entities, "entities").get("maxHealth").getAsDouble());
+    assertEquals("HOSTILE", first(entities, "entities").get("classification").getAsString());
 
     JsonObject recipe =
         invoke(
@@ -273,6 +293,14 @@ class VanillaIntegrationTest {
     return value.getAsJsonArray(property).get(0).getAsJsonObject();
   }
 
+  private static JsonObject equipmentSlot(JsonObject equipment, String slot) {
+    return equipment.getAsJsonArray("slots").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("slot").getAsString().equals(slot))
+        .findFirst()
+        .orElseThrow();
+  }
+
   private static List<String> strings(JsonObject value, String property) {
     return value.getAsJsonArray(property).asList().stream().map(JsonElement::getAsString).toList();
   }
@@ -306,7 +334,17 @@ class VanillaIntegrationTest {
 
   private static class FakePlayerProvider implements PlayerProvider {
     private static final ItemStackInfo PICKAXE =
-        new ItemStackInfo("minecraft:diamond_pickaxe", 1, 1, "Diamond Pickaxe");
+        new ItemStackInfo(
+            "minecraft:diamond_pickaxe",
+            "Diamond Pickaxe",
+            "Workhorse",
+            1,
+            1,
+            new ItemDurabilityInfo(1500, 1561, 61),
+            List.of(
+                new ItemEnchantmentInfo("minecraft:unbreaking", 3),
+                new ItemEnchantmentInfo("minecraft:efficiency", 5)),
+            new ItemComponentsInfo(null, false, 2, List.of("Mining tool"), null, 0));
 
     @Override
     public ToolResult<PlayerStatus> status() {
@@ -327,22 +365,26 @@ class VanillaIntegrationTest {
     public ToolResult<InventorySnapshot> inventory() {
       return ToolResult.success(
           new InventorySnapshot(
-              0,
-              List.of(
-                  new InventorySlotInfo(
-                      0, new ItemStackInfo("minecraft:diamond", 3, 64, "Diamond")))));
+              0, List.of(new InventorySlotInfo(0, item("minecraft:diamond", "Diamond", 3, 64)))));
     }
 
     @Override
     public ToolResult<EquipmentSnapshot> equipment() {
-      return ToolResult.success(new EquipmentSnapshot(PICKAXE, null, null, null, null, null));
+      return ToolResult.success(equipmentWithMainHand(PICKAXE));
     }
 
     @Override
     public ToolResult<Optional<BlockInfo>> targetBlock() {
       return ToolResult.success(
           Optional.of(
-              new BlockInfo("minecraft:stone", new BlockPosition(152, 66, -380), Map.of(), 3.4)));
+              new BlockInfo(
+                  "minecraft:stone",
+                  "Stone",
+                  new BlockPosition(152, 66, -380),
+                  Map.of(),
+                  3.4,
+                  false,
+                  null)));
     }
   }
 
@@ -387,15 +429,24 @@ class VanillaIntegrationTest {
               query.radius(),
               query.limit(),
               false,
-              List.of(new EntityInfo("minecraft:zombie", 8.4, new Position(160, 67, -380)))));
+              List.of(
+                  new EntityInfo(
+                      "minecraft:zombie",
+                      "Zombie",
+                      null,
+                      8.4,
+                      new Position(160, 67, -380),
+                      true,
+                      20.0,
+                      20.0,
+                      EntityClassification.HOSTILE))));
     }
   }
 
   private static final class FakeRecipeProvider implements RecipeProvider {
     @Override
     public ToolResult<List<RecipeInfo>> recipesFor(String itemId) {
-      ItemStackInfo result =
-          new ItemStackInfo("minecraft:diamond_pickaxe", 1, 1, "Diamond Pickaxe");
+      ItemStackInfo result = item("minecraft:diamond_pickaxe", "Diamond Pickaxe", 1, 1);
       return ToolResult.success(
           List.of(
               new RecipeInfo(
@@ -438,5 +489,20 @@ class VanillaIntegrationTest {
     public void register(IntegrationContext context) {
       context.tools().register(TestJsonContracts.echoTool("example.echo"));
     }
+  }
+
+  private static ItemStackInfo item(String itemId, String displayName, int count, int maxCount) {
+    return new ItemStackInfo(itemId, displayName, null, count, maxCount, null, List.of(), null);
+  }
+
+  private static EquipmentSnapshot equipmentWithMainHand(ItemStackInfo mainHand) {
+    return new EquipmentSnapshot(
+        List.of(
+            new EquipmentSlotInfo(EquipmentPosition.MAIN_HAND, mainHand),
+            new EquipmentSlotInfo(EquipmentPosition.OFF_HAND, null),
+            new EquipmentSlotInfo(EquipmentPosition.HEAD, null),
+            new EquipmentSlotInfo(EquipmentPosition.CHEST, null),
+            new EquipmentSlotInfo(EquipmentPosition.LEGS, null),
+            new EquipmentSlotInfo(EquipmentPosition.FEET, null)));
   }
 }

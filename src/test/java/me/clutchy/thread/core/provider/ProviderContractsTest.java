@@ -8,7 +8,10 @@ import java.util.Map;
 import java.util.Optional;
 import me.clutchy.thread.core.model.BlockInfo;
 import me.clutchy.thread.core.model.BlockPosition;
+import me.clutchy.thread.core.model.EntityClassification;
 import me.clutchy.thread.core.model.EntityInfo;
+import me.clutchy.thread.core.model.EquipmentPosition;
+import me.clutchy.thread.core.model.EquipmentSlotInfo;
 import me.clutchy.thread.core.model.EquipmentSnapshot;
 import me.clutchy.thread.core.model.GameInfo;
 import me.clutchy.thread.core.model.InventorySlotInfo;
@@ -30,7 +33,7 @@ import org.junit.jupiter.api.Test;
 class ProviderContractsTest {
   @Test
   void plainJavaFakesCanDriveEveryProviderContract() {
-    ItemStackInfo pickaxe = new ItemStackInfo("minecraft:iron_pickaxe", 1, 1, "Iron Pickaxe");
+    ItemStackInfo pickaxe = item("minecraft:iron_pickaxe", "Iron Pickaxe", 1, 1);
     GameProvider game = new FakeGameProvider();
     PlayerProvider player = new FakePlayerProvider(pickaxe);
     WorldProvider world = new FakeWorldProvider();
@@ -40,7 +43,13 @@ class ProviderContractsTest {
     assertEquals("26.2", game.gameInfo().minecraftVersion());
     assertEquals("minecraft:overworld", player.status().value().dimension());
     assertEquals(pickaxe, player.inventory().value().slots().getFirst().stack());
-    assertEquals(pickaxe, player.equipment().value().mainHand());
+    assertEquals(
+        pickaxe,
+        player.equipment().value().slots().stream()
+            .filter(slot -> slot.slot() == EquipmentPosition.MAIN_HAND)
+            .findFirst()
+            .orElseThrow()
+            .item());
     assertEquals("minecraft:stone", player.targetBlock().value().orElseThrow().blockId());
     assertEquals(
         "minecraft:zombie",
@@ -93,14 +102,21 @@ class ProviderContractsTest {
 
     @Override
     public ToolResult<EquipmentSnapshot> equipment() {
-      return ToolResult.success(new EquipmentSnapshot(pickaxe, null, null, null, null, null));
+      return ToolResult.success(equipmentWithMainHand(pickaxe));
     }
 
     @Override
     public ToolResult<Optional<BlockInfo>> targetBlock() {
       return ToolResult.success(
           Optional.of(
-              new BlockInfo("minecraft:stone", new BlockPosition(1, 63, -3), Map.of(), 2.25)));
+              new BlockInfo(
+                  "minecraft:stone",
+                  "Stone",
+                  new BlockPosition(1, 63, -3),
+                  Map.of(),
+                  2.25,
+                  false,
+                  null)));
     }
   }
 
@@ -112,7 +128,17 @@ class ProviderContractsTest {
               query.radius(),
               query.limit(),
               false,
-              List.of(new EntityInfo("minecraft:zombie", 4, new Position(4, 64, 0)))));
+              List.of(
+                  new EntityInfo(
+                      "minecraft:zombie",
+                      "Zombie",
+                      null,
+                      4,
+                      new Position(4, 64, 0),
+                      true,
+                      20.0,
+                      20.0,
+                      EntityClassification.HOSTILE))));
     }
   }
 
@@ -124,7 +150,7 @@ class ProviderContractsTest {
               new RecipeInfo(
                   "minecraft:iron_pickaxe",
                   "minecraft:crafting_shaped",
-                  new ItemStackInfo("minecraft:iron_pickaxe", 1, 1, "Iron Pickaxe"),
+                  item("minecraft:iron_pickaxe", "Iron Pickaxe", 1, 1),
                   List.of(
                       new RecipeIngredientInfo(List.of("minecraft:iron_ingot"), List.of(), 3),
                       new RecipeIngredientInfo(List.of("minecraft:stick"), List.of(), 2)))));
@@ -136,5 +162,20 @@ class ProviderContractsTest {
           new ItemSearchResult(
               query, limit, false, List.of(new ItemInfo("minecraft:stick", "Stick"))));
     }
+  }
+
+  private static ItemStackInfo item(String itemId, String displayName, int count, int maxCount) {
+    return new ItemStackInfo(itemId, displayName, null, count, maxCount, null, List.of(), null);
+  }
+
+  private static EquipmentSnapshot equipmentWithMainHand(ItemStackInfo mainHand) {
+    return new EquipmentSnapshot(
+        List.of(
+            new EquipmentSlotInfo(EquipmentPosition.MAIN_HAND, mainHand),
+            new EquipmentSlotInfo(EquipmentPosition.OFF_HAND, null),
+            new EquipmentSlotInfo(EquipmentPosition.HEAD, null),
+            new EquipmentSlotInfo(EquipmentPosition.CHEST, null),
+            new EquipmentSlotInfo(EquipmentPosition.LEGS, null),
+            new EquipmentSlotInfo(EquipmentPosition.FEET, null)));
   }
 }

@@ -254,3 +254,23 @@ filtered before registry insertion so discovery cannot advertise an unusable or 
 Invalid files are preserved and the launch falls back to safe defaults without logging the file
 contents. The MCP request-concurrency limit and game-thread deadline are also server-enforced;
 clients cannot override them per call.
+
+## D020: Rich live context uses shared bounded snapshots
+
+**Status:** Accepted
+
+Inventory, equipment, recipe results, and inspected container contents share one explicit
+`ItemStackInfo` contract. It separates localized base and custom names, includes durability and
+canonical enchantments, and whitelists a bounded set of component values. Equipment contains all
+six positions with null items for empties; the main inventory omits empty positions
+and excludes equipment to avoid duplication.
+
+Nearby entities include detached identity, names, position, distance, and living health. Behavior
+Fabric assigns nullable classifications from reliable Minecraft type markers and uses no
+heuristics. Target-block inspection captures the normal client raycast but reads block state and
+block entities from already-loaded integrated-server state. Vanilla container inspection is capped,
+does not serialize raw NBT/components or resolve unopened loot tables.
+
+Fabric owns a small ordered block-entity inspector registry. Future mod integrations may register a
+higher-priority inspector without changing core models, tool handlers, or MCP transport. No
+third-party integration ships with this extension point.

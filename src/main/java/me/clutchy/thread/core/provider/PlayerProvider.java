@@ -17,12 +17,19 @@ public interface PlayerProvider {
   /** Returns the current local-player status after supported-session validation. */
   ToolResult<PlayerStatus> status();
 
-  /** Returns a detached snapshot of non-empty inventory slots and the selected hotbar slot. */
+  /**
+   * Returns the 36 main-inventory positions as non-empty slots plus the selected hotbar slot.
+   *
+   * <p>Callers use {@link #equipment()} for held and armor positions.
+   */
   ToolResult<InventorySnapshot> inventory();
 
-  /** Returns a detached snapshot of held and equipped items. */
+  /** Returns all six held/armor positions, with a null item in each empty position. */
   ToolResult<EquipmentSnapshot> equipment();
 
-  /** Returns the normal client raycast target, or an empty value when no block is targeted. */
+  /**
+   * Returns the normal client raycast target with authoritative loaded server state, or an empty
+   * value when no block is targeted.
+   */
   ToolResult<Optional<BlockInfo>> targetBlock();
 }

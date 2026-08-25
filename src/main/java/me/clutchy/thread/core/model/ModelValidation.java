@@ -19,6 +19,23 @@ final class ModelValidation {
     return value;
   }
 
+  static String boundedNonBlank(String value, String name, int maximumCodePoints) {
+    nonBlank(value, name);
+    if (value.codePointCount(0, value.length()) > maximumCodePoints) {
+      throw new IllegalArgumentException(
+          name + " must not exceed " + maximumCodePoints + " characters");
+    }
+    return value;
+  }
+
+  static String optionalBoundedNonBlank(String value, String name, int maximumCodePoints) {
+    return value == null ? null : boundedNonBlank(value, name, maximumCodePoints);
+  }
+
+  static String optionalRegistryId(String value, String name) {
+    return value == null ? null : registryId(value, name);
+  }
+
   static String registryId(String value, String name) {
     nonBlank(value, name);
     if (!REGISTRY_ID.matcher(value).matches()) {

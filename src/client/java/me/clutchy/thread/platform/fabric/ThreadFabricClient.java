@@ -14,6 +14,7 @@ import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.platform.fabric.game.FabricGameProvider;
 import me.clutchy.thread.platform.fabric.game.FabricProviderLimits;
 import me.clutchy.thread.platform.fabric.game.FabricSessionGuard;
+import me.clutchy.thread.platform.fabric.inspection.FabricBlockEntityInspectorRegistry;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import me.clutchy.thread.platform.fabric.player.FabricPlayerProvider;
 import me.clutchy.thread.platform.fabric.recipe.FabricRecipeProvider;
@@ -56,11 +57,19 @@ public final class ThreadFabricClient implements ClientModInitializer {
         FabricProviderLimits.configured(
             config.maxEntityRadius(), config.maxEntityResults(), config.maxItemSearchResults());
     FabricDtoMapper mapper = new FabricDtoMapper();
+    FabricBlockEntityInspectorRegistry blockEntityInspectors =
+        FabricBlockEntityInspectorRegistry.vanilla(mapper);
 
     providers =
         new FabricProviderBundle(
             new FabricGameProvider(client, clientThread, versions.gameInfo()),
-            new FabricPlayerProvider(client, clientThread, sessionGuard, mapper),
+            new FabricPlayerProvider(
+                client,
+                clientThread,
+                sessionGuard,
+                mapper,
+                blockEntityInspectors,
+                gameThreadTimeout),
             new FabricWorldProvider(client, clientThread, sessionGuard, limits, mapper),
             new FabricRecipeProvider(
                 client, clientThread, sessionGuard, limits, mapper, gameThreadTimeout));

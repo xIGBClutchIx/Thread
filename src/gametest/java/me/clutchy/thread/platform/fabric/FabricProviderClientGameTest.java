@@ -11,7 +11,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
-import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
 import me.clutchy.thread.transport.mcp.McpHttpServer;
@@ -122,17 +121,29 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
       singleplayer.getClientLevel().waitForChunksDownload();
       singleplayer.getServer().runCommand("fill -3 99 -3 3 99 5 minecraft:stone");
-      singleplayer.getServer().runCommand("setblock 0 101 3 minecraft:gold_block");
+      singleplayer
+          .getServer()
+          .runCommand("setblock 0 101 3 minecraft:furnace[facing=north,lit=false]");
+      singleplayer
+          .getServer()
+          .runCommand("item replace block 0 101 3 container.0 with minecraft:iron_ore 3");
+      singleplayer
+          .getServer()
+          .runCommand("item replace block 0 101 3 container.1 with minecraft:coal");
       singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 0 0");
       singleplayer
           .getServer()
           .runCommand("item replace entity @a hotbar.0 with minecraft:diamond_pickaxe");
+      singleplayer.getServer().runCommand("enchant @a minecraft:efficiency 5");
       singleplayer
           .getServer()
           .runCommand("item replace entity @a armor.head with minecraft:diamond_helmet");
       singleplayer.getServer().runCommand("give @a minecraft:diamond 3");
       singleplayer.getServer().runCommand("give @a minecraft:stick 2");
-      singleplayer.getServer().runCommand("summon minecraft:armor_stand 2 100 0");
+      singleplayer.getServer().runCommand("summon minecraft:minecart 2 100 0");
+      singleplayer
+          .getServer()
+          .runCommand("summon minecraft:zombie 4 100 0 {NoAI:1b,Silent:1b,Invulnerable:1b}");
       // Fabric API 0.154 predates the connection-level packet drain helper. Waiting for the
       // command's observable client state keeps the test deterministic without depending on a
       // newer game-test convenience API.
@@ -142,7 +153,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
                   && hasInventoryStack(client, Items.STICK, 2)
                   && client.player != null
                   && client.player.getMainHandItem().is(Items.DIAMOND_PICKAXE));
-      context.waitFor(FabricProviderClientGameTest::targetsKnownGoldBlock);
+      context.waitFor(FabricProviderClientGameTest::targetsKnownFurnace);
 
       assertTrue(
           invokeSuccessfully(context, tools, "minecraft.get_status", "{}")
@@ -172,11 +183,11 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
                   item -> item.get("itemId").getAsString().equals("minecraft:diamond_pickaxe")),
           "live item registry search");
 
-      invokeSuccessfully(context, tools, "minecraft.get_equipment", "{}");
+      JsonObject directEquipment =
+          invokeSuccessfully(context, tools, "minecraft.get_equipment", "{}");
+      assertEquals(6, directEquipment.getAsJsonArray("slots").size(), "fixed equipment slot count");
       ToolResult<JsonElement> target = invoke(context, tools, "minecraft.get_target_block", "{}");
-      assertTrue(
-          target.successful() || target.error().code() == ToolErrorCode.NOT_FOUND,
-          "target-block result");
+      assertTrue(target.successful(), "target-block result");
       invokeSuccessfully(
           context, tools, "minecraft.get_nearby_entities", "{\"radius\":16,\"limit\":8}");
 
@@ -207,22 +218,44 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           mcpTool(context, mcp.endpoint(), 8, "minecraft.get_inventory", new JsonObject());
       assertEquals(3, itemCount(mcpInventory, "minecraft:diamond"), "MCP diamond count");
       assertEquals(2, itemCount(mcpInventory, "minecraft:stick"), "MCP stick count");
+      assertEquals(
+          0,
+          itemCount(mcpInventory, "minecraft:diamond_helmet"),
+          "inventory excludes equipment slots");
 
       JsonObject mcpEquipment =
           mcpTool(context, mcp.endpoint(), 9, "minecraft.get_equipment", new JsonObject());
+      JsonObject mainHand = equipmentItem(mcpEquipment, "MAIN_HAND");
       assertEquals(
           "minecraft:diamond_pickaxe",
-          mcpEquipment.getAsJsonObject("mainHand").get("itemId").getAsString(),
+          mainHand.get("itemId").getAsString(),
           "MCP main-hand equipment");
+      assertTrue(
+          mainHand.getAsJsonObject("durability").get("maximum").getAsInt() > 0, "durability");
+      assertTrue(!mainHand.getAsJsonArray("enchantments").isEmpty(), "enchantments");
       assertEquals(
           "minecraft:diamond_helmet",
-          mcpEquipment.getAsJsonObject("head").get("itemId").getAsString(),
+          equipmentItem(mcpEquipment, "HEAD").get("itemId").getAsString(),
           "MCP head equipment");
+      assertTrue(
+          equipmentSlot(mcpEquipment, "OFF_HAND").get("item").isJsonNull(), "empty off hand");
 
       JsonObject mcpTarget =
           mcpTool(context, mcp.endpoint(), 10, "minecraft.get_target_block", new JsonObject());
       assertEquals(
-          "minecraft:gold_block", mcpTarget.get("blockId").getAsString(), "MCP targeted block");
+          "minecraft:furnace", mcpTarget.get("blockId").getAsString(), "MCP targeted block");
+      assertEquals("Furnace", mcpTarget.get("displayName").getAsString(), "block display name");
+      assertEquals(
+          "north",
+          mcpTarget.getAsJsonObject("properties").get("facing").getAsString(),
+          "block state property");
+      assertTrue(mcpTarget.get("blockEntityPresent").getAsBoolean(), "block entity presence");
+      JsonObject furnace = mcpTarget.getAsJsonObject("blockEntity");
+      assertEquals("minecraft:furnace", furnace.get("typeId").getAsString(), "block entity type");
+      assertEquals(
+          "minecraft:iron_ore",
+          blockEntityItem(furnace, "input").get("itemId").getAsString(),
+          "furnace input item");
 
       JsonObject entityArguments = new JsonObject();
       entityArguments.addProperty("radius", 16);
@@ -233,8 +266,17 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           mcpEntities.getAsJsonArray("entities").asList().stream()
               .map(JsonElement::getAsJsonObject)
               .anyMatch(
-                  entity -> entity.get("entityType").getAsString().equals("minecraft:armor_stand")),
+                  entity -> entity.get("entityType").getAsString().equals("minecraft:minecart")),
           "MCP nearby entity within 16 blocks");
+      JsonObject zombie = entity(mcpEntities, "minecraft:zombie");
+      assertEquals("Zombie", zombie.get("displayName").getAsString(), "entity display name");
+      assertTrue(zombie.get("living").getAsBoolean(), "living entity marker");
+      assertTrue(zombie.get("health").getAsDouble() > 0, "living entity health");
+      assertEquals("HOSTILE", zombie.get("classification").getAsString(), "hostile classification");
+      assertTrue(zombie.get("distance").getAsDouble() > 0, "entity distance");
+      JsonObject minecart = entity(mcpEntities, "minecraft:minecart");
+      assertTrue(!minecart.get("living").getAsBoolean(), "non-living entity marker");
+      assertTrue(minecart.get("health").isJsonNull(), "non-living health absence");
 
       JsonObject recipeArguments = new JsonObject();
       recipeArguments.addProperty("itemId", "minecraft:diamond_pickaxe");
@@ -408,9 +450,38 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     return false;
   }
 
-  private static boolean targetsKnownGoldBlock(Minecraft client) {
+  private static boolean targetsKnownFurnace(Minecraft client) {
     return client.hitResult instanceof BlockHitResult blockHit
         && blockHit.getBlockPos().equals(new BlockPos(0, 101, 3));
+  }
+
+  private static JsonObject equipmentSlot(JsonObject equipment, String slot) {
+    return equipment.getAsJsonArray("slots").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("slot").getAsString().equals(slot))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static JsonObject equipmentItem(JsonObject equipment, String slot) {
+    return equipmentSlot(equipment, slot).getAsJsonObject("item");
+  }
+
+  private static JsonObject blockEntityItem(JsonObject blockEntity, String slot) {
+    return blockEntity.getAsJsonArray("items").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("slot").getAsString().equals(slot))
+        .map(candidate -> candidate.getAsJsonObject("item"))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static JsonObject entity(JsonObject result, String entityType) {
+    return result.getAsJsonArray("entities").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("entityType").getAsString().equals(entityType))
+        .findFirst()
+        .orElseThrow();
   }
 
   private static int itemCount(JsonObject inventory, String itemId) {

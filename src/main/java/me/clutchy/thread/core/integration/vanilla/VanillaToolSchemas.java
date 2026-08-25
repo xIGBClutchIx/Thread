@@ -2,6 +2,8 @@ package me.clutchy.thread.core.integration.vanilla;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import me.clutchy.thread.core.model.BlockEntityInfo;
+import me.clutchy.thread.core.model.InventorySnapshot;
 import me.clutchy.thread.core.serialization.JsonSchema;
 
 final class VanillaToolSchemas {
@@ -15,25 +17,67 @@ final class VanillaToolSchemas {
       object(property("x", integer()), property("y", integer()), property("z", integer()));
   private static final JsonObject ITEM_INFO =
       object(property("itemId", registryId()), property("displayName", string(1, 256, null)));
+  private static final JsonObject ITEM_DURABILITY =
+      object(
+          property("remaining", integer(0, null)),
+          property("maximum", integer(1, null)),
+          property("damage", integer(0, null)));
+  private static final JsonObject ITEM_ENCHANTMENT =
+      object(property("enchantmentId", registryId()), property("level", integer(1, null)));
+  private static final JsonObject ITEM_COMPONENTS =
+      object(
+          property("rarity", nullable(string(1, 32, null))),
+          property("unbreakable", bool()),
+          property("repairCost", integer(0, null)),
+          property("lore", boundedArray(string(1, 256, null), 0, 16)),
+          property("potionId", nullable(registryId())),
+          property("storedItemStacks", integer(0, null)));
   private static final JsonObject ITEM_STACK =
       object(
           property("itemId", registryId()),
+          property("displayName", string(1, 256, null)),
+          property("customName", nullable(string(1, 256, null))),
           property("count", integer(1, null)),
           property("maxCount", integer(1, null)),
-          property("displayName", string(1, 256, null)));
+          property("durability", nullable(ITEM_DURABILITY)),
+          property("enchantments", array(ITEM_ENCHANTMENT)),
+          property("components", nullable(ITEM_COMPONENTS)));
   private static final JsonObject INVENTORY_SLOT =
-      object(property("slot", integer(0, null)), property("stack", ITEM_STACK));
+      object(
+          property("slot", integer(0, InventorySnapshot.MAIN_SLOT_COUNT - 1)),
+          property("stack", ITEM_STACK));
+  private static final JsonObject EQUIPMENT_SLOT =
+      object(
+          property("slot", enumString("MAIN_HAND", "OFF_HAND", "HEAD", "CHEST", "LEGS", "FEET")),
+          property("item", nullable(ITEM_STACK)));
+  private static final JsonObject BLOCK_ENTITY_ITEM =
+      object(property("slot", string(1, 64, null)), property("item", ITEM_STACK));
+  private static final JsonObject BLOCK_ENTITY_INFO =
+      object(
+          property("typeId", registryId()),
+          property("inventorySize", integer(0, null)),
+          property("items", boundedArray(BLOCK_ENTITY_ITEM, 0, BlockEntityInfo.MAX_ITEMS)),
+          property("state", openObject()));
   private static final JsonObject BLOCK_INFO =
       object(
           property("blockId", registryId()),
+          property("displayName", string(1, 256, null)),
           property("position", BLOCK_POSITION),
           property("properties", openObject()),
-          property("distance", number(0.0, null)));
+          property("distance", number(0.0, null)),
+          property("blockEntityPresent", bool()),
+          property("blockEntity", nullable(BLOCK_ENTITY_INFO)));
   private static final JsonObject ENTITY_INFO =
       object(
           property("entityType", registryId()),
+          property("displayName", string(1, 256, null)),
+          property("customName", nullable(string(1, 256, null))),
           property("distance", number(0.0, null)),
-          property("position", POSITION));
+          property("position", POSITION),
+          property("living", bool()),
+          property("health", nullable(number(0.0, null))),
+          property("maxHealth", nullable(number(0.0, null))),
+          property("classification", nullableEnumString("HOSTILE", "PASSIVE", "NEUTRAL")));
   private static final JsonObject RECIPE_INGREDIENT =
       object(
           property("itemIds", array(registryId())),
@@ -89,16 +133,10 @@ final class VanillaToolSchemas {
       schema(
           object(
               property("selectedHotbarSlot", integer(0, 8)),
-              property("slots", array(INVENTORY_SLOT))));
+              property(
+                  "slots", boundedArray(INVENTORY_SLOT, 0, InventorySnapshot.MAIN_SLOT_COUNT))));
   static final JsonSchema EQUIPMENT =
-      schema(
-          object(
-              property("mainHand", nullable(ITEM_STACK)),
-              property("offHand", nullable(ITEM_STACK)),
-              property("head", nullable(ITEM_STACK)),
-              property("chest", nullable(ITEM_STACK)),
-              property("legs", nullable(ITEM_STACK)),
-              property("feet", nullable(ITEM_STACK))));
+      schema(object(property("slots", boundedArray(EQUIPMENT_SLOT, 6, 6))));
   static final JsonSchema TARGET_BLOCK = schema(BLOCK_INFO);
   static final JsonSchema NEARBY_ENTITY_QUERY =
       schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
@@ -159,6 +197,13 @@ final class VanillaToolSchemas {
   private static JsonObject array(JsonObject items) {
     JsonObject schema = typed("array");
     schema.add("items", items.deepCopy());
+    return schema;
+  }
+
+  private static JsonObject boundedArray(JsonObject items, int minimum, int maximum) {
+    JsonObject schema = array(items);
+    schema.addProperty("minItems", minimum);
+    schema.addProperty("maxItems", maximum);
     return schema;
   }
 

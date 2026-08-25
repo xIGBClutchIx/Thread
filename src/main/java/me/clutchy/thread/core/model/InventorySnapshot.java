@@ -15,6 +15,9 @@ import java.util.Set;
  * @param slots non-empty inventory slots
  */
 public record InventorySnapshot(int selectedHotbarSlot, List<InventorySlotInfo> slots) {
+  /** Number of main inventory positions exposed by the V1 player inventory contract. */
+  public static final int MAIN_SLOT_COUNT = 36;
+
   public InventorySnapshot {
     if (selectedHotbarSlot < 0 || selectedHotbarSlot > 8) {
       throw new IllegalArgumentException("selectedHotbarSlot must be between 0 and 8");

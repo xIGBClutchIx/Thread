@@ -137,9 +137,9 @@ public final class VanillaIntegration implements GameIntegration {
   private GameTool<EmptyInput, InventorySnapshot> getInventory() {
     return tool(
         "minecraft.get_inventory",
-        "Returns a snapshot of the local player's non-empty inventory slots using canonical item "
-            + "registry IDs and exact counts. Use this when the answer depends on what the player "
-            + "actually possesses.",
+        "Returns the local player's non-empty main-inventory slots with canonical IDs, names, "
+            + "counts, durability, enchantments, and selected safe components. Equipment is "
+            + "excluded. Use this when the answer depends on what the player possesses.",
         emptyInputCodec(),
         JsonCodec.of(InventorySnapshot.class, VanillaToolSchemas.INVENTORY),
         ToolCapabilities.supportedSingleplayer(),
@@ -150,8 +150,8 @@ public final class VanillaIntegration implements GameIntegration {
     return tool(
         "minecraft.get_equipment",
         "Returns the local player's live main hand, off hand, armor, and empty equipment positions "
-            + "using canonical item registry IDs. Use this to answer what is currently held or "
-            + "worn.",
+            + "with the same rich item context as inventory. Use this to answer what is currently "
+            + "held or worn.",
         emptyInputCodec(),
         JsonCodec.of(EquipmentSnapshot.class, VanillaToolSchemas.EQUIPMENT),
         ToolCapabilities.supportedSingleplayer(),
@@ -162,8 +162,9 @@ public final class VanillaIntegration implements GameIntegration {
     return tool(
         "minecraft.get_target_block",
         "Returns the block currently under the player's normal camera targeting ray, including "
-            + "canonical ID, position, state properties, and distance. Use this to identify what "
-            + "the player is looking at; no block is a structured NOT_FOUND result.",
+            + "canonical ID, name, position, state properties, distance, and safe structured "
+            + "block-entity data. Use this to identify or inspect what the player is looking at; "
+            + "no block is a structured NOT_FOUND result.",
         emptyInputCodec(),
         JsonCodec.of(BlockInfo.class, VanillaToolSchemas.TARGET_BLOCK),
         ToolCapabilities.supportedSingleplayer(),
@@ -173,9 +174,10 @@ public final class VanillaIntegration implements GameIntegration {
   private GameTool<NearbyEntityQuery, NearbyEntityResult> getNearbyEntities() {
     return tool(
         "minecraft.get_nearby_entities",
-        "Returns a bounded snapshot of already-loaded entities around the local player, sorted "
-            + "deterministically with truncation metadata. Use this for nearby-entity questions; "
-            + "server-side radius and result limits always win and no chunks are loaded.",
+        "Returns a bounded snapshot of already-loaded entities around the local player, sorted by "
+            + "distance, type, and position with names, health, and reliable behavior labels. Use "
+            + "this for nearby-entity questions; server-side radius and result limits win and no "
+            + "chunks are loaded.",
         JsonCodec.of(NearbyEntityQuery.class, VanillaToolSchemas.NEARBY_ENTITY_QUERY),
         JsonCodec.of(NearbyEntityResult.class, VanillaToolSchemas.NEARBY_ENTITY_RESULT),
         ToolCapabilities.supportedSingleplayer(),

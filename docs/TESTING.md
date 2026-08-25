@@ -39,6 +39,10 @@ Cover:
 - input validation
 - error serialization
 - result serialization
+- rich item serialization, invariants, durability, enchantments, custom names, and selected components
+- empty/populated inventory and explicit empty equipment positions
+- living/non-living entity health and classification invariants
+- block state and safe block-entity serialization
 - capability discovery
 - session status transitions and preflight behavior
 - disabled tool behavior
@@ -67,7 +71,7 @@ Test conversion logic separately from live access whenever possible.
 Examples:
 
 - `ItemStack` -> `ItemStackInfo`
-- block state -> `BlockInfo`
+- block state/block entity -> `BlockInfo`
 - entity -> `EntityInfo`
 - recipe -> `RecipeInfo`
 
@@ -85,10 +89,13 @@ Critical edge cases:
 - entity result cap reached
 
 The isolated Fabric client game test under `src/gametest` creates a temporary single-player world
-and invokes all ten vanilla V1 tools. It covers external-thread dispatch, exact inventory and
-equipment IDs/counts, a deterministic target block, an already-loaded entity within 16 blocks,
-diamond-pickaxe recipe access, inventory/recipe material comparison, item search, capability
-discovery, and MCP calls from both menu and supported-world states.
+and invokes all ten vanilla V1 tools. It covers external-thread dispatch, a durability/enchantment
+rich item, main-inventory/equipment separation, all explicit equipment positions, a populated
+furnace with authoritative block state and structured contents, living and non-living nearby
+entities with health/distance/classification, diamond-pickaxe recipe access, inventory/recipe
+material comparison, item search, capability discovery, and MCP calls from both menu and
+supported-world states. Separate unit tests preserve no-world and multiplayer rejection plus
+nearby-entity radius/result caps.
 
 `./gradlew runClientGameTest` runs this proof against development outputs.
 `./gradlew runProductionClientGameTest` instead loads the installable runtime JAR plus an isolated

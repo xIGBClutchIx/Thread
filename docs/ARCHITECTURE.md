@@ -62,14 +62,20 @@ Immutable, serialization-friendly values such as:
 - `PlayerStatus`
 - `InventorySnapshot`
 - `ItemStackInfo`
+- `ItemDurabilityInfo`
+- `ItemEnchantmentInfo`
+- `ItemComponentsInfo`
 - `EquipmentSnapshot`
 - `BlockInfo`
+- `BlockEntityInfo`
 - `EntityInfo`
 - `RecipeInfo`
 - `CapabilityInfo`
 - `ToolError`
 
 Registry IDs such as `minecraft:iron_ingot` are preferred over display names as canonical identifiers.
+Inventory, equipment, recipe results, and safe container inspection share `ItemStackInfo`; selected
+component fields are explicit and bounded rather than a generic Minecraft component/NBT mirror.
 
 ### Providers
 
@@ -176,6 +182,12 @@ loader-neutral providers, then activates it through `IntegrationRegistry`. The c
 reads `ToolRegistry` and `IntegrationRegistry` at invocation time so discovery reflects actual
 registrations rather than a parallel hard-coded feature list.
 
+Fabric also owns an ordered block-entity inspector registry. Vanilla furnace and container
+inspectors produce bounded `BlockEntityInfo` values; later Fabric integrations may register a
+higher-priority inspector for a recognized mod block entity. This extension point remains at the
+platform edge because inspectors receive Minecraft block-entity types. Provider, core, tool, and
+MCP contracts expose Thread DTOs.
+
 ## Platform boundary
 
 Fabric code may use Minecraft classes internally, but must convert them before returning across provider boundaries.
@@ -219,6 +231,12 @@ The result should also expose simple booleans such as `worldLoaded`, `playerAvai
 MCP requests may arrive on HTTP/server threads. Minecraft state must not be read unsafely from those threads.
 
 `GameThreadExecutor` is the loader-neutral synchronous dispatch boundary. Fabric supplies separate adapters for the client and integrated-server threads. Provider operations marshal state reads to their owning thread and return detached DTOs to the requesting transport.
+
+Target-block inspection uses two stages: the client thread captures the camera
+raycast target and dimension, then the integrated-server thread reads the already-loaded block,
+state, and block entity. A loaded-chunk check precedes that server read, so inspection cannot force
+a chunk load. Unresolved loot containers are not opened because reading a slot would mutate world
+state by resolving the loot table.
 
 Do not hide unsafe cross-thread reads behind `synchronized`.
 
