@@ -43,12 +43,12 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     ToolRegistry tools = entrypoint.tools();
     if (Boolean.getBoolean(EXPECT_MCP_DISABLED)) {
       assertTrue(!entrypoint.mcpRunning(), "MCP remains stopped when configured off");
-      assertEquals(12, tools.descriptors().size(), "tools initialize independently of MCP");
+      assertEquals(13, tools.descriptors().size(), "tools initialize independently of MCP");
       return;
     }
     McpHttpServer mcp = entrypoint.mcpServer();
 
-    assertEquals(12, tools.descriptors().size(), "registered vanilla tool count");
+    assertEquals(13, tools.descriptors().size(), "registered vanilla tool count");
     JsonObject menuStatus = invokeSuccessfully(context, tools, "minecraft.get_status", "{}");
     assertEquals("MAIN_MENU", menuStatus.get("state").getAsString(), "menu status");
     assertEquals(
@@ -58,7 +58,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .getAsString(),
         "live Minecraft version");
     assertEquals(
-        12,
+        13,
         invokeSuccessfully(context, tools, "minecraft.get_capabilities", "{}")
             .getAsJsonArray("tools")
             .size(),
@@ -93,7 +93,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         "MCP protocol discovery");
     JsonObject catalog = mcpRequest(context, mcp.endpoint(), 2, "tools/list", null, null).body();
     assertEquals(
-        12,
+        13,
         catalog.getAsJsonObject("result").getAsJsonArray("tools").size(),
         "MCP vanilla catalog");
     assertEquals(
@@ -140,6 +140,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           .runCommand("item replace entity @a armor.head with minecraft:diamond_helmet");
       singleplayer.getServer().runCommand("give @a minecraft:diamond 3");
       singleplayer.getServer().runCommand("give @a minecraft:stick 2");
+      singleplayer.getServer().runCommand("give @a minecraft:oak_log 1");
       singleplayer.getServer().runCommand("summon minecraft:minecart 2 100 0");
       singleplayer
           .getServer()
@@ -151,6 +152,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           client ->
               hasInventoryStack(client, Items.DIAMOND, 3)
                   && hasInventoryStack(client, Items.STICK, 2)
+                  && hasInventoryStack(client, Items.OAK_LOG, 1)
                   && client.player != null
                   && client.player.getMainHandItem().is(Items.DIAMOND_PICKAXE));
       context.waitFor(FabricProviderClientGameTest::targetsKnownFurnace);
@@ -183,6 +185,25 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           recipeIngredients(directMissing).stream()
               .allMatch(ingredient -> ingredient.get("missing").getAsInt() == 0),
           "direct missing ingredient counts");
+      JsonObject directPlan =
+          invokeSuccessfully(
+              context,
+              tools,
+              "minecraft.get_crafting_plan",
+              "{\"itemId\":\"minecraft:crafting_table\"}");
+      assertTrue(directPlan.get("craftable").getAsBoolean(), "direct recursive crafting plan");
+      assertTrue(directPlan.getAsJsonArray("steps").size() >= 2, "recursive intermediate steps");
+      assertEquals(
+          "minecraft:crafting_table",
+          directPlan
+              .getAsJsonArray("steps")
+              .get(directPlan.getAsJsonArray("steps").size() - 1)
+              .getAsJsonObject()
+              .get("itemId")
+              .getAsString(),
+          "recursive plan final step");
+      assertTrue(directPlan.getAsJsonArray("missingMaterials").isEmpty(), "no raw shortages");
+      assertTrue(directPlan.getAsJsonArray("issues").isEmpty(), "no planning safety issues");
 
       JsonObject search =
           invokeSuccessfully(
@@ -324,11 +345,20 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
               .allMatch(ingredient -> ingredient.get("missing").getAsInt() == 0),
           "MCP missing ingredient counts");
 
+      JsonObject planArguments = new JsonObject();
+      planArguments.addProperty("itemId", "minecraft:crafting_table");
+      JsonObject mcpPlan =
+          mcpTool(context, mcp.endpoint(), 15, "minecraft.get_crafting_plan", planArguments);
+      assertTrue(mcpPlan.get("craftable").getAsBoolean(), "MCP recursive crafting plan");
+      assertTrue(mcpPlan.getAsJsonArray("steps").size() >= 2, "MCP recursive plan steps");
+      assertTrue(mcpPlan.getAsJsonArray("missingMaterials").isEmpty(), "MCP plan raw shortages");
+      assertTrue(mcpPlan.getAsJsonArray("issues").isEmpty(), "MCP plan safety issues");
+
       JsonObject searchArguments = new JsonObject();
       searchArguments.addProperty("query", "diamond pick");
       searchArguments.addProperty("limit", 10);
       JsonObject mcpSearch =
-          mcpTool(context, mcp.endpoint(), 15, "minecraft.search_items", searchArguments);
+          mcpTool(context, mcp.endpoint(), 16, "minecraft.search_items", searchArguments);
       assertTrue(
           mcpSearch.getAsJsonArray("items").asList().stream()
               .map(JsonElement::getAsJsonObject)
@@ -337,8 +367,8 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           "MCP item search");
 
       JsonObject mcpCapabilities =
-          mcpTool(context, mcp.endpoint(), 16, "minecraft.get_capabilities", new JsonObject());
-      assertEquals(12, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+          mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
+      assertEquals(13, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
     }
   }
 

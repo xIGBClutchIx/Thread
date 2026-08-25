@@ -65,7 +65,7 @@ Thread 0.1.0 initialized for Minecraft 26.2 with Fabric Loader 0.19.3
 Thread MCP listener started at http://127.0.0.1:25580/mcp
 ```
 
-An MCP client should discover twelve read-only tools. Call `minecraft.get_status` from the main menu;
+An MCP client should discover thirteen read-only tools. Call `minecraft.get_status` from the main menu;
 it should report `MAIN_MENU`, `worldLoaded: false`, and `supported: false`. Enter a single-player
 world and call it again; it should report `SINGLEPLAYER` and `supported: true`.
 

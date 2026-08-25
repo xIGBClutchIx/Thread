@@ -300,3 +300,27 @@ Why:
 - explicit allocations make `available` and `missing` counts auditable;
 - maximum flow handles overlapping alternatives correctly where greedy sums cannot;
 - the narrow read-only scope preserves V1 session and safety boundaries.
+
+## D022: Recursive plans use active paths and deterministic local selection
+
+**Status:** Accepted
+
+`CraftingPlanner` consumes the same detached player/recipe providers as `CraftingService` and reuses
+the service's canonical recipe ordering and maximum-flow allocation for scaled recipe executions.
+The `minecraft.get_crafting_plan` handler only delegates to that core service; MCP transport remains
+unchanged and contains no recipe logic.
+
+The selected plan has one shared inventory-and-crafted-surplus ledger. Candidate state is isolated
+while comparing variants, then only the chosen state is committed. This prevents cross-branch
+double-counting without incorrectly memoizing an inventory-dependent answer.
+
+Cycle detection tracks the current item path. Direct, indirect, and tag/alternative cycles stop with
+a structured `CYCLE` issue and path; a global visited set is deliberately not used because an item
+may be valid in multiple independent branches. Maximum depth and total step/branch/quantity limits
+also stop pathological acyclic or broad graphs with `MAX_DEPTH` or `PLAN_LIMIT` issues.
+
+Variants and alternatives are chosen locally by safety issues, unresolved amount, raw shortages,
+step count, and canonical order. This prefers a non-cyclic branch and produces repeatable output
+without exponential global optimization. Recipe definitions alone may be cached. Planning remains
+read-only and excludes automatic crafting, nearby storage, station/fuel feasibility, and third-party
+recipe integrations.

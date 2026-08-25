@@ -359,3 +359,49 @@ intermediate recipes, inspect nearby storage, or add JEI/EMI/REI integration.
 - both tools are discoverable and callable through the unchanged MCP lifecycle
 - the packaged single-player game test proves a real diamond-pickaxe assessment through MCP
 - formatting, lint, unit/integration tests, clean build, and both packaged client tests pass
+
+---
+
+## Slice 8: Bounded recursive crafting plans
+
+### Goal
+
+Explain the intermediate crafts and final raw shortages needed to produce one target item from the
+current main inventory, without hanging on cyclic or pathological recipe graphs.
+
+### Work
+
+Add:
+
+- `minecraft.get_crafting_plan`
+- a transport-independent `CraftingPlanner` that reuses `CraftingService` allocation
+- deterministic local recipe-variant and ingredient-alternative selection
+- post-order crafting steps, final raw-material shortages, and structured safety issues
+- active-path cycle detection plus maximum depth, step, branch, and quantity limits
+
+The planner uses one inventory/surplus ledger across the selected plan so separate branches cannot
+claim the same item. It may cache detached recipe definitions, but never caches a resolution result
+whose answer depends on mutable inventory state. Candidate recipes and alternatives are compared
+locally by safety issues, unresolved amount, raw shortages, step count, and canonical order. This is
+stable and bounded, not exhaustive global optimization.
+
+Raw items with no recipe are reported as materials to acquire, allowing later crafting steps to
+remain visible. A cycle, maximum depth, or work-limit branch is not treated as obtainable; the issue
+contains its affected item, count, and active path.
+
+This slice remains single-player and read-only. It does not perform crafting, inspect equipment or
+nearby storage, model workstation/fuel feasibility, or add JEI/EMI/REI integration.
+
+### Acceptance criteria
+
+- simple and multi-level recipes produce dependency-first steps
+- partial inventory and repeated cross-branch ingredients use one non-overlapping supply ledger
+- recipe variants and alternatives are selected deterministically, including repeated recipe IDs
+- active-path tracking catches direct, indirect, and tag/alternative cycles without rejecting valid
+  reuse in separate branches
+- a non-cyclic variant wins over a cyclic variant when available
+- maximum depth and total planning limits terminate pathological graphs with structured issues
+- empty-inventory, no-recipe, no-world, and multiplayer behavior has automated coverage
+- the tool is discoverable and callable through the unchanged MCP lifecycle
+- the packaged single-player test plans a crafting table recursively from a real oak log through MCP
+- formatting, lint, unit/integration tests, clean build, and both packaged client tests pass

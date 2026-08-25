@@ -60,6 +60,7 @@ Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 | 5 | Configuration, security boundaries, limits, and resilience |
 | 6 | End-to-end validation, packaging, docs, and V1 release readiness |
 | 7 | Deterministic inventory-to-recipe crafting intelligence |
+| 8 | Bounded recursive crafting plans with cycle-safe explanations |
 
 A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
@@ -96,7 +97,7 @@ url = "http://127.0.0.1:25580/mcp"
 
 Restart Codex and open a new task after changing its MCP configuration. Thread must be running in
 Minecraft before the client connects. Codex initializes the connection, receives Thread's server
-identity/instructions, and discovers twelve read-only `minecraft.*` tools. Thread also retains the
+identity/instructions, and discovers thirteen read-only `minecraft.*` tools. Thread also retains the
 stateless MCP `2026-07-28` discovery flow; neither flow creates protocol sessions.
 
 ## Configuration
@@ -155,8 +156,11 @@ See [Installation](docs/INSTALLATION.md) for the complete troubleshooting guide.
 - No authentication or remote binding. The server is intentionally restricted to loopback.
 - No third-party mod integrations or in-game assistant UI.
 - `minecraft.can_craft` and `minecraft.get_missing_ingredients` compare one recipe execution with
-  the current 36-slot main inventory. They do not recurse through ingredient recipes, inspect
-  nearby storage, account for crafting stations/fuel, or perform crafting actions.
+  the current 36-slot main inventory.
+- `minecraft.get_crafting_plan` recursively explains intermediate recipes and final raw shortages
+  using deterministic local choices, one shared inventory ledger, active-path cycle detection, and
+  hard depth/work limits. It does not inspect nearby storage, account for crafting stations/fuel,
+  globally optimize every recipe combination, or perform crafting actions.
 
 ## Development and release
 

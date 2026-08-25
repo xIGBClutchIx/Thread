@@ -63,19 +63,50 @@ public final class CraftingService {
 
     Map<String, Integer> inventory =
         inventoryCounts(Objects.requireNonNull(inventoryResult.value()));
-    List<RecipeInfo> orderedRecipes = matchingRecipes.stream().sorted(RECIPE_ORDER).toList();
+    List<RecipeInfo> orderedRecipes = orderedRecipes(matchingRecipes);
     List<RecipeCraftability> assessments = new ArrayList<>();
     for (int index = 0; index < orderedRecipes.size(); index++) {
-      assessments.add(assessRecipe(index + 1, orderedRecipes.get(index), inventory));
+      assessments.add(assessRecipe(index + 1, orderedRecipes.get(index), 1, inventory));
     }
     boolean craftable = assessments.stream().anyMatch(RecipeCraftability::craftable);
     return ToolResult.success(new CraftingResult(query.itemId(), craftable, assessments));
   }
 
-  private static RecipeCraftability assessRecipe(
-      int variant, RecipeInfo recipe, Map<String, Integer> inventory) {
-    List<NormalizedIngredient> ingredients = normalizedIngredients(recipe.ingredients());
-    Allocation allocation = allocate(inventory, ingredients);
+  /** Returns recipe definitions in Thread's stable variant order. */
+  public List<RecipeInfo> orderedRecipes(List<RecipeInfo> recipeDefinitions) {
+    Objects.requireNonNull(recipeDefinitions, "recipeDefinitions");
+    return recipeDefinitions.stream()
+        .map(recipe -> Objects.requireNonNull(recipe, "recipeDefinitions entry"))
+        .sorted(RECIPE_ORDER)
+        .toList();
+  }
+
+  /**
+   * Allocates available item counts to a fixed number of executions of one recipe.
+   *
+   * <p>The recursive planner uses this method so direct assessments and planned steps share the
+   * same alternative-aware maximum-flow allocation.
+   */
+  public RecipeCraftability assessRecipe(
+      int variant, RecipeInfo recipe, int executions, Map<String, Integer> availableItems) {
+    Objects.requireNonNull(recipe, "recipe");
+    Objects.requireNonNull(availableItems, "availableItems");
+    if (executions <= 0) {
+      throw new IllegalArgumentException("executions must be positive");
+    }
+    TreeMap<String, Integer> normalizedItems = new TreeMap<>();
+    availableItems.forEach(
+        (itemId, count) -> {
+          Objects.requireNonNull(itemId, "availableItems key");
+          Objects.requireNonNull(count, "availableItems value");
+          if (count < 0) {
+            throw new IllegalArgumentException("available item counts must not be negative");
+          }
+          normalizedItems.put(itemId, count);
+        });
+    List<NormalizedIngredient> ingredients =
+        normalizedIngredients(recipe.ingredients(), executions);
+    Allocation allocation = allocate(normalizedItems, ingredients);
     List<IngredientAvailability> availability = new ArrayList<>();
     for (int index = 0; index < ingredients.size(); index++) {
       NormalizedIngredient ingredient = ingredients.get(index);
@@ -99,7 +130,7 @@ public final class CraftingService {
         variant,
         recipe.recipeId(),
         recipe.type(),
-        recipe.result().count(),
+        Math.multiplyExact(recipe.result().count(), executions),
         craftable,
         availability);
   }
@@ -114,10 +145,15 @@ public final class CraftingService {
 
   private static List<NormalizedIngredient> normalizedIngredients(
       List<RecipeIngredientInfo> ingredients) {
+    return normalizedIngredients(ingredients, 1);
+  }
+
+  private static List<NormalizedIngredient> normalizedIngredients(
+      List<RecipeIngredientInfo> ingredients, int executions) {
     TreeMap<IngredientKey, Integer> required = new TreeMap<>(INGREDIENT_ORDER);
     for (RecipeIngredientInfo ingredient : ingredients) {
       IngredientKey key = new IngredientKey(ingredient.itemIds(), ingredient.tagIds());
-      required.merge(key, ingredient.count(), Math::addExact);
+      required.merge(key, Math.multiplyExact(ingredient.count(), executions), Math::addExact);
     }
     return required.entrySet().stream()
         .map(entry -> new NormalizedIngredient(entry.getKey(), entry.getValue()))

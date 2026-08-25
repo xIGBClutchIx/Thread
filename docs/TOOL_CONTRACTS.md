@@ -445,8 +445,115 @@ unmet requirements. This prevents a missing-only projection from hiding how alte
 allocated across overlapping ingredient groups.
 
 Both tools support shaped and shapeless recipes represented by the recipe provider. They inspect
-only the player's 36 main-inventory slots and do not inspect equipment, nearby storage, recursive
-ingredient recipes, crafting stations, or fuel.
+only the player's 36 main-inventory slots and do not inspect equipment, nearby storage, crafting
+stations, or fuel.
+
+## `minecraft.get_crafting_plan`
+
+Purpose: recursively explain the intermediate crafts and final raw materials needed for one target
+item from the player's current 36-slot main inventory. The tool is read-only and performs no
+crafting action.
+
+Input uses the same canonical `itemId` contract as recipe lookup:
+
+```json
+{
+  "itemId": "minecraft:crafting_table"
+}
+```
+
+Representative result when the inventory contains one oak log:
+
+```json
+{
+  "itemId": "minecraft:crafting_table",
+  "requested": 1,
+  "satisfiedFromInventory": 0,
+  "craftable": true,
+  "maxDepth": 32,
+  "steps": [
+    {
+      "step": 1,
+      "itemId": "minecraft:oak_planks",
+      "variant": 1,
+      "recipeId": "minecraft:oak_planks",
+      "type": "minecraft:crafting_shapeless",
+      "executions": 1,
+      "resultCount": 4,
+      "ingredients": [
+        {
+          "itemIds": ["minecraft:oak_log"],
+          "tagIds": ["minecraft:oak_logs"],
+          "required": 1,
+          "available": 1,
+          "missing": 0,
+          "allocations": [{"itemId": "minecraft:oak_log", "count": 1}]
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "itemId": "minecraft:crafting_table",
+      "variant": 1,
+      "recipeId": "minecraft:crafting_table",
+      "type": "minecraft:crafting_shaped",
+      "executions": 1,
+      "resultCount": 1,
+      "ingredients": [
+        {
+          "itemIds": ["minecraft:oak_planks"],
+          "tagIds": ["minecraft:planks"],
+          "required": 4,
+          "available": 4,
+          "missing": 0,
+          "allocations": [{"itemId": "minecraft:oak_planks", "count": 4}]
+        }
+      ]
+    }
+  ],
+  "missingMaterials": [],
+  "issues": []
+}
+```
+
+The example shortens tag-backed `itemIds` arrays for readability. Live results include every
+resolved member as required by the recipe contract.
+
+Steps are dependency-first and use stable one-based sequence numbers. `executions` accounts for
+recipe output batches; `resultCount` is the total produced by those executions, including surplus
+that can satisfy a later branch. Ingredient allocations include current inventory, planned
+intermediate output, and raw materials listed for acquisition. A step-level `missing` count is
+therefore reserved for a branch that could not be resolved safely; unavailable raw leaves instead
+appear in the top-level `missingMaterials` list.
+
+`craftable` is true only when the current inventory can complete the plan without acquiring a raw
+material and no safety issue stopped a branch. A target already present may be satisfied directly,
+with no steps. A target or ingredient with no recipe becomes a deterministic exact-item raw
+shortage.
+
+All selected branches share one inventory and crafted-surplus ledger, so an item consumed by one
+branch cannot satisfy another. Recipe variants and ingredient alternatives are compared locally by
+fewest safety issues, unresolved units, raw shortages, steps, then canonical order. This predictable
+strategy is not exhaustive global optimization.
+
+Cycle and limit termination is structured rather than exceptional:
+
+```json
+{
+  "type": "CYCLE",
+  "itemId": "example:a",
+  "required": 1,
+  "path": ["example:a", "example:b", "example:a"]
+}
+```
+
+`type` is `CYCLE`, `MAX_DEPTH`, or `PLAN_LIMIT`. Cycle detection uses only the active dependency
+path, so the same item can validly appear in separate branches. The production maximum depth is 32;
+step, explored-branch, and scaled-quantity ceilings provide additional bounds. A non-cyclic variant
+is preferred over a cyclic one under the deterministic selection order.
+
+The planner does not inspect equipment or nearby storage, model crafting stations/fuel, integrate
+JEI/EMI/REI, perform automatic crafting, or mutate the game.
 
 ## `minecraft.search_items`
 

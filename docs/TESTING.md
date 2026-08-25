@@ -52,6 +52,9 @@ Cover:
 - crafting assessment for craftable and missing recipes, multiple variants, shaped/shapeless
   recipes, expanded tag alternatives, duplicate requirements, overlapping alternatives, empty
   inventories, no matches, and provider failures
+- recursive crafting plans for simple and deep dependencies, partial inventory, repeated
+  cross-branch materials, deterministic variants and repeated IDs, direct/indirect/tag cycles,
+  cyclic-versus-safe variants, maximum depth, empty inventory, no recipes, and session failures
 
 ## Architecture tests
 
@@ -92,11 +95,12 @@ Critical edge cases:
 - entity result cap reached
 
 The isolated Fabric client game test under `src/gametest` creates a temporary single-player world
-and invokes all twelve vanilla V1 tools. It covers external-thread dispatch, a durability/enchantment
+and invokes all thirteen vanilla V1 tools. It covers external-thread dispatch, a durability/enchantment
 rich item, main-inventory/equipment separation, all explicit equipment positions, a populated
 furnace with authoritative block state and structured contents, living and non-living nearby
 entities with health/distance/classification, diamond-pickaxe recipe access, deterministic
-craftability/missing-ingredient results, item search, capability discovery, and MCP calls from both menu and
+craftability/missing-ingredient results, a recursive crafting-table plan from an oak log, item search,
+capability discovery, and MCP calls from both menu and
 supported-world states. Separate unit tests preserve no-world and multiplayer rejection plus
 nearby-entity radius/result caps.
 
@@ -139,7 +143,7 @@ Do not require Minecraft for most MCP tests.
 The Fabric client game test additionally starts the production listener at
 `http://127.0.0.1:25580/mcp`. It performs the Codex initialization sequence before
 `server/discover` and `tools/list`, verifies all required release scenarios through real HTTP
-`tools/call` requests, including both crafting tools, and confirms an invalid MCP call does not stop the listener. Normal client
+`tools/call` requests, including all three crafting tools, and confirms an invalid MCP call does not stop the listener. Normal client
 shutdown must log that the listener stopped.
 
 `./gradlew runMcpDisabledProductionClientGameTest` writes an isolated config with MCP disabled,

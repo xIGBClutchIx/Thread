@@ -61,6 +61,7 @@ class VanillaIntegrationTest {
       List.of(
           "minecraft.can_craft",
           "minecraft.get_capabilities",
+          "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
           "minecraft.get_game_info",
           "minecraft.get_inventory",
@@ -165,6 +166,16 @@ class VanillaIntegrationTest {
             .map(JsonElement::getAsJsonObject)
             .allMatch(ingredient -> ingredient.get("missing").getAsInt() == 0));
 
+    JsonObject plan =
+        invoke(
+            catalog.tools(),
+            "minecraft.get_crafting_plan",
+            "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
+    assertTrue(plan.get("craftable").getAsBoolean());
+    assertEquals("minecraft:diamond_pickaxe", first(plan, "steps").get("itemId").getAsString());
+    assertTrue(plan.getAsJsonArray("missingMaterials").isEmpty());
+    assertTrue(plan.getAsJsonArray("issues").isEmpty());
+
     JsonObject search =
         invoke(
             catalog.tools(), "minecraft.search_items", "{\"query\":\"diamond pick\",\"limit\":10}");
@@ -204,7 +215,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        12, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        13, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -227,6 +238,8 @@ class VanillaIntegrationTest {
     assertInvalid(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(
         catalog.tools(), "minecraft.get_missing_ingredients", "{\"itemId\":\"not a registry id\"}");
+    assertInvalid(
+        catalog.tools(), "minecraft.get_crafting_plan", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.search_items", "{\"query\":\"\",\"limit\":0}");
   }
 
@@ -250,6 +263,24 @@ class VanillaIntegrationTest {
             .tools(),
         "minecraft.get_missing_ingredients",
         ToolErrorCode.UNSUPPORTED);
+    assertToolFailure(
+        catalog(
+                new MenuGameProvider(),
+                new UnavailablePlayerProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
+                new UnavailableRecipeProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
+                ignored -> true)
+            .tools(),
+        "minecraft.get_crafting_plan",
+        ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertToolFailure(
+        catalog(
+                new MultiplayerGameProvider(),
+                new UnavailablePlayerProvider(ToolErrorCode.UNSUPPORTED),
+                new UnavailableRecipeProvider(ToolErrorCode.UNSUPPORTED),
+                ignored -> true)
+            .tools(),
+        "minecraft.get_crafting_plan",
+        ToolErrorCode.UNSUPPORTED);
   }
 
   @Test
@@ -271,7 +302,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(13, strings(capabilities, "tools").size());
+    assertEquals(14, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("example.echo"));
     assertEquals(
         List.of("example", "vanilla"),
@@ -494,6 +525,34 @@ class VanillaIntegrationTest {
     @Override
     public ToolResult<Optional<BlockInfo>> targetBlock() {
       throw unexpected();
+    }
+  }
+
+  private static final class UnavailablePlayerProvider implements PlayerProvider {
+    private final ToolError error;
+
+    private UnavailablePlayerProvider(ToolErrorCode code) {
+      error = ToolError.of(code, "Unavailable for test.", true);
+    }
+
+    @Override
+    public ToolResult<PlayerStatus> status() {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<InventorySnapshot> inventory() {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<EquipmentSnapshot> equipment() {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<Optional<BlockInfo>> targetBlock() {
+      return ToolResult.failure(error);
     }
   }
 

@@ -13,6 +13,7 @@ import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
 import me.clutchy.thread.core.model.capability.IntegrationCapability;
+import me.clutchy.thread.core.model.crafting.CraftingPlan;
 import me.clutchy.thread.core.model.crafting.CraftingResult;
 import me.clutchy.thread.core.model.game.GameInfo;
 import me.clutchy.thread.core.model.game.SessionStatus;
@@ -31,6 +32,7 @@ import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.serialization.JsonCodec;
+import me.clutchy.thread.core.service.CraftingPlanner;
 import me.clutchy.thread.core.service.CraftingService;
 import me.clutchy.thread.core.tool.EmptyInput;
 import me.clutchy.thread.core.tool.GameTool;
@@ -51,6 +53,7 @@ public final class VanillaIntegration implements GameIntegration {
   private final WorldProvider world;
   private final RecipeProvider recipes;
   private final CraftingService crafting;
+  private final CraftingPlanner craftingPlanner;
   private final Predicate<ToolId> enabledTools;
 
   /** Creates the vanilla catalog over explicit loader-neutral providers. */
@@ -71,6 +74,7 @@ public final class VanillaIntegration implements GameIntegration {
     this.world = Objects.requireNonNull(world, "world");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
     crafting = new CraftingService(player, recipes);
+    craftingPlanner = new CraftingPlanner(player, recipes, crafting);
     this.enabledTools = Objects.requireNonNull(enabledTools, "enabledTools");
   }
 
@@ -101,6 +105,7 @@ public final class VanillaIntegration implements GameIntegration {
     register(context, getRecipe());
     register(context, canCraft());
     register(context, getMissingIngredients());
+    register(context, getCraftingPlan());
     register(context, searchItems());
     register(context, getCapabilities(context));
   }
@@ -224,6 +229,19 @@ public final class VanillaIntegration implements GameIntegration {
         JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
         ToolCapabilities.supportedSingleplayer(),
         crafting::assess);
+  }
+
+  private GameTool<RecipeLookupQuery, CraftingPlan> getCraftingPlan() {
+    return tool(
+        "minecraft.get_crafting_plan",
+        "Builds a deterministic recursive plan for one canonical item from the current main "
+            + "inventory, including intermediate steps, final raw shortages, and bounded cycle "
+            + "or depth issues. Use this to explain how to reach a target without performing any "
+            + "crafting action.",
+        JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
+        JsonCodec.of(CraftingPlan.class, VanillaToolSchemas.CRAFTING_PLAN),
+        ToolCapabilities.supportedSingleplayer(),
+        craftingPlanner::plan);
   }
 
   private GameTool<ItemSearchQuery, ItemSearchResult> searchItems() {

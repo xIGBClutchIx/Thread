@@ -107,6 +107,24 @@ final class VanillaToolSchemas {
           property("resultCount", integer(1, null)),
           property("craftable", bool()),
           property("ingredients", array(INGREDIENT_AVAILABILITY)));
+  private static final JsonObject CRAFTING_PLAN_STEP =
+      object(
+          property("step", integer(1, null)),
+          property("itemId", registryId()),
+          property("variant", integer(1, null)),
+          property("recipeId", registryId()),
+          property("type", registryId()),
+          property("executions", integer(1, null)),
+          property("resultCount", integer(1, null)),
+          property("ingredients", array(INGREDIENT_AVAILABILITY)));
+  private static final JsonObject MISSING_MATERIAL =
+      object(property("itemId", registryId()), property("count", integer(1, null)));
+  private static final JsonObject CRAFTING_PLAN_ISSUE =
+      object(
+          property("type", enumString("CYCLE", "MAX_DEPTH", "PLAN_LIMIT")),
+          property("itemId", registryId()),
+          property("required", integer(1, null)),
+          property("path", boundedArray(registryId(), 1, 33)));
   private static final JsonObject INTEGRATION_CAPABILITY =
       object(
           property("id", string(1, 64, INTEGRATION_ID_PATTERN)),
@@ -175,6 +193,17 @@ final class VanillaToolSchemas {
               property("itemId", registryId()),
               property("craftable", bool()),
               property("recipes", array(RECIPE_CRAFTABILITY))));
+  static final JsonSchema CRAFTING_PLAN =
+      schema(
+          object(
+              property("itemId", registryId()),
+              property("requested", integer(1, null)),
+              property("satisfiedFromInventory", integer(0, null)),
+              property("craftable", bool()),
+              property("maxDepth", integer(1, null)),
+              property("steps", boundedArray(CRAFTING_PLAN_STEP, 0, 512)),
+              property("missingMaterials", array(MISSING_MATERIAL)),
+              property("issues", array(CRAFTING_PLAN_ISSUE))));
   static final JsonSchema ITEM_SEARCH_QUERY =
       schema(object(property("query", string(1, 128, null)), property("limit", integer(1, null))));
   static final JsonSchema ITEM_SEARCH_RESULT =

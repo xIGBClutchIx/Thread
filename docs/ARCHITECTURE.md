@@ -20,6 +20,7 @@
                   | Context Registry  |
                   | Integration Reg.  |
                   | Crafting Service  |
+                  | Crafting Planner  |
                   | DTOs / Errors     |
                   +---------+---------+
                             |
@@ -81,7 +82,7 @@ component fields are explicit and bounded rather than a generic Minecraft compon
 Thread groups model types by the game domain they describe:
 
 - `model.capability`: capability and integration snapshots
-- `model.crafting`: craftability, allocation, and shortage results
+- `model.crafting`: craftability, allocation, recursive plan, shortage, and safety-issue results
 - `model.game`: runtime and session state
 - `model.item`: item identity, stacks, components, and search
 - `model.player`: player status, inventory, and equipment
@@ -106,9 +107,23 @@ same stack and gives constrained groups priority without sacrificing the maximum
 Identical ingredient groups are merged defensively, and recipe variants receive stable one-based
 ordinals after canonical sorting; recipe IDs are not assumed unique.
 
-The current assessment covers one execution of a represented recipe using only the player's 36
-main-inventory slots. It does not inspect equipment or nearby storage, check workstations/fuel,
-recurse into intermediate recipes, or perform crafting actions.
+The direct assessment covers one execution of a represented recipe using only the player's 36
+main-inventory slots. It does not inspect equipment or nearby storage, check workstations/fuel, or
+perform crafting actions.
+
+`CraftingPlanner` recursively resolves ingredient recipes over the same provider contracts and calls
+`CraftingService.assessRecipe` for every planned recipe execution. One mutable supply ledger follows
+the selected plan so inventory and crafted surplus cannot be double-counted across branches. Recipe
+definitions may be cached, but inventory-dependent resolution is never memoized.
+
+Cycles are detected against the active dependency path, not a global visited set, so a material may
+legitimately appear in separate branches. Maximum depth, step count, explored-branch count, and
+scaled-quantity limits provide additional termination boundaries. Raw leaves become final shortages;
+cycle/depth/limit branches remain unresolved and produce structured issues with their paths.
+
+Recipe variants and ingredient alternatives are evaluated in canonical order and selected locally
+by fewest safety issues, unresolved units, raw shortages, then steps. This is deterministic and
+bounded rather than an exhaustive global optimizer. Steps are returned in dependency-first order.
 
 ### Providers
 
@@ -210,7 +225,7 @@ public interface GameIntegration {
 
 Future integrations can register tools/providers/context without changing MCP code.
 
-The built-in `VanillaIntegration` owns the twelve V1 `minecraft.*` tools. Fabric startup supplies its
+The built-in `VanillaIntegration` owns the thirteen V1 `minecraft.*` tools. Fabric startup supplies its
 loader-neutral providers, then activates it through `IntegrationRegistry`. The capabilities tool
 reads `ToolRegistry` and `IntegrationRegistry` at invocation time so discovery reflects actual
 registrations rather than a parallel hard-coded feature list.

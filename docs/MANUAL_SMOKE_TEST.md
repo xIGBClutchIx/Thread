@@ -8,9 +8,9 @@ log with the release evidence.
 
 1. Start a clean Minecraft 26.2 Fabric client containing Fabric API and the Thread release JAR.
 2. Start at the main menu and connect the MCP client to `http://127.0.0.1:25580/mcp`.
-3. Confirm discovery lists twelve tools and every tool has `readOnly: true` annotations.
+3. Confirm discovery lists thirteen tools and every tool has `readOnly: true` annotations.
 4. Prepare a survival world with a known block in view, at least one known entity within 16 blocks,
-   a diamond pickaxe equipped, and exactly three diamonds plus two sticks in inventory.
+   a diamond pickaxe equipped, and exactly three diamonds, two sticks, and one oak log in inventory.
 
 ## Required scenarios
 
@@ -27,6 +27,7 @@ log with the release evidence.
 | 9 | Ask how to craft a diamond pickaxe. | `minecraft.get_recipe` returns a recipe requiring three diamonds and two sticks. |
 | 10 | Ask whether the held inventory has the materials for that recipe. | `minecraft.can_craft` reports `craftable: true` and identifies at least one craftable recipe variant. |
 | 11 | Remove one diamond and ask what is missing. | `minecraft.get_missing_ingredients` reports the affected variant with diamonds `required: 3`, `available: 2`, and `missing: 1`. |
+| 12 | Restore the diamond and ask how to make a crafting table from the oak log. | `minecraft.get_crafting_plan` reports dependency-first plank and crafting-table steps, no final shortage, and no safety issue. |
 
 ## Safety observations
 
