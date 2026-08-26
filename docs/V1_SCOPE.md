@@ -49,6 +49,8 @@ project toolchain.
 - current dimension and position
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
+- nearby container discovery and individual loaded-container inspection within a stricter bounded
+  radius, including common vanilla storage and processing block entities
 - live native recipe lookup, including datapack and installed-mod changes
 - deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - deterministic recursive crafting plans with bounded cycle/depth handling
@@ -94,7 +96,7 @@ project toolchain.
 - JEI/REI/EMI integration in the base artifact
 - FTB Quests integration
 - Create/Mekanism/AE2/etc. integrations
-- broad chest/container scanning
+- unbounded or world-wide chest/container scanning
 - world-wide searches
 - chunk generation/loading for queries
 - semantic embeddings/vector databases
@@ -119,15 +121,18 @@ From a clean install, an MCP client can discover Thread and correctly answer eac
 8. "How do I craft a diamond pickaxe?"
 9. "Do I have the materials for a diamond pickaxe?"
 10. "What intermediate crafts and raw materials do I need for a crafting table?"
+11. "What loaded containers are near me?"
+12. "What is inside that nearby furnace or chest?"
 
 For #9, Thread performs a deterministic comparison against the player's current main inventory and
 reports each recipe variant independently with required, allocated, and missing counts. For #10,
 Thread recursively plans intermediate recipes with one shared inventory ledger and reports final raw
 shortages plus structured cycle/depth/work-limit issues. Both are read-only analyses: Thread does not
-craft items, search nearby storage, model workstation/fuel feasibility, or globally optimize every
-recipe combination. The base recipe source is Minecraft's final live recipe manager, not a static
-vanilla list, so supported datapack and installed-mod recipe changes flow through the same tool
-contracts.
+craft items, include nearby storage in crafting calculations, model workstation/fuel feasibility,
+or globally optimize every recipe combination. Questions #11 and #12 use independent bounded
+loaded-world reads and never alter those crafting inputs. The base recipe source is Minecraft's
+final live recipe manager, not a static vanilla list, so supported datapack and installed-mod recipe
+changes flow through the same tool contracts.
 
 ## Non-goals that protect the architecture
 

@@ -71,6 +71,14 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer
           .getServer()
           .runCommand("item replace block 0 101 3 container.1 with minecraft:coal");
+      singleplayer.getServer().runCommand("setblock -2 101 2 minecraft:barrel");
+      singleplayer.getServer().runCommand("setblock 2 101 2 minecraft:hopper");
+      for (int slot = 0; slot < 5; slot++) {
+        singleplayer
+            .getServer()
+            .runCommand(
+                "item replace block 2 101 2 container." + slot + " with minecraft:stone 64");
+      }
       singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 0 0");
       singleplayer
           .getServer()
@@ -194,6 +202,96 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       assertTrue(target.successful(), "target-block result");
       invokeSuccessfully(
           context, tools, "minecraft.get_nearby_entities", "{\"radius\":16,\"limit\":8}");
+      JsonObject directContainers =
+          invokeSuccessfully(
+              context, tools, "minecraft.get_nearby_containers", "{\"radius\":16,\"limit\":8}");
+      assertTrue(
+          directContainers.getAsJsonArray("containers").size() >= 3, "nearby container discovery");
+      assertDistanceOrdered(directContainers);
+      assertEquals(
+          0,
+          container(directContainers, "minecraft:barrel").get("usedSlotCount").getAsInt(),
+          "empty barrel occupancy");
+      JsonObject hopperSummary = container(directContainers, "minecraft:hopper");
+      assertEquals(5, hopperSummary.get("usedSlotCount").getAsInt(), "full hopper occupancy");
+      assertEquals(4, hopperSummary.getAsJsonArray("itemSummary").size(), "short item summary");
+      assertTrue(hopperSummary.get("itemSummaryTruncated").getAsBoolean(), "summary truncation");
+
+      JsonObject directFurnace =
+          invokeSuccessfully(
+              context,
+              tools,
+              "minecraft.inspect_container",
+              "{\"position\":{\"x\":0,\"y\":101,\"z\":3}}");
+      JsonObject directFurnaceEntity = directFurnace.getAsJsonObject("blockEntity");
+      assertEquals(3, directFurnaceEntity.get("inventorySize").getAsInt(), "furnace slots");
+      assertEquals(
+          "minecraft:iron_ore",
+          blockEntityItem(directFurnaceEntity, "input").get("itemId").getAsString(),
+          "inspected furnace input");
+      assertTrue(
+          directFurnaceEntity.getAsJsonObject("state").has("cookingProgress"),
+          "furnace cooking progress");
+      JsonObject directBarrel =
+          invokeSuccessfully(
+              context,
+              tools,
+              "minecraft.inspect_container",
+              "{\"position\":{\"x\":-2,\"y\":101,\"z\":2}}");
+      assertEquals(
+          27,
+          directBarrel.getAsJsonObject("blockEntity").get("inventorySize").getAsInt(),
+          "empty barrel slots");
+      assertTrue(
+          directBarrel.getAsJsonObject("blockEntity").getAsJsonArray("items").isEmpty(),
+          "empty barrel inventory");
+      JsonObject directHopper =
+          invokeSuccessfully(
+              context,
+              tools,
+              "minecraft.inspect_container",
+              "{\"position\":{\"x\":2,\"y\":101,\"z\":2}}");
+      assertEquals(
+          5,
+          directHopper.getAsJsonObject("blockEntity").getAsJsonArray("items").size(),
+          "full hopper inventory");
+
+      assertEquals(
+          "OUT_OF_RANGE",
+          invoke(context, tools, "minecraft.get_nearby_containers", "{\"radius\":17,\"limit\":8}")
+              .error()
+              .code()
+              .name(),
+          "container radius limit");
+      assertEquals(
+          "RESULT_LIMIT_EXCEEDED",
+          invoke(context, tools, "minecraft.get_nearby_containers", "{\"radius\":8,\"limit\":65}")
+              .error()
+              .code()
+              .name(),
+          "container result limit");
+      assertEquals(
+          "OUT_OF_RANGE",
+          invoke(
+                  context,
+                  tools,
+                  "minecraft.inspect_container",
+                  "{\"position\":{\"x\":32,\"y\":100,\"z\":0}}")
+              .error()
+              .code()
+              .name(),
+          "container inspection range");
+      assertEquals(
+          "NOT_FOUND",
+          invoke(
+                  context,
+                  tools,
+                  "minecraft.inspect_container",
+                  "{\"position\":{\"x\":0,\"y\":99,\"z\":0}}")
+              .error()
+              .code()
+              .name(),
+          "non-container inspection");
 
       JsonObject inventory = invokeSuccessfully(context, tools, "minecraft.get_inventory", "{}");
       assertTrue(
@@ -282,6 +380,25 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       assertTrue(!minecart.get("living").getAsBoolean(), "non-living entity marker");
       assertTrue(minecart.get("health").isJsonNull(), "non-living health absence");
 
+      JsonObject containerArguments = new JsonObject();
+      containerArguments.addProperty("radius", 16);
+      containerArguments.addProperty("limit", 8);
+      JsonObject mcpContainers =
+          mcpTool(
+              context, mcp.endpoint(), 40, "minecraft.get_nearby_containers", containerArguments);
+      assertTrue(
+          mcpContainers.getAsJsonArray("containers").size() >= 3, "MCP nearby container discovery");
+      JsonObject furnacePosition = new JsonObject();
+      furnacePosition.addProperty("x", 0);
+      furnacePosition.addProperty("y", 101);
+      furnacePosition.addProperty("z", 3);
+      JsonObject inspectionArguments = new JsonObject();
+      inspectionArguments.add("position", furnacePosition);
+      JsonObject mcpFurnace =
+          mcpTool(context, mcp.endpoint(), 41, "minecraft.inspect_container", inspectionArguments);
+      assertEquals(
+          "minecraft:furnace", mcpFurnace.get("blockId").getAsString(), "MCP inspected furnace");
+
       JsonObject recipeArguments = new JsonObject();
       recipeArguments.addProperty("itemId", "minecraft:diamond_pickaxe");
       JsonObject mcpRecipe =
@@ -331,7 +448,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
       JsonObject mcpCapabilities =
           mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
-      assertEquals(13, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+      assertEquals(15, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
       assertEquals(
           2, mcpCapabilities.getAsJsonArray("integrations").size(), "MCP integration count");
       assertTrue(
@@ -501,6 +618,23 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         .filter(candidate -> candidate.get("entityType").getAsString().equals(entityType))
         .findFirst()
         .orElseThrow();
+  }
+
+  private static JsonObject container(JsonObject result, String blockId) {
+    return result.getAsJsonArray("containers").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("blockId").getAsString().equals(blockId))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static void assertDistanceOrdered(JsonObject result) {
+    double previous = -1;
+    for (JsonElement element : result.getAsJsonArray("containers")) {
+      double current = element.getAsJsonObject().get("distance").getAsDouble();
+      assertTrue(current >= previous, "container distance ordering");
+      previous = current;
+    }
   }
 
   private static JsonObject recipe(JsonObject result, String recipeId) {

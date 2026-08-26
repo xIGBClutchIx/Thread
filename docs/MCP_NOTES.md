@@ -89,7 +89,7 @@ The real local HTTP tests cover:
 - tool schemas, annotations, structured success/error mapping, disconnects, and shutdown.
 
 Packaged client tests repeat initialization against each actual loader-specific JAR. A shared
-loader-neutral parity fixture verifies the exact catalog, exercises all thirteen tool paths across
+loader-neutral parity fixture verifies the exact catalog, exercises all fifteen tool paths across
 the menu/world/menu lifecycle, and repeats representative status, player, recipe, and crafting
 calls through MCP on Fabric, NeoForge, and Forge.
 

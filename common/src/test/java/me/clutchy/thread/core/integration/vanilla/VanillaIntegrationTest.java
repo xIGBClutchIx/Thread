@@ -40,10 +40,15 @@ import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
+import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
@@ -68,11 +73,13 @@ class VanillaIntegrationTest {
           "minecraft.get_game_info",
           "minecraft.get_inventory",
           "minecraft.get_missing_ingredients",
+          "minecraft.get_nearby_containers",
           "minecraft.get_nearby_entities",
           "minecraft.get_player",
           "minecraft.get_recipe",
           "minecraft.get_status",
           "minecraft.get_target_block",
+          "minecraft.inspect_container",
           "minecraft.search_items");
 
   @Test
@@ -143,6 +150,18 @@ class VanillaIntegrationTest {
     assertTrue(first(entities, "entities").get("living").getAsBoolean());
     assertEquals(20, first(entities, "entities").get("maxHealth").getAsDouble());
     assertEquals("HOSTILE", first(entities, "entities").get("classification").getAsString());
+
+    JsonObject containers =
+        invoke(catalog.tools(), "minecraft.get_nearby_containers", "{\"radius\":12,\"limit\":8}");
+    assertEquals("minecraft:chest", first(containers, "containers").get("blockId").getAsString());
+    assertEquals(27, first(containers, "containers").get("slotCount").getAsInt());
+    JsonObject inspected =
+        invoke(
+            catalog.tools(),
+            "minecraft.inspect_container",
+            "{\"position\":{\"x\":2,\"y\":64,\"z\":0}}");
+    assertEquals("minecraft:chest", inspected.get("blockId").getAsString());
+    assertEquals(27, inspected.getAsJsonObject("blockEntity").get("inventorySize").getAsInt());
 
     JsonObject recipe =
         invoke(
@@ -217,7 +236,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        13, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        15, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -236,6 +255,8 @@ class VanillaIntegrationTest {
 
     assertInvalid(catalog.tools(), "minecraft.get_status", "{\"extra\":true}");
     assertInvalid(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":0,\"limit\":8}");
+    assertInvalid(catalog.tools(), "minecraft.get_nearby_containers", "{\"radius\":0,\"limit\":8}");
+    assertInvalid(catalog.tools(), "minecraft.inspect_container", "{\"position\":null}");
     assertInvalid(catalog.tools(), "minecraft.get_recipe", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(
@@ -286,6 +307,35 @@ class VanillaIntegrationTest {
   }
 
   @Test
+  void containerToolsPreserveNoWorldAndMultiplayerFailures() {
+    Catalog noWorld =
+        catalog(
+            new MenuGameProvider(),
+            new FailingPlayerProvider(),
+            new UnavailableWorldProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
+            new FakeRecipeProvider(),
+            ignored -> true);
+    assertToolFailure(
+        noWorld.tools(),
+        "minecraft.get_nearby_containers",
+        "{\"radius\":8,\"limit\":8}",
+        ToolErrorCode.WORLD_NOT_AVAILABLE);
+
+    Catalog multiplayer =
+        catalog(
+            new SupportedGameProvider(),
+            new FailingPlayerProvider(),
+            new UnavailableWorldProvider(ToolErrorCode.UNSUPPORTED),
+            new FakeRecipeProvider(),
+            ignored -> true);
+    assertToolFailure(
+        multiplayer.tools(),
+        "minecraft.inspect_container",
+        "{\"position\":{\"x\":0,\"y\":64,\"z\":0}}",
+        ToolErrorCode.UNSUPPORTED);
+  }
+
+  @Test
   void targetAbsenceIsAStableStructuredNotFoundResult() {
     Catalog catalog = catalog(new SupportedGameProvider(), new EmptyTargetPlayerProvider());
 
@@ -323,7 +373,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(14, strings(capabilities, "tools").size());
+    assertEquals(16, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -381,7 +431,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(13, strings(capabilities, "tools").size());
+    assertEquals(15, strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -424,6 +474,15 @@ class VanillaIntegrationTest {
       PlayerProvider player,
       RecipeProvider recipes,
       Predicate<ToolId> enabledTools) {
+    return catalog(game, player, new FakeWorldProvider(), recipes, enabledTools);
+  }
+
+  private static Catalog catalog(
+      GameProvider game,
+      PlayerProvider player,
+      WorldProvider world,
+      RecipeProvider recipes,
+      Predicate<ToolId> enabledTools) {
     ToolRegistry tools = new ToolRegistry();
     IntegrationRegistry integrations =
         new IntegrationRegistry(tools, new ContextRegistry(), new IntegrationExtensionRegistry());
@@ -431,7 +490,7 @@ class VanillaIntegrationTest {
         new VanillaIntegration(
             game,
             player,
-            new FakeWorldProvider(),
+            world,
             recipes,
             enabledTools,
             () -> integrations.capabilities(game.gameInfo().threadVersion())));
@@ -455,8 +514,12 @@ class VanillaIntegrationTest {
 
   private static void assertToolFailure(
       ToolRegistry tools, String toolId, ToolErrorCode expectedCode) {
-    ToolResult<JsonElement> result =
-        tools.invoke(toolId, object("{\"itemId\":\"minecraft:diamond_pickaxe\"}"));
+    assertToolFailure(tools, toolId, "{\"itemId\":\"minecraft:diamond_pickaxe\"}", expectedCode);
+  }
+
+  private static void assertToolFailure(
+      ToolRegistry tools, String toolId, String input, ToolErrorCode expectedCode) {
+    ToolResult<JsonElement> result = tools.invoke(toolId, object(input));
     assertFalse(result.successful());
     assertEquals(expectedCode, result.error().code());
   }
@@ -660,6 +723,62 @@ class VanillaIntegrationTest {
                       20.0,
                       20.0,
                       EntityClassification.HOSTILE))));
+    }
+
+    @Override
+    public ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query) {
+      return ToolResult.success(
+          new NearbyContainerResult(
+              query.radius(),
+              query.limit(),
+              false,
+              List.of(
+                  new NearbyContainerSummary(
+                      "minecraft:chest",
+                      "minecraft:chest",
+                      "Chest",
+                      new BlockPosition(2, 64, 0),
+                      2,
+                      27,
+                      0,
+                      List.of(),
+                      false))));
+    }
+
+    @Override
+    public ToolResult<BlockInfo> inspectContainer(ContainerInspectionQuery query) {
+      return ToolResult.success(
+          new BlockInfo(
+              "minecraft:chest",
+              "Chest",
+              query.position(),
+              Map.of("type", "single"),
+              2,
+              true,
+              new BlockEntityInfo("minecraft:chest", 27, List.of(), Map.of())));
+    }
+  }
+
+  private static final class UnavailableWorldProvider implements WorldProvider {
+    private final ToolError error;
+
+    private UnavailableWorldProvider(ToolErrorCode code) {
+      error = ToolError.of(code, "Unavailable for test.", true);
+    }
+
+    @Override
+    public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query) {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<BlockInfo> inspectContainer(ContainerInspectionQuery query) {
+      return ToolResult.failure(error);
     }
   }
 

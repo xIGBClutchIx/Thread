@@ -24,6 +24,9 @@ import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
 import me.clutchy.thread.core.model.recipe.RecipeLookupResult;
 import me.clutchy.thread.core.model.world.BlockInfo;
+import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
+import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.provider.GameProvider;
@@ -96,6 +99,8 @@ public final class VanillaIntegration implements ThreadIntegration {
     register(context, getInventory());
     register(context, getEquipment());
     register(context, getTargetBlock());
+    register(context, getNearbyContainers());
+    register(context, inspectContainer());
     register(context, getNearbyEntities());
     register(context, getRecipe());
     register(context, canCraft());
@@ -188,6 +193,32 @@ public final class VanillaIntegration implements ThreadIntegration {
         JsonCodec.of(NearbyEntityResult.class, VanillaToolSchemas.NEARBY_ENTITY_RESULT),
         ToolCapabilities.supportedSingleplayer(),
         world::nearbyEntities);
+  }
+
+  private GameTool<NearbyContainerQuery, NearbyContainerResult> getNearbyContainers() {
+    return tool(
+        "minecraft.get_nearby_containers",
+        "Returns compact distance-ordered summaries of container block entities in already-loaded "
+            + "chunks near the local player. Use this to locate nearby storage or machines before "
+            + "inspecting one position; results include occupancy and at most four representative "
+            + "slots, never full inventories.",
+        JsonCodec.of(NearbyContainerQuery.class, VanillaToolSchemas.NEARBY_CONTAINER_QUERY),
+        JsonCodec.of(NearbyContainerResult.class, VanillaToolSchemas.NEARBY_CONTAINER_RESULT),
+        ToolCapabilities.supportedSingleplayer(),
+        world::nearbyContainers);
+  }
+
+  private GameTool<ContainerInspectionQuery, BlockInfo> inspectContainer() {
+    return tool(
+        "minecraft.inspect_container",
+        "Returns the full safe visible inventory and selected machine state for one nearby loaded "
+            + "container position. Use this after locating a container; the position must remain "
+            + "loaded and within the server-side range, unresolved loot is not opened, and no "
+            + "items or world state are changed.",
+        JsonCodec.of(ContainerInspectionQuery.class, VanillaToolSchemas.CONTAINER_INSPECTION_QUERY),
+        JsonCodec.of(BlockInfo.class, VanillaToolSchemas.CONTAINER_INSPECTION),
+        ToolCapabilities.supportedSingleplayer(),
+        world::inspectContainer);
   }
 
   private GameTool<RecipeLookupQuery, RecipeLookupResult> getRecipe() {

@@ -3,10 +3,8 @@ package me.clutchy.thread.platform.minecraft.player;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.model.player.EquipmentPosition;
@@ -16,7 +14,6 @@ import me.clutchy.thread.core.model.player.InventorySlotInfo;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.world.BlockInfo;
-import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -29,7 +26,6 @@ import me.clutchy.thread.platform.minecraft.threading.MinecraftThreadExecutor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -38,7 +34,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
@@ -191,13 +186,10 @@ public final class MinecraftPlayerProvider implements PlayerProvider {
     BlockState state = level.getBlockState(position);
     var blockEntity = level.getBlockEntity(position);
     BlockInfo base =
-        new BlockInfo(
-            BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(),
-            state.getBlock().getName().getString(),
-            new BlockPosition(position.getX(), position.getY(), position.getZ()),
-            properties(state),
+        mapper.block(
+            state,
+            position,
             context.distance(),
-            blockEntity != null,
             blockEntity == null ? null : blockEntityInspectors.inspect(blockEntity));
     return ToolResult.success(
         Optional.of(blockEnrichers.enrich(level, position, state, blockEntity, base)));
@@ -205,19 +197,6 @@ public final class MinecraftPlayerProvider implements PlayerProvider {
 
   static boolean isValidBlockTarget(HitResult hitResult) {
     return hitResult instanceof BlockHitResult && hitResult.getType() == HitResult.Type.BLOCK;
-  }
-
-  private static Map<String, String> properties(BlockState state) {
-    Map<String, String> properties = new TreeMap<>();
-    for (Property<?> property : state.getProperties()) {
-      properties.put(property.getName(), propertyValue(state, property));
-    }
-    return properties;
-  }
-
-  private static <T extends Comparable<T>> String propertyValue(
-      BlockState state, Property<T> property) {
-    return property.getName(state.getValue(property));
   }
 
   private EquipmentSlotInfo equipmentSlot(

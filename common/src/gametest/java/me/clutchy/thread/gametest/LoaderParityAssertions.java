@@ -39,11 +39,13 @@ public final class LoaderParityAssertions {
           "minecraft.get_game_info",
           "minecraft.get_inventory",
           "minecraft.get_missing_ingredients",
+          "minecraft.get_nearby_containers",
           "minecraft.get_nearby_entities",
           "minecraft.get_player",
           "minecraft.get_recipe",
           "minecraft.get_status",
           "minecraft.get_target_block",
+          "minecraft.inspect_container",
           "minecraft.search_items");
 
   private LoaderParityAssertions() {}
@@ -133,6 +135,27 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "menu gameplay rejection");
+    JsonObject nearbyArguments = new JsonObject();
+    nearbyArguments.addProperty("radius", 8);
+    nearbyArguments.addProperty("limit", 8);
+    assertToolError(
+        mcpToolResult(endpoint, 6, "minecraft.get_nearby_containers", nearbyArguments),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu container search rejection");
+    JsonObject inspectionArguments = new JsonObject();
+    JsonObject menuPosition = new JsonObject();
+    menuPosition.addProperty("x", 0);
+    menuPosition.addProperty("y", 64);
+    menuPosition.addProperty("z", 0);
+    inspectionArguments.add("position", menuPosition);
+    assertToolError(
+        mcpToolResult(endpoint, 7, "minecraft.inspect_container", inspectionArguments),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu container inspection rejection");
   }
 
   /** Verifies the common single-player catalog, native recipes, crafting, and MCP behavior. */
@@ -141,10 +164,8 @@ public final class LoaderParityAssertions {
     JsonObject status = invoke(tools, "minecraft.get_status", "{}");
     assertEquals("SINGLEPLAYER", status.get("state").getAsString(), "single-player state");
     assertTrue(status.get("supported").getAsBoolean(), "single-player support");
-    assertEquals(
-        "minecraft:overworld",
-        invoke(tools, "minecraft.get_player", "{}").get("dimension").getAsString(),
-        "player dimension");
+    JsonObject player = invoke(tools, "minecraft.get_player", "{}");
+    assertEquals("minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
     invoke(tools, "minecraft.get_inventory", "{}");
     assertEquals(
         6,
@@ -155,6 +176,20 @@ public final class LoaderParityAssertions {
       assertEquals(ToolErrorCode.NOT_FOUND, target.error().code(), "controlled target absence");
     }
     invoke(tools, "minecraft.get_nearby_entities", "{\"radius\":16,\"limit\":8}");
+    invoke(tools, "minecraft.get_nearby_containers", "{\"radius\":16,\"limit\":8}");
+    JsonObject playerPosition = player.getAsJsonObject("position");
+    String inspectionInput =
+        "{\"position\":{\"x\":"
+            + (int) Math.floor(playerPosition.get("x").getAsDouble())
+            + ",\"y\":"
+            + (int) Math.floor(playerPosition.get("y").getAsDouble())
+            + ",\"z\":"
+            + (int) Math.floor(playerPosition.get("z").getAsDouble())
+            + "}}";
+    ToolResult<JsonElement> nonContainer =
+        invokeResult(tools, "minecraft.inspect_container", inspectionInput);
+    assertTrue(!nonContainer.successful(), "non-container inspection is rejected");
+    assertEquals(ToolErrorCode.NOT_FOUND, nonContainer.error().code(), "non-container error code");
     JsonObject search =
         invoke(tools, "minecraft.search_items", "{\"query\":\"diamond pick\",\"limit\":10}");
     assertTrue(
@@ -218,6 +253,17 @@ public final class LoaderParityAssertions {
             .get("craftable")
             .getAsBoolean(),
         "MCP craftability");
+    JsonObject nearbyContainerArguments = new JsonObject();
+    nearbyContainerArguments.addProperty("radius", 16);
+    nearbyContainerArguments.addProperty("limit", 8);
+    mcpTool(endpoint, 24, "minecraft.get_nearby_containers", nearbyContainerArguments);
+    JsonObject mcpInspectionArguments = JsonParser.parseString(inspectionInput).getAsJsonObject();
+    assertToolError(
+        mcpToolResult(endpoint, 25, "minecraft.inspect_container", mcpInspectionArguments),
+        "NOT_FOUND",
+        "The requested position is not a supported container.",
+        false,
+        "MCP non-container rejection");
   }
 
   /** Verifies clean world detachment while the loader-owned client remains running. */
@@ -239,6 +285,16 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "return-to-menu gameplay rejection");
+    JsonObject nearbyArguments = new JsonObject();
+    nearbyArguments.addProperty("radius", 8);
+    nearbyArguments.addProperty("limit", 8);
+    assertToolError(
+        mcpToolResult(
+            runtime.mcpServer().endpoint(), 32, "minecraft.get_nearby_containers", nearbyArguments),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu container rejection");
     assertTrue(runtime.mcpRunning(), "MCP listener survives world close");
   }
 

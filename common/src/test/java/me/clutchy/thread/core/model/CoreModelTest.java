@@ -25,8 +25,11 @@ import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
+import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.Position;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
@@ -147,6 +150,41 @@ class CoreModelTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> new BlockEntityInfo("minecraft:chest", items.size(), items, Map.of()));
+  }
+
+  @Test
+  void nearbyContainerResultsAreDetachedOrderedAndSummaryBounded() {
+    NearbyContainerSummary farther =
+        new NearbyContainerSummary(
+            "minecraft:barrel",
+            "minecraft:barrel",
+            "Barrel",
+            new BlockPosition(4, 64, 0),
+            4,
+            27,
+            0,
+            List.of(),
+            false);
+    NearbyContainerSummary nearer =
+        new NearbyContainerSummary(
+            "minecraft:chest",
+            "minecraft:chest",
+            "Chest",
+            new BlockPosition(1, 64, 0),
+            1,
+            27,
+            null,
+            List.of(),
+            false);
+
+    NearbyContainerResult result = new NearbyContainerResult(8, 2, false, List.of(farther, nearer));
+
+    assertEquals(
+        List.of("minecraft:chest", "minecraft:barrel"),
+        result.containers().stream().map(NearbyContainerSummary::blockId).toList());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new NearbyContainerResult(8, 1, true, List.of(nearer, farther)));
   }
 
   @Test

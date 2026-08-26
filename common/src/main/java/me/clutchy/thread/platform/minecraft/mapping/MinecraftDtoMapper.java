@@ -1,10 +1,15 @@
 package me.clutchy.thread.platform.minecraft.mapping;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import me.clutchy.thread.core.model.item.ItemComponentsInfo;
 import me.clutchy.thread.core.model.item.ItemDurabilityInfo;
 import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
 import me.clutchy.thread.core.model.item.ItemStackInfo;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.BlockInfo;
+import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.Position;
@@ -24,6 +29,8 @@ import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.ItemLore;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 
 /** Converts Minecraft runtime objects into detached Thread DTOs at the platform boundary. */
 public final class MinecraftDtoMapper {
@@ -53,6 +60,22 @@ public final class MinecraftDtoMapper {
   /** Converts an entity's current continuous position. */
   public Position position(Entity entity) {
     return new Position(entity.getX(), entity.getY(), entity.getZ());
+  }
+
+  /** Converts a loaded block and optional selected block-entity state into a detached snapshot. */
+  public BlockInfo block(
+      BlockState state,
+      net.minecraft.core.BlockPos position,
+      double distance,
+      BlockEntityInfo blockEntity) {
+    return new BlockInfo(
+        BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(),
+        state.getBlock().getName().getString(),
+        new BlockPosition(position.getX(), position.getY(), position.getZ()),
+        properties(state),
+        distance,
+        blockEntity != null,
+        blockEntity);
   }
 
   /** Converts an already-loaded entity with health and supported Minecraft classifications. */
@@ -98,6 +121,19 @@ public final class MinecraftDtoMapper {
     int maximum = stack.getMaxDamage();
     int damage = Math.max(0, Math.min(stack.getDamageValue(), maximum));
     return new ItemDurabilityInfo(maximum - damage, maximum, damage);
+  }
+
+  private static Map<String, String> properties(BlockState state) {
+    Map<String, String> properties = new TreeMap<>();
+    for (Property<?> property : state.getProperties()) {
+      properties.put(property.getName(), propertyValue(state, property));
+    }
+    return properties;
+  }
+
+  private static <T extends Comparable<T>> String propertyValue(
+      BlockState state, Property<T> property) {
+    return property.getName(state.getValue(property));
   }
 
   private static List<ItemEnchantmentInfo> enchantments(ItemStack stack) {

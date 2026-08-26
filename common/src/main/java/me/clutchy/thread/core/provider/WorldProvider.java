@@ -1,5 +1,9 @@
 package me.clutchy.thread.core.provider;
 
+import me.clutchy.thread.core.model.world.BlockInfo;
+import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
+import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -15,4 +19,13 @@ public interface WorldProvider {
    * already-loaded state, bounded by the supplied radius and limit.
    */
   ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query);
+
+  /**
+   * Returns compact distance-ordered summaries of container block entities in loaded chunks near
+   * the local player.
+   */
+  ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query);
+
+  /** Returns full safe inspection data for one nearby loaded container position. */
+  ToolResult<BlockInfo> inspectContainer(ContainerInspectionQuery query);
 }

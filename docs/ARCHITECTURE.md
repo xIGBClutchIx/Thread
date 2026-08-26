@@ -44,7 +44,7 @@ loader types, MCP types, and optional-mod types do not cross this boundary.
 
 - client and integrated-server thread dispatch;
 - the single-player session guard and status mapping;
-- bounded game, player, world, item, block, entity, and live-recipe reads;
+- bounded game, player, world, item, block, entity, loaded-container, and live-recipe reads;
 - conversion from Minecraft objects to detached Thread DTOs;
 - safe Minecraft-facing block/entity extension points and registries.
 
@@ -131,7 +131,7 @@ behavior.
 
 Packaged parity coverage requires each loader to prove:
 
-- the exact same thirteen-tool catalog and active vanilla integration;
+- the exact same fifteen-tool catalog and active vanilla integration;
 - correct loader identity plus menu, single-player, and return-to-menu status;
 - MCP-enabled, restarted-config, and MCP-disabled startup;
 - standard MCP initialization, discovery, tool listing, calls, and controlled menu rejection;
@@ -151,7 +151,7 @@ shared session guard and reject menus, loading states, missing players, and mult
 exposing game state.
 
 Client-owned reads run on the Minecraft client thread. Integrated-server-owned reads, including
-live recipes and block entities, run on the integrated-server thread. Dispatch has a configured
+live recipes, block entities, and nearby container scans, run on the integrated-server thread. Dispatch has a configured
 deadline; timeout and lifecycle rejection become structured retryable errors. A request may fail
 safely if the world unloads while it is waiting.
 
@@ -164,6 +164,13 @@ and validates serialized output before returning it to MCP.
 `CraftingService` uses maximum-flow allocation so overlapping alternatives cannot spend the same
 inventory item twice. `CraftingPlanner` uses one inventory/surplus ledger, active-path cycle
 detection, deterministic local variant scoring, and hard depth/work/quantity limits.
+
+Nearby container discovery and inspection remain `WorldProvider` operations. Discovery walks a
+distance-ordered, hard-capped set of block positions, skips unloaded chunks, and returns compact
+summaries. Individual inspection reuses `BlockInfo`, `BlockEntityInfo`, and the existing
+`MinecraftBlockEntityInspectorRegistry`, so contributed inspectors can enrich future custom
+machines without a second registry. These snapshots are not inputs to `CraftingService` or
+`CraftingPlanner`.
 
 External packages advertise metadata through the loader-specific catalog (`thread:integrations`
 on Fabric and a Java service provider on NeoForge or Forge). Common `IntegrationRegistry` performs enabled,

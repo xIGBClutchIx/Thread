@@ -14,6 +14,8 @@ class MinecraftProviderLimitsTest {
     assertEquals(128, limits.maxEntityResults());
     assertEquals(8_192, limits.maxItemDefinitions());
     assertEquals(64, limits.maxItemSearchResults());
+    assertEquals(16, limits.maxContainerRadius());
+    assertEquals(64, limits.maxContainerResults());
     assertEquals(16_384, limits.maxRecipeDefinitions());
     assertEquals(256, limits.maxRecipesPerItem());
   }
@@ -35,6 +37,8 @@ class MinecraftProviderLimitsTest {
     assertEquals(24, limits.maxEntityRadius());
     assertEquals(20, limits.maxEntityResults());
     assertEquals(10, limits.maxItemSearchResults());
+    assertEquals(16, limits.maxContainerRadius());
+    assertEquals(20, limits.maxContainerResults());
     assertEquals(
         MinecraftProviderLimits.defaults().maxItemDefinitions(), limits.maxItemDefinitions());
     assertEquals(

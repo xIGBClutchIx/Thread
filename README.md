@@ -8,20 +8,21 @@ Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fab
 
 ## What it exposes
 
-Thirteen `minecraft.*` tools cover:
+Fifteen `minecraft.*` tools cover:
 
 - session status and game versions;
 - player health, hunger, experience, position, dimension, and game mode;
 - inventory, held items, and armor;
-- the targeted block and safe container contents;
+- the targeted block plus bounded nearby container discovery and inspection;
 - bounded nearby loaded entities;
 - live recipe lookup and item search;
 - direct craftability, missing ingredients, and bounded recursive crafting plans;
 - the active tool and integration capabilities.
 
 Recipes come from Minecraft's live integrated-server recipe manager, so active datapack and mod
-recipe additions, replacements, and removals are included. Queries never force-load chunks,
-scan the wider world, use nearby storage, or mutate game state.
+recipe additions, replacements, and removals are included. Queries never force-load chunks, scan
+the wider world, resolve unopened loot containers, or mutate game state. Nearby storage is exposed
+only as read-only context; crafting calculations still use the player's main inventory alone.
 
 ## Install
 
@@ -108,6 +109,7 @@ See [Thread Integrations](docs/INTEGRATIONS.md) for the supported API and packag
 - No multiplayer gameplay queries or dedicated-server mode.
 - No remote binding, authentication, or public MCP hosting.
 - No commands, movement, crafting actions, inventory changes, or world edits.
+- No automatic item movement or use of nearby storage in crafting calculations.
 - No raw NBT/components or Minecraft objects in public core contracts.
 - No bundled JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or similar adapter.
 - Crafting plans are deterministic and bounded, not exhaustive global optimizers.

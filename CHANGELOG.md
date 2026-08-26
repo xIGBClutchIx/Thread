@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Safe nearby loaded-container discovery and individual inspection across common vanilla storage
+  and machines, with compact summaries, full bounded inventory snapshots, selected furnace/brewing
+  state, and no chunk loading or crafting changes.
 - A recommended `thread-universal-<version>.jar` that packages common output and all three thin
   loader adapters directly, with duplicate detection and the same packaged parity proofs on
   Fabric, NeoForge, and Forge. Dedicated loader JARs remain available.
@@ -14,7 +17,7 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 - NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate
   release JAR, and real packaged-client lifecycle/MCP/recipe tests.
 - Deterministic direct craftability, missing-ingredient analysis, and bounded recursive crafting
-  plans across thirteen read-only tools.
+  plans across fifteen read-only tools.
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
 - Loader-specific metadata discovery for separately distributed Thread Integrations packages:

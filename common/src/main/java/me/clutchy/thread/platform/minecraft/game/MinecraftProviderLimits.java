@@ -8,6 +8,9 @@ public record MinecraftProviderLimits(
     int maxItemSearchResults,
     int maxRecipeDefinitions,
     int maxRecipesPerItem) {
+  private static final double HARD_MAX_CONTAINER_RADIUS = 16;
+  private static final int HARD_MAX_CONTAINER_RESULTS = 64;
+
   public MinecraftProviderLimits {
     if (!Double.isFinite(maxEntityRadius) || maxEntityRadius <= 0) {
       throw new IllegalArgumentException("maxEntityRadius must be finite and positive");
@@ -39,5 +42,20 @@ public record MinecraftProviderLimits(
       double maxEntityRadius, int maxEntityResults, int maxItemSearchResults) {
     return new MinecraftProviderLimits(
         maxEntityRadius, maxEntityResults, 8_192, maxItemSearchResults, 16_384, 256);
+  }
+
+  /**
+   * Returns the container scan radius after applying the stricter fixed workload ceiling.
+   *
+   * <p>Container discovery visits block positions rather than an entity index, so it intentionally
+   * uses a smaller ceiling while still respecting a user-configured lower world-query radius.
+   */
+  public double maxContainerRadius() {
+    return Math.min(maxEntityRadius, HARD_MAX_CONTAINER_RADIUS);
+  }
+
+  /** Returns the container result cap after respecting the configured world-query result limit. */
+  public int maxContainerResults() {
+    return Math.min(maxEntityResults, HARD_MAX_CONTAINER_RESULTS);
   }
 }

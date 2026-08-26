@@ -64,6 +64,19 @@ only already-loaded state and never force-load chunks.
 Recipes come from the integrated server's final live `RecipeManager`, including active datapack and
 installed-mod changes. Thread has no static vanilla recipe catalog.
 
+## Nearby containers are bounded context, not crafting inventory
+
+`minecraft.get_nearby_containers` scans only already-loaded chunks within a hard 16-block ceiling
+and returns at most 64 distance-ordered summaries. Each summary includes at most four occupied
+slots. `minecraft.inspect_container` accepts one position within the same range and reuses the
+existing safe block/block-entity DTOs and inspector registry for full visible contents and selected
+machine state.
+
+Unopened loot containers remain unresolved because reading their slots would mutate world state.
+The tools run on the integrated-server thread, never force-load chunks, and remain independent of
+crafting: `CraftingService` and `CraftingPlanner` continue to read only the player's 36-slot main
+inventory.
+
 ## Crafting intelligence remains deterministic and bounded
 
 Direct craftability uses maximum-flow allocation so overlapping alternatives cannot spend the same

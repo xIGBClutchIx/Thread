@@ -25,7 +25,7 @@ bounded DTOs, and preserve native fallback behavior. Do not add an integration t
 
 Potential read-only additions include status effects, biome/time/weather, advancements, and more
 precise bounded inspection. Add a tool only when it answers a distinct question better than the
-existing thirteen tools; avoid large background snapshots or generic world scanning.
+existing fifteen tools; avoid large background snapshots or generic world scanning.
 
 ## Future product phases
 

@@ -20,10 +20,15 @@ import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
+import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
+import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
@@ -59,6 +64,21 @@ class ProviderContractsTest {
             .entities()
             .getFirst()
             .entityType());
+    assertEquals(
+        "minecraft:barrel",
+        world
+            .nearbyContainers(new NearbyContainerQuery(12, 10))
+            .value()
+            .containers()
+            .getFirst()
+            .blockId());
+    assertEquals(
+        27,
+        world
+            .inspectContainer(new ContainerInspectionQuery(new BlockPosition(2, 64, 0)))
+            .value()
+            .blockEntity()
+            .inventorySize());
     assertEquals(
         "minecraft:stick", recipes.searchItems("stick", 5).value().items().getFirst().itemId());
     assertEquals(
@@ -139,6 +159,39 @@ class ProviderContractsTest {
                       20.0,
                       20.0,
                       EntityClassification.HOSTILE))));
+    }
+
+    @Override
+    public ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query) {
+      return ToolResult.success(
+          new NearbyContainerResult(
+              query.radius(),
+              query.limit(),
+              false,
+              List.of(
+                  new NearbyContainerSummary(
+                      "minecraft:barrel",
+                      "minecraft:barrel",
+                      "Barrel",
+                      new BlockPosition(2, 64, 0),
+                      1,
+                      27,
+                      0,
+                      List.of(),
+                      false))));
+    }
+
+    @Override
+    public ToolResult<BlockInfo> inspectContainer(ContainerInspectionQuery query) {
+      return ToolResult.success(
+          new BlockInfo(
+              "minecraft:barrel",
+              "Barrel",
+              query.position(),
+              Map.of(),
+              1,
+              true,
+              new BlockEntityInfo("minecraft:barrel", 27, List.of(), Map.of())));
     }
   }
 

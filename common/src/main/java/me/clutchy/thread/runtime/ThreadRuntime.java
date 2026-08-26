@@ -172,7 +172,15 @@ public final class ThreadRuntime implements AutoCloseable {
             gameThreadTimeout);
     WorldProvider worldProvider =
         new MinecraftWorldProvider(
-            client, clientThread, sessionGuard, limits, mapper, entityEnrichers);
+            client,
+            clientThread,
+            sessionGuard,
+            limits,
+            mapper,
+            entityEnrichers,
+            blockEntityInspectors,
+            blockEnrichers,
+            gameThreadTimeout);
 
     ToolRegistry toolRegistry = new ToolRegistry();
     IntegrationRegistry integrationRegistry =

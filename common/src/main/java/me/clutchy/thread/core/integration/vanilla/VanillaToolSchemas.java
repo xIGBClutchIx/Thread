@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.serialization.JsonSchema;
 
 final class VanillaToolSchemas {
@@ -69,6 +70,19 @@ final class VanillaToolSchemas {
           property("distance", number(0.0, null)),
           property("blockEntityPresent", bool()),
           property("blockEntity", nullable(BLOCK_ENTITY_INFO)));
+  private static final JsonObject NEARBY_CONTAINER_SUMMARY =
+      object(
+          property("blockId", registryId()),
+          property("containerTypeId", registryId()),
+          property("displayName", string(1, 256, null)),
+          property("position", BLOCK_POSITION),
+          property("distance", number(0.0, null)),
+          property("slotCount", integer(0, null)),
+          property("usedSlotCount", nullable(integer(0, null))),
+          property(
+              "itemSummary",
+              boundedArray(BLOCK_ENTITY_ITEM, 0, NearbyContainerSummary.MAX_SUMMARY_ITEMS)),
+          property("itemSummaryTruncated", bool()));
   private static final JsonObject ENTITY_INFO =
       object(
           property("entityType", registryId()),
@@ -181,6 +195,18 @@ final class VanillaToolSchemas {
   static final JsonSchema EQUIPMENT =
       schema(object(property("slots", boundedArray(EQUIPMENT_SLOT, 6, 6))));
   static final JsonSchema TARGET_BLOCK = schema(BLOCK_INFO);
+  static final JsonSchema NEARBY_CONTAINER_QUERY =
+      schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
+  static final JsonSchema NEARBY_CONTAINER_RESULT =
+      schema(
+          object(
+              property("radius", number(0.0, null)),
+              property("limit", integer(1, null)),
+              property("truncated", bool()),
+              property("containers", array(NEARBY_CONTAINER_SUMMARY))));
+  static final JsonSchema CONTAINER_INSPECTION_QUERY =
+      schema(object(property("position", BLOCK_POSITION)));
+  static final JsonSchema CONTAINER_INSPECTION = schema(BLOCK_INFO);
   static final JsonSchema NEARBY_ENTITY_QUERY =
       schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
   static final JsonSchema NEARBY_ENTITY_RESULT =

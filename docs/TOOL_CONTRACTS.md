@@ -276,7 +276,13 @@ Example result:
         }
       }
     ],
-    "state": {"kind": "furnace"}
+    "state": {
+      "kind": "furnace",
+      "cookingProgress": "0",
+      "cookingTotalTime": "200",
+      "litTimeRemaining": "0",
+      "litTotalTime": "1600"
+    }
   }
 }
 ```
@@ -290,6 +296,102 @@ higher-priority safe inspector for richer mod-specific state later.
 
 When the normal client raycast has no valid block target, Thread returns a structured `NOT_FOUND`
 tool error rather than inventing block data.
+
+## `minecraft.get_nearby_containers`
+
+Purpose: locate container block entities near the local player without returning every complete
+inventory.
+
+Input:
+
+```json
+{
+  "radius": 12,
+  "limit": 16
+}
+```
+
+The hard container radius is 16 blocks and the hard result limit is 64. A lower configured entity
+radius/result limit also lowers the corresponding container maximum. Search visits a finite sphere
+of block positions ordered by block-center distance, skips positions whose chunks are not already
+loaded, and stops after finding `limit + 1` containers so truncation is known without serializing an
+unbounded result.
+
+Example result:
+
+```json
+{
+  "radius": 12,
+  "limit": 16,
+  "truncated": false,
+  "containers": [
+    {
+      "blockId": "minecraft:furnace",
+      "containerTypeId": "minecraft:furnace",
+      "displayName": "Furnace",
+      "position": {"x": 153, "y": 67, "z": -379},
+      "distance": 3.4,
+      "slotCount": 3,
+      "usedSlotCount": 1,
+      "itemSummary": [
+        {
+          "slot": "fuel",
+          "item": {
+            "itemId": "minecraft:coal",
+            "displayName": "Coal",
+            "customName": null,
+            "count": 1,
+            "maxCount": 64,
+            "durability": null,
+            "enchantments": [],
+            "components": null
+          }
+        }
+      ],
+      "itemSummaryTruncated": false
+    }
+  ]
+}
+```
+
+`itemSummary` contains at most four representative occupied slots. `usedSlotCount` is null when
+contents are deliberately unresolved or the inspector could not count every slot safely. Use
+`minecraft.inspect_container` for one full visible inventory rather than treating this summary as a
+complete item list.
+
+Base Thread recognizes vanilla `Container` block entities, including chest, trapped chest, barrel,
+furnace, smoker, blast furnace, hopper, brewing stand, dispenser, and dropper. A future separate
+Thread Integration may recognize a custom machine through the same block-entity inspector registry.
+
+## `minecraft.inspect_container`
+
+Purpose: inspect one known nearby loaded container position with full safe visible contents and
+selected machine state.
+
+Input:
+
+```json
+{
+  "position": {"x": 153, "y": 67, "z": -379}
+}
+```
+
+The result reuses the `BlockInfo`/`BlockEntityInfo` shape shown for
+`minecraft.get_target_block`. The requested block can be anywhere within the hard 16-block
+container range; it does not need to be the current camera target. All non-empty visible slots are
+returned up to the shared 64-slot block-entity ceiling. Furnaces use named `input`, `fuel`, and
+`output` slots plus cooking/burn progress counters. Brewing stands use named bottle, ingredient,
+and fuel slots plus brew/fuel counters. Other vanilla containers use numeric slot names.
+
+An out-of-range position returns `OUT_OF_RANGE`. A position in an unloaded chunk returns retryable
+`NOT_AVAILABLE`; Thread never loads the chunk to answer. A loaded non-container position returns
+`NOT_FOUND`. Menu/no-world and multiplayer calls are rejected by the same centralized session guard
+as every other gameplay tool.
+
+Unopened loot containers return their type, slot count, and unresolved-loot metadata without
+reading slots or resolving the loot table. Raw NBT, component maps, and Minecraft implementation
+objects never enter the result. This tool is read-only and does not move items. Neither container
+tool contributes its contents to direct craftability or recursive crafting plans.
 
 ## `minecraft.get_nearby_entities`
 
@@ -613,7 +715,7 @@ Example result:
       "id": "vanilla",
       "version": "1",
       "metadata": [
-        {"key": "thread.tool_count", "value": "13"}
+        {"key": "thread.tool_count", "value": "15"}
       ]
     }
   ]
@@ -631,7 +733,7 @@ capabilities and their classes are not resolved before presence/compatibility ch
 
 The base artifact reports only the required `vanilla` integration. Future separately installed
 Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
-changing the thirteen `minecraft.*` tool contracts.
+changing the fifteen built-in `minecraft.*` tool contracts.
 
 ## Tool descriptions
 

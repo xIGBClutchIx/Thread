@@ -37,6 +37,12 @@ core API. They may accept Minecraft inputs on the owning logical thread; contrib
 detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and component
 maps must never be returned. Their stable extension IDs use the `minecraft.*` namespace.
 
+The same block-entity inspector registry serves targeted-block details,
+`minecraft.get_nearby_containers`, and `minecraft.inspect_container`. A contributed inspector that
+recognizes a custom machine can therefore make it discoverable and inspectable through the existing
+bounded provider path. It must still avoid chunk loading, world mutation, unresolved loot access,
+and unbounded payloads. Base Thread contains no third-party machine logic.
+
 ## Internal implementation surface
 
 The following types may be public for cross-package wiring or tests but are not external API

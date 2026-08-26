@@ -64,6 +64,8 @@ Important regression areas include:
 - success/error schema validation and deterministic discovery;
 - all session states and multiplayer rejection;
 - rich item/block/entity conversion and query caps;
+- nearby loaded-container ordering, occupancy summaries, full single-position inspection,
+  unresolved-loot safety, and radius/result caps;
 - live recipe variants, alternatives, and provider fallback;
 - maximum-flow crafting allocation without inventory double-counting;
 - recursive plans, shared supplies, cycles, safe alternatives, and work limits;
@@ -111,7 +113,7 @@ but is not the release proof.
 
 Each normal test launches a temporary client with a final dedicated or universal Thread JAR and a
 separately packaged proof integration/game-test mod. All three loaders compile the same loader-neutral parity
-fixture from `common/src/gametest/java`. It verifies the exact thirteen-tool catalog, config,
+fixture from `common/src/gametest/java`. It verifies the exact fifteen-tool catalog, config,
 loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
 recipes and crafting, external integration activation, and controlled gameplay rejection at the
 menu.
@@ -165,13 +167,15 @@ Use the release JAR, not a development run, for the final human check:
 
 1. Put the universal release JAR and its loader requirements in a clean Minecraft 26.2 instance.
 2. Launch to the menu and confirm `http://127.0.0.1:25580/mcp` is listening.
-3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm thirteen
+3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm fifteen
    read-only `minecraft.*` tools.
 4. Call `minecraft.get_status` in the menu; it must return a controlled unsupported/no-world state.
 5. Load an integrated single-player world and call status, player, inventory, equipment, target,
-   nearby-entity, recipe, crafting, search, and capability tools.
-6. Confirm tools return detached bounded data, recipes reflect the live world, and no call mutates
-   the game.
+   nearby-entity, nearby-container, container-inspection, recipe, crafting, search, and capability
+   tools.
+6. Confirm tools return detached bounded data, recipes reflect the live world, container searches
+   skip unloaded chunks, and no call mutates the game. Confirm crafting answers do not change when
+   items exist only in nearby containers.
 7. Join multiplayer only for rejection verification if appropriate: status remains callable while
    gameplay tools return `UNSUPPORTED` without exposing live state.
 8. Exit Minecraft and confirm the listener closes cleanly.

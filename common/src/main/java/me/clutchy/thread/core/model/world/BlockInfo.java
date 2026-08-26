@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import me.clutchy.thread.core.model.validation.ModelValidation;
 
-/** Snapshot of the block currently targeted by the local player's camera raycast. */
+/** Safe detached snapshot of one loaded block selected by a bounded player-facing query. */
 public record BlockInfo(
     String blockId,
     String displayName,

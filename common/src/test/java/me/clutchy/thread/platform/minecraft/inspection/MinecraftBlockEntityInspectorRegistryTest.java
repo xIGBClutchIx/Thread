@@ -19,8 +19,17 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BarrelBlockEntity;
+import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
+import net.minecraft.world.level.block.entity.DropperBlockEntity;
 import net.minecraft.world.level.block.entity.FurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.HopperBlockEntity;
+import net.minecraft.world.level.block.entity.SmokerBlockEntity;
+import net.minecraft.world.level.block.entity.TrappedChestBlockEntity;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -69,6 +78,34 @@ class MinecraftBlockEntityInspectorRegistryTest {
     assertEquals("false", result.state().get("contentsResolved"));
     assertEquals("minecraft:chests/simple_dungeon", result.state().get("lootTable"));
     assertEquals(BuiltInLootTables.SIMPLE_DUNGEON, chest.getLootTable());
+  }
+
+  @Test
+  void recognizesCommonVanillaContainerAndMachineTypes() {
+    List<BlockEntity> blockEntities =
+        List.of(
+            new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()),
+            new TrappedChestBlockEntity(BlockPos.ZERO, Blocks.TRAPPED_CHEST.defaultBlockState()),
+            new BarrelBlockEntity(BlockPos.ZERO, Blocks.BARREL.defaultBlockState()),
+            new FurnaceBlockEntity(BlockPos.ZERO, Blocks.FURNACE.defaultBlockState()),
+            new SmokerBlockEntity(BlockPos.ZERO, Blocks.SMOKER.defaultBlockState()),
+            new BlastFurnaceBlockEntity(BlockPos.ZERO, Blocks.BLAST_FURNACE.defaultBlockState()),
+            new HopperBlockEntity(BlockPos.ZERO, Blocks.HOPPER.defaultBlockState()),
+            new BrewingStandBlockEntity(BlockPos.ZERO, Blocks.BREWING_STAND.defaultBlockState()),
+            new DispenserBlockEntity(BlockPos.ZERO, Blocks.DISPENSER.defaultBlockState()),
+            new DropperBlockEntity(BlockPos.ZERO, Blocks.DROPPER.defaultBlockState()));
+
+    List<BlockEntityInfo> inspections =
+        blockEntities.stream()
+            .map(inspectors::inspectContainer)
+            .map(Optional::orElseThrow)
+            .toList();
+
+    assertEquals(
+        List.of(27, 27, 27, 3, 3, 3, 5, 5, 9, 9),
+        inspections.stream().map(BlockEntityInfo::inventorySize).toList());
+    BlockEntityInfo brewingStand = inspections.get(7);
+    assertEquals("brewing_stand", brewingStand.state().get("kind"));
   }
 
   @Test
