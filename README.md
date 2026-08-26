@@ -25,19 +25,11 @@ scan the wider world, use nearby storage, or mutate game state.
 
 ## Install
 
-1. Install Minecraft 26.2 with Java 25 and choose one loader: Fabric Loader 0.19.3 plus Fabric API
+1. Install Minecraft 26.2 with Java 25 using either Fabric Loader 0.19.3 and Fabric API
    0.154.0+26.2, or NeoForge 26.2.0.62.
-2. Download the matching `thread-fabric-0.1.0.jar` or `thread-neoforge-0.1.0.jar` and its
-   `.sha256` file. Do not install both Thread JARs.
-3. Verify the checksum and copy only the JAR into the instance's `mods` directory.
-4. Launch Minecraft and confirm the log reports both Thread initialization and the MCP listener.
-
-PowerShell checksum verification:
-
-```powershell
-(Get-FileHash .\thread-neoforge-0.1.0.jar -Algorithm SHA256).Hash.ToLower()
-Get-Content .\thread-neoforge-0.1.0.jar.sha256
-```
+2. Put the matching `thread-fabric-0.1.0.jar` or `thread-neoforge-0.1.0.jar` in your instance's
+   `mods` folder. Do not install both.
+3. Launch Minecraft. Thread starts its MCP server automatically.
 
 ## Connect an MCP client
 
