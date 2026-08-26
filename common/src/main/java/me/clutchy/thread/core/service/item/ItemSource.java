@@ -3,24 +3,56 @@ package me.clutchy.thread.core.service.item;
 import java.util.List;
 import java.util.Objects;
 import me.clutchy.thread.core.model.item.ItemStackInfo;
-import me.clutchy.thread.core.model.item.find.FindItemQuery;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
 import me.clutchy.thread.core.model.player.EquipmentPosition;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.validation.ModelValidation;
 import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /** Supplies one bounded transport-independent set of located live item stacks. */
 @FunctionalInterface
 public interface ItemSource {
   /** Reads one bounded detached snapshot for the requested search scope. */
-  ToolResult<Snapshot> read(FindItemQuery query);
+  ToolResult<Snapshot> read(Request request);
 
-  /** One source read plus whether its nearby-container enumeration was truncated. */
-  record Snapshot(boolean containersTruncated, List<Entry> entries) {
+  /** Optional nearby-container bounds supplied to sources that need a loaded-world scan. */
+  record Request(NearbyContainerQuery nearbyContainers) {
+    /** Request for sources that do not inspect nearby containers. */
+    public static Request playerOnly() {
+      return new Request(null);
+    }
+
+    /** Request using explicit safe nearby-container bounds. */
+    public static Request nearby(NearbyContainerQuery query) {
+      return new Request(Objects.requireNonNull(query, "query"));
+    }
+  }
+
+  /** One source read plus structured completeness information for bounded live discovery. */
+  record Snapshot(
+      boolean complete,
+      boolean containersTruncated,
+      int unresolvedContainersSkipped,
+      int contentLimitedContainersSkipped,
+      List<Entry> entries) {
     public Snapshot {
+      if (unresolvedContainersSkipped < 0 || contentLimitedContainersSkipped < 0) {
+        throw new IllegalArgumentException("skipped container counts must not be negative");
+      }
+      if (complete
+          && (containersTruncated
+              || unresolvedContainersSkipped > 0
+              || contentLimitedContainersSkipped > 0)) {
+        throw new IllegalArgumentException("complete source snapshot cannot report omissions");
+      }
       entries = ModelValidation.immutableList(entries, "entries");
+    }
+
+    /** Complete snapshot for a non-container source. */
+    public static Snapshot complete(List<Entry> entries) {
+      return new Snapshot(true, false, 0, 0, entries);
     }
   }
 

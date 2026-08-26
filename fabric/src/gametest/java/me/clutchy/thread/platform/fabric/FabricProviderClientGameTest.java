@@ -484,6 +484,105 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       assertTrue(mcpPlan.getAsJsonArray("missingMaterials").isEmpty(), "MCP plan raw shortages");
       assertTrue(mcpPlan.getAsJsonArray("issues").isEmpty(), "MCP plan safety issues");
 
+      singleplayer.getServer().runCommand("clear @a minecraft:dirt");
+      context.waitFor(client -> !hasInventoryItem(client, Items.DIRT));
+      JsonObject storageRecipeArguments = new JsonObject();
+      storageRecipeArguments.addProperty("itemId", "minecraft:command_block");
+      JsonObject playerOnlyStorageCraftability =
+          mcpTool(context, mcp.endpoint(), 44, "minecraft.can_craft", storageRecipeArguments);
+      assertEquals(
+          "PLAYER_ONLY",
+          playerOnlyStorageCraftability.get("scope").getAsString(),
+          "storage crafting default scope");
+      assertTrue(
+          !playerOnlyStorageCraftability.get("craftable").getAsBoolean(),
+          "nearby stone does not affect default crafting");
+
+      JsonObject expandedStorageArguments = storageRecipeArguments.deepCopy();
+      expandedStorageArguments.addProperty("scope", "PLAYER_AND_NEARBY");
+      JsonObject expandedStorageCraftability =
+          mcpTool(context, mcp.endpoint(), 45, "minecraft.can_craft", expandedStorageArguments);
+      assertEquals(
+          "PLAYER_AND_NEARBY",
+          expandedStorageCraftability.get("scope").getAsString(),
+          "storage crafting expanded scope");
+      JsonObject storageStatus = expandedStorageCraftability.getAsJsonObject("sourceStatus");
+      assertTrue(storageStatus.get("complete").getAsBoolean(), "storage source snapshot complete");
+      assertEquals(16D, storageStatus.get("nearbyRadius").getAsDouble(), "storage radius bound");
+      assertEquals(
+          64, storageStatus.get("nearbyContainerLimit").getAsInt(), "storage container bound");
+      assertTrue(
+          expandedStorageCraftability.get("craftable").getAsBoolean(),
+          "nearby hopper stone enables expanded crafting");
+      JsonObject storageAllocation =
+          recipe(expandedStorageCraftability, NATIVE_COMMAND_BLOCK_RECIPE)
+              .getAsJsonArray("ingredients")
+              .get(0)
+              .getAsJsonObject()
+              .getAsJsonArray("allocations")
+              .get(0)
+              .getAsJsonObject();
+      assertEquals(
+          "minecraft:stone",
+          storageAllocation.get("itemId").getAsString(),
+          "expanded crafting selected nearby alternative");
+      JsonObject storageSource =
+          storageAllocation.getAsJsonArray("sourceAllocations").get(0).getAsJsonObject();
+      assertEquals(
+          "NEARBY_CONTAINER",
+          storageSource.get("sourceType").getAsString(),
+          "expanded crafting source type");
+      assertEquals(
+          "minecraft:hopper",
+          storageSource.get("containerTypeId").getAsString(),
+          "expanded crafting source container");
+      assertEquals(
+          2,
+          storageSource.getAsJsonObject("containerPosition").get("x").getAsInt(),
+          "expanded crafting source position");
+
+      JsonObject expandedStorageMissing =
+          mcpTool(
+              context,
+              mcp.endpoint(),
+              46,
+              "minecraft.get_missing_ingredients",
+              expandedStorageArguments);
+      assertTrue(
+          expandedStorageMissing.get("craftable").getAsBoolean(),
+          "expanded missing ingredients uses nearby storage");
+      JsonObject expandedPlanArguments = new JsonObject();
+      expandedPlanArguments.addProperty("itemId", "minecraft:chain_command_block");
+      expandedPlanArguments.addProperty("scope", "PLAYER_AND_NEARBY");
+      JsonObject expandedStoragePlan =
+          mcpTool(
+              context, mcp.endpoint(), 47, "minecraft.get_crafting_plan", expandedPlanArguments);
+      assertTrue(
+          expandedStoragePlan.get("craftable").getAsBoolean(),
+          "expanded recursive plan uses nearby storage");
+      JsonObject intermediateStorageStep =
+          expandedStoragePlan.getAsJsonArray("steps").asList().stream()
+              .map(JsonElement::getAsJsonObject)
+              .filter(
+                  step -> step.get("recipeId").getAsString().equals(NATIVE_COMMAND_BLOCK_RECIPE))
+              .findFirst()
+              .orElseThrow();
+      JsonObject plannedStorageSource =
+          intermediateStorageStep
+              .getAsJsonArray("ingredients")
+              .get(0)
+              .getAsJsonObject()
+              .getAsJsonArray("allocations")
+              .get(0)
+              .getAsJsonObject()
+              .getAsJsonArray("sourceAllocations")
+              .get(0)
+              .getAsJsonObject();
+      assertEquals(
+          "minecraft:hopper",
+          plannedStorageSource.get("containerTypeId").getAsString(),
+          "expanded recursive plan source container");
+
       JsonObject searchArguments = new JsonObject();
       searchArguments.addProperty("query", "diamond pick");
       searchArguments.addProperty("limit", 10);
@@ -630,6 +729,18 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     for (int slot = 0; slot < client.player.getInventory().getContainerSize(); slot++) {
       if (client.player.getInventory().getItem(slot).is(item)
           && client.player.getInventory().getItem(slot).getCount() == count) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasInventoryItem(Minecraft client, Item item) {
+    if (client.player == null) {
+      return false;
+    }
+    for (int slot = 0; slot < client.player.getInventory().getContainerSize(); slot++) {
+      if (client.player.getInventory().getItem(slot).is(item)) {
         return true;
       }
     }

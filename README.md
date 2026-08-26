@@ -23,8 +23,8 @@ Sixteen `minecraft.*` tools cover:
 Recipes come from Minecraft's live integrated-server recipe manager, so active datapack and mod
 recipe additions, replacements, and removals are included. Queries never force-load chunks, scan
 the wider world, resolve unopened loot containers, or mutate game state. Nearby storage is exposed
-through `minecraft.find_item` as read-only context; crafting calculations still use the player's
-main inventory alone.
+through `minecraft.find_item` as read-only context. Crafting stays player-inventory-only by default,
+with an explicit `PLAYER_AND_NEARBY` scope when a client wants eligible loaded containers included.
 
 ## Install
 
@@ -111,7 +111,7 @@ See [Thread Integrations](docs/INTEGRATIONS.md) for the supported API and packag
 - No multiplayer gameplay queries or dedicated-server mode.
 - No remote binding, authentication, or public MCP hosting.
 - No commands, movement, crafting actions, inventory changes, or world edits.
-- No automatic item movement or use of nearby storage in crafting calculations.
+- No automatic item movement or implicit use of nearby storage in crafting calculations.
 - No raw NBT/components or Minecraft objects in public core contracts.
 - No bundled JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or similar adapter.
 - Crafting plans are deterministic and bounded, not exhaustive global optimizers.

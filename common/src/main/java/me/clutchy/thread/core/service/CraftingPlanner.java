@@ -12,16 +12,15 @@ import me.clutchy.thread.core.model.crafting.CraftingPlan;
 import me.clutchy.thread.core.model.crafting.CraftingPlanIssue;
 import me.clutchy.thread.core.model.crafting.CraftingPlanIssueType;
 import me.clutchy.thread.core.model.crafting.CraftingPlanStep;
+import me.clutchy.thread.core.model.crafting.CraftingQuery;
 import me.clutchy.thread.core.model.crafting.IngredientAllocation;
 import me.clutchy.thread.core.model.crafting.IngredientAvailability;
 import me.clutchy.thread.core.model.crafting.MissingMaterial;
 import me.clutchy.thread.core.model.crafting.RecipeCraftability;
-import me.clutchy.thread.core.model.player.InventorySlotInfo;
-import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.item.find.FoundItemSource;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
-import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
-import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
+import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /** Builds bounded, deterministic recursive crafting plans from detached provider snapshots. */
@@ -40,7 +39,7 @@ public final class CraftingPlanner {
           .thenComparingInt(value -> value.score().steps())
           .thenComparingInt(Candidate::order);
 
-  private final PlayerProvider players;
+  private final CraftingItemSourceProvider itemSources;
   private final RecipeProvider recipes;
   private final CraftingService crafting;
   private final int maxDepth;
@@ -48,19 +47,21 @@ public final class CraftingPlanner {
   private final int maxBranches;
 
   /** Creates a planner with Thread's production recursion and work limits. */
-  public CraftingPlanner(PlayerProvider players, RecipeProvider recipes, CraftingService crafting) {
-    this(players, recipes, crafting, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STEPS, DEFAULT_MAX_BRANCHES);
+  public CraftingPlanner(
+      CraftingItemSourceProvider itemSources, RecipeProvider recipes, CraftingService crafting) {
+    this(
+        itemSources, recipes, crafting, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STEPS, DEFAULT_MAX_BRANCHES);
   }
 
   /** Creates a planner with explicit safety limits for focused boundary tests. */
   CraftingPlanner(
-      PlayerProvider players,
+      CraftingItemSourceProvider itemSources,
       RecipeProvider recipes,
       CraftingService crafting,
       int maxDepth,
       int maxSteps,
       int maxBranches) {
-    this.players = Objects.requireNonNull(players, "players");
+    this.itemSources = Objects.requireNonNull(itemSources, "itemSources");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
     this.crafting = Objects.requireNonNull(crafting, "crafting");
     if (maxDepth <= 0 || maxSteps <= 0 || maxBranches <= 0) {
@@ -71,15 +72,18 @@ public final class CraftingPlanner {
     this.maxBranches = maxBranches;
   }
 
-  /** Plans one requested item using a single main-inventory snapshot. */
-  public ToolResult<CraftingPlan> plan(RecipeLookupQuery query) {
+  /** Plans one requested item using one detached snapshot of the selected item-source scope. */
+  public ToolResult<CraftingPlan> plan(CraftingQuery query) {
     Objects.requireNonNull(query, "query");
-    ToolResult<InventorySnapshot> inventoryResult = players.inventory();
-    if (!inventoryResult.successful()) {
-      return ToolResult.failure(Objects.requireNonNull(inventoryResult.error()));
+    ToolResult<CraftingItemSourceProvider.Snapshot> sourceResult =
+        itemSources.snapshot(query.scope());
+    if (!sourceResult.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(sourceResult.error()));
     }
+    CraftingItemSourceProvider.Snapshot sourceSnapshot =
+        Objects.requireNonNull(sourceResult.value());
 
-    PlanState state = new PlanState(new SupplyLedger(inventoryCounts(inventoryResult.value())));
+    PlanState state = new PlanState(new CraftingSupplyLedger(sourceSnapshot.entries()));
     PlannerRun run = new PlannerRun();
     Fulfillment root = resolveItem(query.itemId(), 1, List.of(), state, run);
     if (run.error != null) {
@@ -108,8 +112,11 @@ public final class CraftingPlanner {
     return ToolResult.success(
         new CraftingPlan(
             query.itemId(),
+            query.scope(),
+            sourceSnapshot.sourceStatus(),
             1,
             root.inventoryUsed(),
+            root.sourceAllocations(),
             craftable,
             maxDepth,
             steps,
@@ -120,41 +127,47 @@ public final class CraftingPlanner {
   private Fulfillment resolveItem(
       String itemId, int required, List<String> activePath, PlanState state, PlannerRun run) {
     if (required <= 0 || run.error != null) {
-      return new Fulfillment(itemId, 0, 0);
+      return new Fulfillment(itemId, 0, 0, List.of());
     }
     run.branches++;
     if (run.branches > maxBranches) {
       state.addIssue(
           CraftingPlanIssueType.PLAN_LIMIT, itemId, required, append(activePath, itemId));
-      return new Fulfillment(itemId, 0, 0);
+      return new Fulfillment(itemId, 0, 0, List.of());
     }
 
-    Consumption existing = state.supplies.consume(itemId, required);
+    CraftingSupplyLedger.Consumption existing = state.supplies.consume(itemId, required);
     int remaining = required - existing.total();
     if (remaining == 0) {
-      return new Fulfillment(itemId, required, existing.inventory());
+      return new Fulfillment(
+          itemId, required, existing.playerInventory(), existing.sourceAllocations());
     }
     if (activePath.contains(itemId)) {
       state.addIssue(CraftingPlanIssueType.CYCLE, itemId, remaining, cycle(activePath, itemId));
-      return new Fulfillment(itemId, existing.total(), existing.inventory());
+      return new Fulfillment(
+          itemId, existing.total(), existing.playerInventory(), existing.sourceAllocations());
     }
     if (activePath.size() >= maxDepth) {
       state.addIssue(
           CraftingPlanIssueType.MAX_DEPTH, itemId, remaining, append(activePath, itemId));
-      return new Fulfillment(itemId, existing.total(), existing.inventory());
+      return new Fulfillment(
+          itemId, existing.total(), existing.playerInventory(), existing.sourceAllocations());
     }
 
     List<RecipeInfo> definitions = recipeDefinitions(itemId, run);
     if (run.error != null) {
-      return new Fulfillment(itemId, existing.total(), existing.inventory());
+      return new Fulfillment(
+          itemId, existing.total(), existing.playerInventory(), existing.sourceAllocations());
     }
     if (definitions.isEmpty()) {
       if (!state.tryAddMissing(itemId, remaining)) {
         state.addIssue(
             CraftingPlanIssueType.PLAN_LIMIT, itemId, remaining, append(activePath, itemId));
-        return new Fulfillment(itemId, existing.total(), existing.inventory());
+        return new Fulfillment(
+            itemId, existing.total(), existing.playerInventory(), existing.sourceAllocations());
       }
-      return new Fulfillment(itemId, required, existing.inventory());
+      return new Fulfillment(
+          itemId, required, existing.playerInventory(), existing.sourceAllocations());
     }
 
     List<String> childPath = append(activePath, itemId);
@@ -168,7 +181,11 @@ public final class CraftingPlanner {
         candidates.add(
             new Candidate(
                 candidateState,
-                new Fulfillment(itemId, existing.total(), existing.inventory()),
+                new Fulfillment(
+                    itemId,
+                    existing.total(),
+                    existing.playerInventory(),
+                    existing.sourceAllocations()),
                 index,
                 score(baseline, candidateState, remaining)));
         break;
@@ -177,7 +194,11 @@ public final class CraftingPlanner {
           planRecipe(
               itemId, remaining, index + 1, definitions.get(index), childPath, candidateState, run);
       Fulfillment fulfillment =
-          new Fulfillment(itemId, existing.total() + produced, existing.inventory());
+          new Fulfillment(
+              itemId,
+              existing.total() + produced,
+              existing.playerInventory(),
+              existing.sourceAllocations());
       candidates.add(
           new Candidate(
               candidateState,
@@ -186,7 +207,8 @@ public final class CraftingPlanner {
               score(baseline, candidateState, remaining - produced)));
     }
     if (run.error != null || candidates.isEmpty()) {
-      return new Fulfillment(itemId, existing.total(), existing.inventory());
+      return new Fulfillment(
+          itemId, existing.total(), existing.playerInventory(), existing.sourceAllocations());
     }
     Candidate selected = candidates.stream().min(CANDIDATE_ORDER).orElseThrow();
     state.replaceWith(selected.state());
@@ -214,20 +236,22 @@ public final class CraftingPlanner {
         state.addIssue(CraftingPlanIssueType.PLAN_LIMIT, itemId, required, activePath);
         return 0;
       }
-      assessment = crafting.assessRecipe(variant, recipe, executions, state.supplies.counts());
+      assessment = crafting.assessRecipe(variant, recipe, executions, state.supplies);
     } catch (ArithmeticException exception) {
       state.addIssue(CraftingPlanIssueType.PLAN_LIMIT, itemId, required, activePath);
       return 0;
     }
 
-    List<TreeMap<String, Integer>> allocatedByIngredient = new ArrayList<>();
+    List<TreeMap<String, IngredientAllocation>> allocatedByIngredient = new ArrayList<>();
     for (IngredientAvailability ingredient : assessment.ingredients()) {
-      TreeMap<String, Integer> allocations = new TreeMap<>();
+      TreeMap<String, IngredientAllocation> allocations = new TreeMap<>();
       for (IngredientAllocation allocation : ingredient.allocations()) {
         // Reserve the whole maximum-flow result before recursion. Otherwise an earlier missing
         // branch could consume supply that the allocator assigned to a later ingredient.
-        state.supplies.consumeExact(allocation.itemId(), allocation.count());
-        allocations.merge(allocation.itemId(), allocation.count(), Math::addExact);
+        CraftingSupplyLedger.Consumption consumed =
+            state.supplies.consumeExact(allocation.itemId(), allocation.count());
+        mergeAllocation(
+            allocations, allocation.itemId(), allocation.count(), consumed.sourceAllocations());
       }
       allocatedByIngredient.add(allocations);
     }
@@ -238,7 +262,8 @@ public final class CraftingPlanner {
         ingredientIndex < assessment.ingredients().size();
         ingredientIndex++) {
       IngredientAvailability ingredient = assessment.ingredients().get(ingredientIndex);
-      TreeMap<String, Integer> allocations = allocatedByIngredient.get(ingredientIndex);
+      TreeMap<String, IngredientAllocation> allocations =
+          allocatedByIngredient.get(ingredientIndex);
       int available = ingredient.available();
       int unresolved = ingredient.missing();
       if (unresolved > 0) {
@@ -250,7 +275,11 @@ public final class CraftingPlanner {
         state.replaceWith(selected.state());
         int supplied = selected.fulfillment().fulfilled();
         if (supplied > 0) {
-          allocations.merge(selected.fulfillment().itemId(), supplied, Math::addExact);
+          mergeAllocation(
+              allocations,
+              selected.fulfillment().itemId(),
+              supplied,
+              selected.fulfillment().sourceAllocations());
           available = Math.addExact(available, supplied);
           unresolved -= supplied;
         }
@@ -258,10 +287,7 @@ public final class CraftingPlanner {
       if (unresolved > 0) {
         inputsResolved = false;
       }
-      List<IngredientAllocation> itemAllocations =
-          allocations.entrySet().stream()
-              .map(entry -> new IngredientAllocation(entry.getKey(), entry.getValue()))
-              .toList();
+      List<IngredientAllocation> itemAllocations = List.copyOf(allocations.values());
       plannedIngredients.add(
           new IngredientAvailability(
               ingredient.itemIds(),
@@ -292,6 +318,24 @@ public final class CraftingPlanner {
     return state.supplies.consume(itemId, required).total();
   }
 
+  private static void mergeAllocation(
+      TreeMap<String, IngredientAllocation> allocations,
+      String itemId,
+      int count,
+      List<FoundItemSource> sources) {
+    IngredientAllocation current = allocations.get(itemId);
+    if (current == null) {
+      allocations.put(itemId, new IngredientAllocation(itemId, count, sources));
+      return;
+    }
+    allocations.put(
+        itemId,
+        new IngredientAllocation(
+            itemId,
+            Math.addExact(current.count(), count),
+            CraftingSupplyLedger.mergeSources(current.sourceAllocations(), sources)));
+  }
+
   private Candidate selectAlternative(
       List<String> itemIds,
       int required,
@@ -316,7 +360,10 @@ public final class CraftingPlanner {
     }
     if (candidates.isEmpty()) {
       return new Candidate(
-          baseline, new Fulfillment(itemIds.getFirst(), 0, 0), 0, new Score(1, required, 0, 0));
+          baseline,
+          new Fulfillment(itemIds.getFirst(), 0, 0, List.of()),
+          0,
+          new Score(1, required, 0, 0));
     }
     return candidates.stream().min(CANDIDATE_ORDER).orElseThrow();
   }
@@ -359,14 +406,6 @@ public final class CraftingPlanner {
     return (long) recipe.result().count() * executions > MAX_REQUIRED_UNITS;
   }
 
-  private static Map<String, Integer> inventoryCounts(InventorySnapshot inventory) {
-    TreeMap<String, Integer> counts = new TreeMap<>();
-    for (InventorySlotInfo slot : Objects.requireNonNull(inventory, "inventory").slots()) {
-      counts.merge(slot.stack().itemId(), slot.stack().count(), Math::addExact);
-    }
-    return counts;
-  }
-
   private static List<String> append(List<String> path, String itemId) {
     ArrayList<String> result = new ArrayList<>(path);
     result.add(itemId);
@@ -380,7 +419,12 @@ public final class CraftingPlanner {
     return List.copyOf(result);
   }
 
-  private record Fulfillment(String itemId, int fulfilled, int inventoryUsed) {}
+  private record Fulfillment(
+      String itemId, int fulfilled, int inventoryUsed, List<FoundItemSource> sourceAllocations) {
+    private Fulfillment {
+      sourceAllocations = List.copyOf(sourceAllocations);
+    }
+  }
 
   private record Score(int issues, int unfulfilled, long missingUnits, int steps) {}
 
@@ -402,17 +446,17 @@ public final class CraftingPlanner {
   }
 
   private static final class PlanState {
-    private SupplyLedger supplies;
+    private CraftingSupplyLedger supplies;
     private List<StepDraft> steps;
     private TreeMap<String, Integer> missing;
     private List<CraftingPlanIssue> issues;
 
-    private PlanState(SupplyLedger supplies) {
+    private PlanState(CraftingSupplyLedger supplies) {
       this(supplies, new ArrayList<>(), new TreeMap<>(), new ArrayList<>());
     }
 
     private PlanState(
-        SupplyLedger supplies,
+        CraftingSupplyLedger supplies,
         List<StepDraft> steps,
         TreeMap<String, Integer> missing,
         List<CraftingPlanIssue> issues) {
@@ -449,65 +493,6 @@ public final class CraftingPlanner {
 
     private long missingUnits() {
       return missing.values().stream().mapToLong(Integer::longValue).sum();
-    }
-  }
-
-  private static final class SupplyLedger {
-    private final TreeMap<String, Integer> inventory;
-    private final TreeMap<String, Integer> crafted;
-
-    private SupplyLedger(Map<String, Integer> inventory) {
-      this(new TreeMap<>(inventory), new TreeMap<>());
-    }
-
-    private SupplyLedger(TreeMap<String, Integer> inventory, TreeMap<String, Integer> crafted) {
-      this.inventory = inventory;
-      this.crafted = crafted;
-    }
-
-    private SupplyLedger copy() {
-      return new SupplyLedger(new TreeMap<>(inventory), new TreeMap<>(crafted));
-    }
-
-    private Map<String, Integer> counts() {
-      TreeMap<String, Integer> counts = new TreeMap<>(inventory);
-      crafted.forEach((itemId, count) -> counts.merge(itemId, count, Math::addExact));
-      return counts;
-    }
-
-    private Consumption consume(String itemId, int requested) {
-      int fromInventory = take(inventory, itemId, requested);
-      int fromCrafting = take(crafted, itemId, requested - fromInventory);
-      return new Consumption(fromInventory, fromCrafting);
-    }
-
-    private void consumeExact(String itemId, int requested) {
-      Consumption consumed = consume(itemId, requested);
-      if (consumed.total() != requested) {
-        throw new IllegalStateException("allocation exceeded available supply for " + itemId);
-      }
-    }
-
-    private void addCrafted(String itemId, int count) {
-      crafted.merge(itemId, count, Math::addExact);
-    }
-
-    private static int take(Map<String, Integer> source, String itemId, int requested) {
-      int available = source.getOrDefault(itemId, 0);
-      int consumed = Math.min(available, requested);
-      int remaining = available - consumed;
-      if (remaining == 0) {
-        source.remove(itemId);
-      } else {
-        source.put(itemId, remaining);
-      }
-      return consumed;
-    }
-  }
-
-  private record Consumption(int inventory, int crafted) {
-    private int total() {
-      return Math.addExact(inventory, crafted);
     }
   }
 }

@@ -20,6 +20,18 @@ public record FoundItemSource(
     BlockPosition containerPosition,
     String containerTypeId,
     Double distance) {
+  private static final Comparator<FoundItemSource> ORDER =
+      Comparator.comparing(FoundItemSource::sourceType)
+          .thenComparing(source -> source.distance() == null ? -1D : source.distance())
+          .thenComparing(
+              source -> source.containerPosition() == null ? 0 : source.containerPosition().x())
+          .thenComparing(
+              source -> source.containerPosition() == null ? 0 : source.containerPosition().y())
+          .thenComparing(
+              source -> source.containerPosition() == null ? 0 : source.containerPosition().z())
+          .thenComparing(
+              source -> source.containerTypeId() == null ? "" : source.containerTypeId());
+
   public FoundItemSource {
     Objects.requireNonNull(sourceType, "sourceType");
     if (count <= 0) {
@@ -53,6 +65,25 @@ public record FoundItemSource(
         containerPosition,
         containerTypeId,
         distance);
+  }
+
+  /** Returns immutable deterministic source locations and rejects duplicate source identities. */
+  public static List<FoundItemSource> normalized(List<FoundItemSource> sources, String name) {
+    List<FoundItemSource> normalized =
+        ModelValidation.immutableList(sources, name).stream().sorted(ORDER).toList();
+    Set<String> keys = new HashSet<>();
+    for (FoundItemSource source : normalized) {
+      String key =
+          source.sourceType()
+              + ":"
+              + Objects.toString(source.containerPosition(), "")
+              + ":"
+              + Objects.toString(source.containerTypeId(), "");
+      if (!keys.add(key)) {
+        throw new IllegalArgumentException(name + " contains a duplicate source location");
+      }
+    }
+    return normalized;
   }
 
   private static void validateLocation(

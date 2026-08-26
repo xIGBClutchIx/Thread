@@ -163,6 +163,15 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "menu live item search rejection");
+    JsonObject expandedCrafting = new JsonObject();
+    expandedCrafting.addProperty("itemId", "minecraft:command_block");
+    expandedCrafting.addProperty("scope", "PLAYER_AND_NEARBY");
+    assertToolError(
+        mcpToolResult(endpoint, 9, "minecraft.can_craft", expandedCrafting),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu expanded crafting rejection");
   }
 
   /** Verifies the common single-player catalog, native recipes, crafting, and MCP behavior. */
@@ -216,10 +225,35 @@ public final class LoaderParityAssertions {
     assertEquals(1, recipeOccurrences(recipe, "minecraft:stone"), "native recipe stone input");
     JsonObject craftability =
         invoke(tools, "minecraft.can_craft", "{\"itemId\":\"minecraft:command_block\"}");
+    assertEquals("PLAYER_ONLY", craftability.get("scope").getAsString(), "default crafting scope");
+    assertTrue(
+        craftability.getAsJsonObject("sourceStatus").get("complete").getAsBoolean(),
+        "default source snapshot completeness");
     assertEquals(
         nativeRecipeCraftable,
         craftability.get("craftable").getAsBoolean(),
         "native recipe craftability");
+    JsonObject explicitPlayer =
+        invoke(
+            tools,
+            "minecraft.can_craft",
+            "{\"itemId\":\"minecraft:command_block\",\"scope\":\"PLAYER_ONLY\"}");
+    assertEquals(craftability, explicitPlayer, "explicit player-only crafting parity");
+    JsonObject expandedCraftability =
+        invoke(
+            tools,
+            "minecraft.can_craft",
+            "{\"itemId\":\"minecraft:command_block\",\"scope\":\"PLAYER_AND_NEARBY\"}");
+    assertEquals(
+        "PLAYER_AND_NEARBY", expandedCraftability.get("scope").getAsString(), "expanded scope");
+    assertEquals(
+        16D,
+        expandedCraftability.getAsJsonObject("sourceStatus").get("nearbyRadius").getAsDouble(),
+        "expanded crafting radius");
+    assertEquals(
+        nativeRecipeCraftable,
+        expandedCraftability.get("craftable").getAsBoolean(),
+        "expanded native recipe craftability");
     JsonObject missing =
         invoke(
             tools, "minecraft.get_missing_ingredients", "{\"itemId\":\"minecraft:command_block\"}");
@@ -227,10 +261,12 @@ public final class LoaderParityAssertions {
         nativeRecipeCraftable,
         missing.get("craftable").getAsBoolean(),
         "native recipe missing ingredients");
+    assertEquals("PLAYER_ONLY", missing.get("scope").getAsString(), "missing default scope");
     JsonObject plan =
         invoke(
             tools, "minecraft.get_crafting_plan", "{\"itemId\":\"minecraft:chain_command_block\"}");
     assertEquals(nativeRecipeCraftable, plan.get("craftable").getAsBoolean(), "native recipe plan");
+    assertEquals("PLAYER_ONLY", plan.get("scope").getAsString(), "plan default scope");
     assertEquals(
         nativeRecipeCraftable,
         plan.getAsJsonArray("missingMaterials").isEmpty(),
@@ -264,6 +300,14 @@ public final class LoaderParityAssertions {
             .get("craftable")
             .getAsBoolean(),
         "MCP craftability");
+    JsonObject expandedRecipeArguments = recipeArguments.deepCopy();
+    expandedRecipeArguments.addProperty("scope", "PLAYER_AND_NEARBY");
+    assertEquals(
+        "PLAYER_AND_NEARBY",
+        mcpTool(endpoint, 27, "minecraft.can_craft", expandedRecipeArguments)
+            .get("scope")
+            .getAsString(),
+        "MCP expanded crafting scope");
     JsonObject nearbyContainerArguments = new JsonObject();
     nearbyContainerArguments.addProperty("radius", 16);
     nearbyContainerArguments.addProperty("limit", 8);
@@ -318,6 +362,15 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "return-to-menu live item search rejection");
+    JsonObject expandedCrafting = new JsonObject();
+    expandedCrafting.addProperty("itemId", "minecraft:command_block");
+    expandedCrafting.addProperty("scope", "PLAYER_AND_NEARBY");
+    assertToolError(
+        mcpToolResult(runtime.mcpServer().endpoint(), 34, "minecraft.can_craft", expandedCrafting),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu expanded crafting rejection");
     assertTrue(runtime.mcpRunning(), "MCP listener survives world close");
   }
 

@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.Optional;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
+import me.clutchy.thread.core.model.crafting.CraftingQuery;
 import me.clutchy.thread.core.model.crafting.CraftingResult;
+import me.clutchy.thread.core.model.crafting.CraftingScope;
 import me.clutchy.thread.core.model.crafting.IngredientAvailability;
 import me.clutchy.thread.core.model.crafting.RecipeCraftability;
 import me.clutchy.thread.core.model.item.ItemInfo;
@@ -21,16 +23,16 @@ import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
-import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
+import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
 
 class CraftingServiceTest {
-  private static final RecipeLookupQuery PICKAXE =
-      new RecipeLookupQuery("minecraft:diamond_pickaxe");
+  private static final CraftingQuery PICKAXE =
+      new CraftingQuery("minecraft:diamond_pickaxe", CraftingScope.PLAYER_ONLY);
 
   @Test
   void marksACompleteShapedRecipeCraftable() {
@@ -140,14 +142,16 @@ class CraftingServiceTest {
   @Test
   void returnsAnEmptyDeterministicResultWhenNoRecipeMatches() {
     FakePlayerProvider player = new FakePlayerProvider(inventory(stack("minecraft:diamond", 64)));
-    CraftingService service = new CraftingService(player, new FakeRecipeProvider(List.of()));
+    CraftingService service =
+        new CraftingService(
+            CraftingItemSourceProvider.playerOnly(player), new FakeRecipeProvider(List.of()));
 
     ToolResult<CraftingResult> result = service.assess(PICKAXE);
 
     assertTrue(result.successful());
     assertFalse(result.value().craftable());
     assertTrue(result.value().recipes().isEmpty());
-    assertEquals(0, player.inventoryReads);
+    assertEquals(1, player.inventoryReads);
   }
 
   @Test
@@ -185,7 +189,7 @@ class CraftingServiceTest {
     assertEquals(
         ToolErrorCode.WORLD_NOT_AVAILABLE,
         new CraftingService(
-                new FakePlayerProvider(inventory()),
+                CraftingItemSourceProvider.playerOnly(new FakePlayerProvider(inventory())),
                 new FailingRecipeProvider(ToolErrorCode.WORLD_NOT_AVAILABLE))
             .assess(PICKAXE)
             .error()
@@ -200,7 +204,10 @@ class CraftingServiceTest {
                     ingredient("minecraft:diamond", 3))));
     assertEquals(
         ToolErrorCode.UNSUPPORTED,
-        new CraftingService(new FailingPlayerProvider(ToolErrorCode.UNSUPPORTED), availableRecipes)
+        new CraftingService(
+                CraftingItemSourceProvider.playerOnly(
+                    new FailingPlayerProvider(ToolErrorCode.UNSUPPORTED)),
+                availableRecipes)
             .assess(PICKAXE)
             .error()
             .code());
@@ -209,7 +216,8 @@ class CraftingServiceTest {
   private static CraftingResult assess(InventorySnapshot inventory, RecipeInfo... recipes) {
     ToolResult<CraftingResult> result =
         new CraftingService(
-                new FakePlayerProvider(inventory), new FakeRecipeProvider(List.of(recipes)))
+                CraftingItemSourceProvider.playerOnly(new FakePlayerProvider(inventory)),
+                new FakeRecipeProvider(List.of(recipes)))
             .assess(PICKAXE);
     assertTrue(result.successful(), () -> String.valueOf(result.error()));
     return result.value();

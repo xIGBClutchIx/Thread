@@ -203,7 +203,7 @@ class ArchitectureBoundaryTest {
   }
 
   @Test
-  void craftingServicesRemainIndependentOfWorldAndContainerState() throws IOException {
+  void craftingServicesConsumeOnlyDetachedItemSourceSnapshots() throws IOException {
     for (String service : List.of("CraftingService.java", "CraftingPlanner.java")) {
       Path source = COMMON_SOURCE_ROOT.resolve("me/clutchy/thread/core/service").resolve(service);
       String contents = Files.readString(source, StandardCharsets.UTF_8);
@@ -211,9 +211,8 @@ class ArchitectureBoundaryTest {
       assertFalse(contents.contains("NearbyContainer"), source::toString);
       assertFalse(contents.contains("ContainerInspection"), source::toString);
       assertFalse(contents.contains("ItemFinder"), source::toString);
-      assertFalse(contents.contains("ItemSource"), source::toString);
-      assertFalse(contents.contains("FoundItem"), source::toString);
       assertFalse(contents.contains("find_item"), source::toString);
+      assertTrue(contents.contains("CraftingItemSourceProvider"), source::toString);
     }
   }
 

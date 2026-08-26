@@ -137,7 +137,10 @@ final class VanillaToolSchemas {
           property("result", ITEM_STACK),
           property("ingredients", array(RECIPE_INGREDIENT)));
   private static final JsonObject INGREDIENT_ALLOCATION =
-      object(property("itemId", registryId()), property("count", integer(1, null)));
+      object(
+          property("itemId", registryId()),
+          property("count", integer(1, null)),
+          property("sourceAllocations", array(FOUND_ITEM_SOURCE)));
   private static final JsonObject INGREDIENT_AVAILABILITY =
       object(
           property("itemIds", array(registryId())),
@@ -172,6 +175,14 @@ final class VanillaToolSchemas {
           property("itemId", registryId()),
           property("required", integer(1, null)),
           property("path", boundedArray(registryId(), 1, 33)));
+  private static final JsonObject CRAFTING_SOURCE_STATUS =
+      object(
+          property("complete", bool()),
+          property("nearbyRadius", nullable(number(0.0, null))),
+          property("nearbyContainerLimit", nullable(integer(1, null))),
+          property("nearbyContainersTruncated", bool()),
+          property("unresolvedContainersSkipped", integer(0, null)),
+          property("contentLimitedContainersSkipped", integer(0, null)));
   private static final JsonObject INTEGRATION_METADATA_ENTRY =
       object(
           property("key", string(1, 128, INTEGRATION_METADATA_KEY_PATTERN)),
@@ -249,20 +260,30 @@ final class VanillaToolSchemas {
               property("entities", array(ENTITY_INFO))));
   static final JsonSchema RECIPE_LOOKUP_QUERY =
       schema(object(property("itemId", string(1, 256, REGISTRY_ID_PATTERN))));
+  static final JsonSchema CRAFTING_QUERY =
+      schema(
+          object(
+              property("itemId", string(1, 256, REGISTRY_ID_PATTERN)),
+              optionalProperty("scope", craftingScope())));
   static final JsonSchema RECIPE_LOOKUP_RESULT =
       schema(object(property("itemId", registryId()), property("recipes", array(RECIPE_INFO))));
   static final JsonSchema CRAFTING_RESULT =
       schema(
           object(
               property("itemId", registryId()),
+              property("scope", enumString("PLAYER_ONLY", "PLAYER_AND_NEARBY")),
+              property("sourceStatus", CRAFTING_SOURCE_STATUS),
               property("craftable", bool()),
               property("recipes", array(RECIPE_CRAFTABILITY))));
   static final JsonSchema CRAFTING_PLAN =
       schema(
           object(
               property("itemId", registryId()),
+              property("scope", enumString("PLAYER_ONLY", "PLAYER_AND_NEARBY")),
+              property("sourceStatus", CRAFTING_SOURCE_STATUS),
               property("requested", integer(1, null)),
               property("satisfiedFromInventory", integer(0, null)),
+              property("satisfiedFromSources", array(FOUND_ITEM_SOURCE)),
               property("craftable", bool()),
               property("maxDepth", integer(1, null)),
               property("steps", boundedArray(CRAFTING_PLAN_STEP, 0, 512)),
@@ -314,7 +335,9 @@ final class VanillaToolSchemas {
     JsonArray required = new JsonArray();
     for (Property property : properties) {
       propertySchemas.add(property.name(), property.schema().deepCopy());
-      required.add(property.name());
+      if (property.required()) {
+        required.add(property.name());
+      }
     }
     schema.add("properties", propertySchemas);
     schema.add("required", required);
@@ -411,6 +434,17 @@ final class VanillaToolSchemas {
     return typed("boolean");
   }
 
+  private static JsonObject craftingScope() {
+    JsonObject schema = enumString("PLAYER_ONLY", "PLAYER_AND_NEARBY");
+    schema.addProperty("default", "PLAYER_ONLY");
+    schema.addProperty(
+        "description",
+        "PLAYER_ONLY uses the 36-slot main inventory and is the default. "
+            + "PLAYER_AND_NEARBY explicitly adds eligible nearby loaded containers within "
+            + "Thread's configured bounds; results report incomplete or truncated discovery.");
+    return schema;
+  }
+
   private static JsonObject nullable(JsonObject requiredSchema) {
     JsonObject schema = requiredSchema.deepCopy();
     String declaredType = schema.get("type").getAsString();
@@ -428,8 +462,12 @@ final class VanillaToolSchemas {
   }
 
   private static Property property(String name, JsonObject schema) {
-    return new Property(name, schema);
+    return new Property(name, schema, true);
   }
 
-  private record Property(String name, JsonObject schema) {}
+  private static Property optionalProperty(String name, JsonObject schema) {
+    return new Property(name, schema, false);
+  }
+
+  private record Property(String name, JsonObject schema, boolean required) {}
 }

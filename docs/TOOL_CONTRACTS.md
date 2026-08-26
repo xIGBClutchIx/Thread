@@ -475,22 +475,36 @@ members and the tag that supplied them.
 
 ## `minecraft.can_craft`
 
-Purpose: determine whether the player's current main inventory satisfies at least one live recipe
+Purpose: determine whether the item sources selected by `scope` satisfy at least one live recipe
 variant for the requested item. It assesses one recipe execution and performs no crafting action.
 
 Input:
 
 ```json
 {
-  "itemId": "minecraft:diamond_pickaxe"
+  "itemId": "minecraft:diamond_pickaxe",
+  "scope": "PLAYER_ONLY"
 }
 ```
+
+`scope` is optional. `PLAYER_ONLY` is the default and reads only the player's 36-slot main
+inventory. `PLAYER_AND_NEARBY` explicitly adds eligible containers from one bounded scan of already
+loaded chunks. Equipment is not crafting supply in either scope.
 
 Example result:
 
 ```json
 {
   "itemId": "minecraft:diamond_pickaxe",
+  "scope": "PLAYER_ONLY",
+  "sourceStatus": {
+    "complete": true,
+    "nearbyRadius": null,
+    "nearbyContainerLimit": null,
+    "nearbyContainersTruncated": false,
+    "unresolvedContainersSkipped": 0,
+    "contentLimitedContainersSkipped": 0
+  },
   "craftable": false,
   "recipes": [
     {
@@ -507,7 +521,22 @@ Example result:
           "available": 2,
           "missing": 1,
           "allocations": [
-            {"itemId": "minecraft:diamond", "count": 2}
+            {
+              "itemId": "minecraft:diamond",
+              "count": 2,
+              "sourceAllocations": [
+                {
+                  "sourceType": "PLAYER_INVENTORY",
+                  "count": 2,
+                  "inventorySlots": [9],
+                  "equipmentSlots": [],
+                  "containerSlots": [],
+                  "containerPosition": null,
+                  "containerTypeId": null,
+                  "distance": null
+                }
+              ]
+            }
           ]
         },
         {
@@ -517,7 +546,22 @@ Example result:
           "available": 2,
           "missing": 0,
           "allocations": [
-            {"itemId": "minecraft:stick", "count": 2}
+            {
+              "itemId": "minecraft:stick",
+              "count": 2,
+              "sourceAllocations": [
+                {
+                  "sourceType": "PLAYER_INVENTORY",
+                  "count": 2,
+                  "inventorySlots": [10],
+                  "equipmentSlots": [],
+                  "containerSlots": [],
+                  "containerPosition": null,
+                  "containerTypeId": null,
+                  "distance": null
+                }
+              ]
+            }
           ]
         }
       ]
@@ -531,14 +575,22 @@ entry even when recipe IDs repeat. `variant` is a stable one-based ordinal assig
 sorting and identifies an individual returned variant.
 
 `available` is the number actually allocated to that ingredient group, not a sum that another
-ingredient may also claim. `allocations` shows the deterministic item choices made from alternatives.
-The allocation maximizes satisfied requirements while consuming each inventory unit at most once.
-Identical ingredient groups are merged before assessment, even if a provider supplies duplicates.
-A supported lookup with no matching recipe returns `craftable: false` and an empty `recipes` array.
+ingredient may also claim. `allocations` shows the deterministic item choices made from
+alternatives, and each `sourceAllocations` list identifies the live player slots or specific
+containers that supplied those units. Player sources are consumed first, then nearby containers in
+distance/position/type order. The allocation maximizes satisfied requirements while consuming each
+item unit at most once. Identical ingredient groups are merged before assessment, even if a
+provider supplies duplicates. A supported lookup with no matching recipe returns `craftable: false`
+and an empty `recipes` array.
+
+For expanded scope, `sourceStatus` reports the applied radius/container bounds. `complete: false`
+means the answer describes the observed safe snapshot but may be conservative because the bounded
+scan truncated, unopened loot was excluded, or a container's contents exceeded the safe content
+representation. Thread never guesses those contents or loads a chunk to complete the answer.
 
 ## `minecraft.get_missing_ingredients`
 
-Purpose: explain shortages for every live recipe variant using the same fresh recipe/inventory
+Purpose: explain shortages for every live recipe variant using the same one-snapshot scoped
 assessment as `minecraft.can_craft`.
 
 Input and result use the same contract as `minecraft.can_craft`. Each ingredient remains present so
@@ -546,31 +598,44 @@ clients can explain the complete requirement; entries with `missing` greater tha
 unmet requirements. This prevents a missing-only projection from hiding how alternative items were
 allocated across overlapping ingredient groups.
 
-Both tools support shaped and shapeless recipes represented by the recipe provider. They inspect
-only the player's 36 main-inventory slots and do not inspect equipment, nearby storage, crafting
-stations, or fuel.
+Both tools support shaped and shapeless recipes represented by the recipe provider. They never
+inspect equipment, crafting stations, or fuel. Nearby storage is read only when the request
+explicitly selects `PLAYER_AND_NEARBY`.
 
 ## `minecraft.get_crafting_plan`
 
 Purpose: recursively explain the intermediate crafts and final raw materials needed for one target
-item from the player's current 36-slot main inventory. The tool is read-only and performs no
-crafting action.
+item from the item sources selected by `scope`. The tool is read-only and performs no crafting
+action.
 
 Input uses the same canonical `itemId` contract as recipe lookup:
 
 ```json
 {
-  "itemId": "minecraft:crafting_table"
+  "itemId": "minecraft:crafting_table",
+  "scope": "PLAYER_ONLY"
 }
 ```
+
+`scope` has the same optional enum and `PLAYER_ONLY` default as direct craftability.
 
 Representative result when the inventory contains one oak log:
 
 ```json
 {
   "itemId": "minecraft:crafting_table",
+  "scope": "PLAYER_ONLY",
+  "sourceStatus": {
+    "complete": true,
+    "nearbyRadius": null,
+    "nearbyContainerLimit": null,
+    "nearbyContainersTruncated": false,
+    "unresolvedContainersSkipped": 0,
+    "contentLimitedContainersSkipped": 0
+  },
   "requested": 1,
   "satisfiedFromInventory": 0,
+  "satisfiedFromSources": [],
   "craftable": true,
   "maxDepth": 32,
   "steps": [
@@ -589,7 +654,24 @@ Representative result when the inventory contains one oak log:
           "required": 1,
           "available": 1,
           "missing": 0,
-          "allocations": [{"itemId": "minecraft:oak_log", "count": 1}]
+          "allocations": [
+            {
+              "itemId": "minecraft:oak_log",
+              "count": 1,
+              "sourceAllocations": [
+                {
+                  "sourceType": "PLAYER_INVENTORY",
+                  "count": 1,
+                  "inventorySlots": [9],
+                  "equipmentSlots": [],
+                  "containerSlots": [],
+                  "containerPosition": null,
+                  "containerTypeId": null,
+                  "distance": null
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -608,7 +690,9 @@ Representative result when the inventory contains one oak log:
           "required": 4,
           "available": 4,
           "missing": 0,
-          "allocations": [{"itemId": "minecraft:oak_planks", "count": 4}]
+          "allocations": [
+            {"itemId": "minecraft:oak_planks", "count": 4, "sourceAllocations": []}
+          ]
         }
       ]
     }
@@ -627,6 +711,11 @@ that can satisfy a later branch. Ingredient allocations include current inventor
 intermediate output, and raw materials listed for acquisition. A step-level `missing` count is
 therefore reserved for a branch that could not be resolved safely; unavailable raw leaves instead
 appear in the top-level `missingMaterials` list.
+
+`satisfiedFromInventory` is retained as the main-inventory portion of a target already present.
+`satisfiedFromSources` locates every live source that directly satisfied that target. Step
+allocations likewise locate live inputs; a planned intermediate output or hypothetical raw
+acquisition has an empty `sourceAllocations` list because it has no live slot or container location.
 
 `craftable` is true only when the current inventory can complete the plan without acquiring a raw
 material and no safety issue stopped a branch. A target already present may be satisfied directly,
@@ -654,17 +743,18 @@ path, so the same item can validly appear in separate branches. The production m
 step, explored-branch, and scaled-quantity ceilings provide additional bounds. A non-cyclic variant
 is preferred over a cyclic one under the deterministic selection order.
 
-The planner does not inspect equipment or nearby storage, model crafting stations/fuel, perform
-automatic crafting, or mutate the game. It remains unaware of recipe-viewer APIs. Base Thread reads
-Minecraft's final live recipe manager, including active vanilla, datapack, and installed-mod additions,
-replacements, and removals; it does not use a static vanilla recipe list. A future separate Thread
-Integrations package may contribute detached recipes through the same `RecipeProvider` extension
-without changing this contract.
+The planner does not inspect equipment, model crafting stations/fuel, perform automatic crafting,
+move items, or mutate the game. Nearby storage is eligible only under explicit
+`PLAYER_AND_NEARBY`, with the same `sourceStatus` caveat as direct assessment. It remains unaware of
+recipe-viewer APIs. Base Thread reads Minecraft's final live recipe manager, including active
+vanilla, datapack, and installed-mod additions, replacements, and removals; it does not use a static
+vanilla recipe list. A future separate Thread Integrations package may contribute detached recipes
+or item sources through explicit integration wiring without changing the planner.
 
 ## `minecraft.find_item`
 
 Purpose: find matching items across the player's live inventory, offhand/armor, and nearby loaded
-containers without moving items or changing crafting inputs.
+containers without moving items or implicitly changing crafting inputs.
 
 Input:
 
@@ -747,9 +837,10 @@ Unopened loot and any container whose full contents cannot be represented safely
 item totals rather than guessed. `containersTruncated` and `itemsTruncated` tell the client when the
 requested bounds omitted additional candidates.
 
-This tool is live lookup context only. `minecraft.can_craft`,
-`minecraft.get_missing_ingredients`, and `minecraft.get_crafting_plan` continue to read only the
-player's 36-slot main inventory and never consume this result.
+This tool is live lookup context only; crafting never consumes its search result. The three
+crafting tools independently build one source snapshot per invocation: they read only the player's
+36-slot main inventory by default and add eligible nearby containers only for explicit
+`PLAYER_AND_NEARBY` requests.
 
 ## `minecraft.search_items`
 

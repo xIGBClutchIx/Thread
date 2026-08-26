@@ -14,6 +14,8 @@ import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.model.crafting.CraftingPlan;
 import me.clutchy.thread.core.model.crafting.CraftingPlanIssueType;
+import me.clutchy.thread.core.model.crafting.CraftingQuery;
+import me.clutchy.thread.core.model.crafting.CraftingScope;
 import me.clutchy.thread.core.model.item.ItemInfo;
 import me.clutchy.thread.core.model.item.ItemSearchResult;
 import me.clutchy.thread.core.model.item.ItemStackInfo;
@@ -23,10 +25,10 @@ import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
-import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
+import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
 
@@ -238,8 +240,10 @@ class CraftingPlannerTest {
   private static ToolResult<CraftingPlan> planFailure(ToolErrorCode code) {
     PlayerProvider player = new FailingPlayerProvider(code);
     MapRecipeProvider provider = provider();
-    CraftingService service = new CraftingService(player, provider);
-    return new CraftingPlanner(player, provider, service).plan(new RecipeLookupQuery(TARGET));
+    CraftingItemSourceProvider sources = CraftingItemSourceProvider.playerOnly(player);
+    CraftingService service = new CraftingService(sources, provider);
+    return new CraftingPlanner(sources, provider, service)
+        .plan(new CraftingQuery(TARGET, CraftingScope.PLAYER_ONLY));
   }
 
   private static CraftingPlan plan(InventorySnapshot inventory, RecipeInfo... recipes) {
@@ -249,10 +253,11 @@ class CraftingPlannerTest {
   private static CraftingPlan plan(
       InventorySnapshot inventory, MapRecipeProvider provider, int maxDepth) {
     FakePlayerProvider player = new FakePlayerProvider(inventory);
-    CraftingService service = new CraftingService(player, provider);
+    CraftingItemSourceProvider sources = CraftingItemSourceProvider.playerOnly(player);
+    CraftingService service = new CraftingService(sources, provider);
     ToolResult<CraftingPlan> result =
-        new CraftingPlanner(player, provider, service, maxDepth, 64, 512)
-            .plan(new RecipeLookupQuery(TARGET));
+        new CraftingPlanner(sources, provider, service, maxDepth, 64, 512)
+            .plan(new CraftingQuery(TARGET, CraftingScope.PLAYER_ONLY));
     assertTrue(result.successful(), () -> String.valueOf(result.error()));
     return result.value();
   }

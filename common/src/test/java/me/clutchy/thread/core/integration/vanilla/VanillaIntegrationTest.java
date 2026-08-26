@@ -231,6 +231,38 @@ class VanillaIntegrationTest {
   }
 
   @Test
+  void craftingSchemasDocumentTheOptionalScopeAndItsDefault() {
+    Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
+
+    for (String toolId :
+        List.of(
+            "minecraft.can_craft",
+            "minecraft.get_missing_ingredients",
+            "minecraft.get_crafting_plan")) {
+      ToolDescriptor descriptor =
+          catalog.tools().descriptors().stream()
+              .filter(candidate -> candidate.id().toString().equals(toolId))
+              .findFirst()
+              .orElseThrow();
+      JsonObject input = descriptor.inputSchema().document();
+      assertFalse(
+          input.getAsJsonArray("required").asList().stream()
+              .map(JsonElement::getAsString)
+              .anyMatch("scope"::equals),
+          toolId);
+      JsonObject scope = input.getAsJsonObject("properties").getAsJsonObject("scope");
+      assertEquals("PLAYER_ONLY", scope.get("default").getAsString(), toolId);
+      assertEquals(
+          List.of("PLAYER_ONLY", "PLAYER_AND_NEARBY"),
+          scope.getAsJsonArray("enum").asList().stream().map(JsonElement::getAsString).toList(),
+          toolId);
+      assertTrue(scope.get("description").getAsString().contains("PLAYER_ONLY"), toolId);
+      assertTrue(scope.get("description").getAsString().contains("PLAYER_AND_NEARBY"), toolId);
+      assertTrue(scope.get("description").getAsString().contains("incomplete"), toolId);
+    }
+  }
+
+  @Test
   void advertisesAccurateAvailabilityAndKeepsMenuSafeToolsCallable() {
     Catalog catalog = catalog(new MenuGameProvider(), new FailingPlayerProvider());
 
@@ -281,6 +313,10 @@ class VanillaIntegrationTest {
     assertInvalid(catalog.tools(), "minecraft.get_recipe", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(
+        catalog.tools(),
+        "minecraft.can_craft",
+        "{\"itemId\":\"minecraft:stick\",\"scope\":\"EVERYWHERE\"}");
+    assertInvalid(
         catalog.tools(), "minecraft.get_missing_ingredients", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(
         catalog.tools(), "minecraft.get_crafting_plan", "{\"itemId\":\"not a registry id\"}");
@@ -292,11 +328,30 @@ class VanillaIntegrationTest {
   }
 
   @Test
+  void craftingScopeDefaultsToPlayerOnlyAndAcceptsTheExplicitEquivalent() {
+    Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
+
+    JsonObject omitted =
+        invoke(
+            catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
+    JsonObject explicit =
+        invoke(
+            catalog.tools(),
+            "minecraft.can_craft",
+            "{\"itemId\":\"minecraft:diamond_pickaxe\",\"scope\":\"PLAYER_ONLY\"}");
+
+    assertEquals(omitted, explicit);
+    assertEquals("PLAYER_ONLY", omitted.get("scope").getAsString());
+    assertTrue(omitted.getAsJsonObject("sourceStatus").get("complete").getAsBoolean());
+    assertTrue(omitted.getAsJsonObject("sourceStatus").get("nearbyRadius").isJsonNull());
+  }
+
+  @Test
   void craftingToolsPreserveNoWorldAndMultiplayerFailures() {
     assertToolFailure(
         catalog(
                 new MenuGameProvider(),
-                new FailingPlayerProvider(),
+                new UnavailablePlayerProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
                 new UnavailableRecipeProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
                 ignored -> true)
             .tools(),
@@ -305,7 +360,7 @@ class VanillaIntegrationTest {
     assertToolFailure(
         catalog(
                 new MultiplayerGameProvider(),
-                new FailingPlayerProvider(),
+                new UnavailablePlayerProvider(ToolErrorCode.UNSUPPORTED),
                 new UnavailableRecipeProvider(ToolErrorCode.UNSUPPORTED),
                 ignored -> true)
             .tools(),
@@ -328,6 +383,28 @@ class VanillaIntegrationTest {
                 ignored -> true)
             .tools(),
         "minecraft.get_crafting_plan",
+        ToolErrorCode.UNSUPPORTED);
+    assertToolFailure(
+        catalog(
+                new MenuGameProvider(),
+                new UnavailablePlayerProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
+                new UnavailableWorldProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
+                new FakeRecipeProvider(),
+                ignored -> true)
+            .tools(),
+        "minecraft.can_craft",
+        "{\"itemId\":\"minecraft:diamond_pickaxe\",\"scope\":\"PLAYER_AND_NEARBY\"}",
+        ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertToolFailure(
+        catalog(
+                new MultiplayerGameProvider(),
+                new UnavailablePlayerProvider(ToolErrorCode.UNSUPPORTED),
+                new UnavailableWorldProvider(ToolErrorCode.UNSUPPORTED),
+                new FakeRecipeProvider(),
+                ignored -> true)
+            .tools(),
+        "minecraft.get_crafting_plan",
+        "{\"itemId\":\"minecraft:diamond_pickaxe\",\"scope\":\"PLAYER_AND_NEARBY\"}",
         ToolErrorCode.UNSUPPORTED);
   }
 
@@ -371,12 +448,17 @@ class VanillaIntegrationTest {
   }
 
   @Test
-  void nearbyItemMatchesNeverBecomeCraftingInventory() {
-    PlayerProvider emptyPlayer =
+  void nearbyItemsAffectCraftingOnlyWhenExplicitlyRequested() {
+    PlayerProvider partialPlayer =
         new FakePlayerProvider() {
           @Override
           public ToolResult<InventorySnapshot> inventory() {
-            return ToolResult.success(new InventorySnapshot(0, List.of()));
+            return ToolResult.success(
+                new InventorySnapshot(
+                    0,
+                    List.of(
+                        new InventorySlotInfo(0, item("minecraft:diamond", "Diamond", 1, 64)),
+                        new InventorySlotInfo(1, item("minecraft:stick", "Stick", 2, 64)))));
           }
 
           @Override
@@ -384,7 +466,7 @@ class VanillaIntegrationTest {
             return ToolResult.success(equipmentWithMainHand(null));
           }
         };
-    Catalog catalog = catalog(new SupportedGameProvider(), emptyPlayer);
+    Catalog catalog = catalog(new SupportedGameProvider(), partialPlayer);
 
     JsonObject found =
         invoke(
@@ -393,25 +475,26 @@ class VanillaIntegrationTest {
             "{\"query\":\"minecraft:diamond\",\"radius\":8,"
                 + "\"containerLimit\":8,\"itemLimit\":16}");
 
-    assertEquals(2, first(found, "matches").get("totalCount").getAsInt());
-    assertFalse(
-        invoke(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"minecraft:diamond_pickaxe\"}")
-            .get("craftable")
-            .getAsBoolean());
-    assertFalse(
-        invoke(
-                catalog.tools(),
-                "minecraft.get_missing_ingredients",
-                "{\"itemId\":\"minecraft:diamond_pickaxe\"}")
-            .get("craftable")
-            .getAsBoolean());
-    assertFalse(
-        invoke(
-                catalog.tools(),
-                "minecraft.get_crafting_plan",
-                "{\"itemId\":\"minecraft:diamond_pickaxe\"}")
-            .get("craftable")
-            .getAsBoolean());
+    assertEquals(3, first(found, "matches").get("totalCount").getAsInt());
+    for (String tool :
+        List.of(
+            "minecraft.can_craft",
+            "minecraft.get_missing_ingredients",
+            "minecraft.get_crafting_plan")) {
+      JsonObject playerOnly =
+          invoke(catalog.tools(), tool, "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
+      JsonObject expanded =
+          invoke(
+              catalog.tools(),
+              tool,
+              "{\"itemId\":\"minecraft:diamond_pickaxe\"," + "\"scope\":\"PLAYER_AND_NEARBY\"}");
+      assertFalse(playerOnly.get("craftable").getAsBoolean(), tool);
+      assertEquals("PLAYER_ONLY", playerOnly.get("scope").getAsString(), tool);
+      assertTrue(expanded.get("craftable").getAsBoolean(), tool);
+      assertEquals("PLAYER_AND_NEARBY", expanded.get("scope").getAsString(), tool);
+      assertEquals(
+          16, expanded.getAsJsonObject("sourceStatus").get("nearbyRadius").getAsDouble(), tool);
+    }
   }
 
   @Test
@@ -571,6 +654,7 @@ class VanillaIntegrationTest {
             player,
             world,
             recipes,
+            new NearbyContainerQuery(16, 64),
             enabledTools,
             () -> integrations.capabilities(game.gameInfo().threadVersion())));
     return new Catalog(tools, integrations);

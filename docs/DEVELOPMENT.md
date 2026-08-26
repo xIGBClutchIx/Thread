@@ -176,8 +176,9 @@ Use the release JAR, not a development run, for the final human check:
    nearby-entity, nearby-container, container-inspection, unified live item search, recipe,
    crafting, registry search, and capability tools.
 6. Confirm tools return detached bounded data, recipes reflect the live world, container searches
-   skip unloaded chunks, and no call mutates the game. Confirm `minecraft.find_item` can report
-   nearby contents while crafting answers do not change when items exist only in those containers.
+   skip unloaded chunks, and no call mutates the game. Confirm crafting with omitted or explicit
+   `PLAYER_ONLY` scope ignores nearby-only items, while explicit `PLAYER_AND_NEARBY` can use an
+   eligible loaded container and reports its source plus any incomplete discovery.
 7. Join multiplayer only for rejection verification if appropriate: status remains callable while
    gameplay tools return `UNSUPPORTED` without exposing live state.
 8. Exit Minecraft and confirm the listener closes cleanly.

@@ -56,8 +56,9 @@ promises:
 - `IntegrationExtensionRegistry` and `CompositeRecipeProvider`;
 - loader integration catalogs/environments, shared Minecraft provider/enricher
   registries, client runtime/lifecycle wiring, configuration, and MCP classes;
-- `ItemFinder` and `ItemSource`, which are transport-independent internal composition types but not
-  yet a registered external storage contribution point;
+- `ItemFinder`, `CraftingItemSourceProvider`, and `ItemSource`, which are transport-independent
+  internal composition types but not registered public extension points; the explicit composition
+  keeps future storage-source wiring possible without changing crafting algorithms;
 - the built-in `VanillaIntegration` implementation.
 
 External packages should not construct registries, loaders, platform providers, or transports.

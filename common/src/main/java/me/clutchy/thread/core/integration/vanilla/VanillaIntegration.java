@@ -13,6 +13,7 @@ import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.ThreadIntegration;
 import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
 import me.clutchy.thread.core.model.crafting.CraftingPlan;
+import me.clutchy.thread.core.model.crafting.CraftingQuery;
 import me.clutchy.thread.core.model.crafting.CraftingResult;
 import me.clutchy.thread.core.model.game.GameInfo;
 import me.clutchy.thread.core.model.game.SessionStatus;
@@ -38,6 +39,7 @@ import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.serialization.JsonCodec;
 import me.clutchy.thread.core.service.CraftingPlanner;
 import me.clutchy.thread.core.service.CraftingService;
+import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
 import me.clutchy.thread.core.service.item.ItemFinder;
 import me.clutchy.thread.core.tool.EmptyInput;
 import me.clutchy.thread.core.tool.GameTool;
@@ -68,14 +70,17 @@ public final class VanillaIntegration implements ThreadIntegration {
       PlayerProvider player,
       WorldProvider world,
       RecipeProvider recipes,
+      NearbyContainerQuery craftingNearbyBounds,
       Predicate<ToolId> enabledTools,
       Supplier<CapabilitiesSnapshot> capabilities) {
     this.game = Objects.requireNonNull(game, "game");
     this.player = Objects.requireNonNull(player, "player");
     this.world = Objects.requireNonNull(world, "world");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
-    crafting = new CraftingService(player, recipes);
-    craftingPlanner = new CraftingPlanner(player, recipes, crafting);
+    CraftingItemSourceProvider craftingSources =
+        CraftingItemSourceProvider.vanilla(player, world, craftingNearbyBounds);
+    crafting = new CraftingService(craftingSources, recipes);
+    craftingPlanner = new CraftingPlanner(craftingSources, recipes, crafting);
     itemFinder = ItemFinder.vanilla(player, world);
     this.enabledTools = Objects.requireNonNull(enabledTools, "enabledTools");
     this.capabilities = Objects.requireNonNull(capabilities, "capabilities");
@@ -239,38 +244,42 @@ public final class VanillaIntegration implements ThreadIntegration {
         this::lookupRecipe);
   }
 
-  private GameTool<RecipeLookupQuery, CraftingResult> canCraft() {
+  private GameTool<CraftingQuery, CraftingResult> canCraft() {
     return tool(
         "minecraft.can_craft",
-        "Determines whether the current main inventory can satisfy at least one live recipe for "
-            + "a canonical item ID. Use this for a direct yes-or-no answer backed by deterministic, "
-            + "non-overlapping allocations for each variant; no crafting action is performed.",
-        JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
+        "Determines whether eligible live items can satisfy at least one recipe for a canonical "
+            + "item ID. Omit scope or use PLAYER_ONLY for the main inventory; explicitly use "
+            + "PLAYER_AND_NEARBY to add bounded loaded containers. Results include deterministic "
+            + "source allocations and incomplete-discovery status. Use this for a direct answer; "
+            + "no crafting action occurs.",
+        JsonCodec.of(CraftingQuery.class, VanillaToolSchemas.CRAFTING_QUERY),
         JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
         ToolCapabilities.supportedSingleplayer(),
         crafting::assess);
   }
 
-  private GameTool<RecipeLookupQuery, CraftingResult> getMissingIngredients() {
+  private GameTool<CraftingQuery, CraftingResult> getMissingIngredients() {
     return tool(
         "minecraft.get_missing_ingredients",
-        "Returns required, allocated, and missing item counts for every live recipe variant that "
-            + "produces a canonical item ID. Use this to explain shortages from missing counts "
-            + "above zero; alternatives never double-count inventory.",
-        JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
+        "Returns required, source-allocated, and missing counts for every live recipe variant. "
+            + "Scope defaults to PLAYER_ONLY; explicitly use PLAYER_AND_NEARBY when nearby loaded "
+            + "containers should count. Bounded or unresolved storage omissions are reported, and "
+            + "alternatives never spend one item twice. Use this to explain exact shortages.",
+        JsonCodec.of(CraftingQuery.class, VanillaToolSchemas.CRAFTING_QUERY),
         JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
         ToolCapabilities.supportedSingleplayer(),
         crafting::assess);
   }
 
-  private GameTool<RecipeLookupQuery, CraftingPlan> getCraftingPlan() {
+  private GameTool<CraftingQuery, CraftingPlan> getCraftingPlan() {
     return tool(
         "minecraft.get_crafting_plan",
-        "Builds a deterministic recursive plan for one canonical item from the current main "
-            + "inventory, including intermediate steps, final raw shortages, and bounded cycle "
-            + "or depth issues. Use this to explain how to reach a target without performing any "
-            + "crafting action.",
-        JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
+        "Builds a deterministic bounded recursive plan for one canonical item. Scope defaults to "
+            + "PLAYER_ONLY; explicitly use PLAYER_AND_NEARBY to include eligible nearby loaded "
+            + "containers. The result reports live source allocations, incomplete discovery, raw "
+            + "shortages, cycles, and limits. Use this for step-by-step guidance without crafting "
+            + "or moving items.",
+        JsonCodec.of(CraftingQuery.class, VanillaToolSchemas.CRAFTING_QUERY),
         JsonCodec.of(CraftingPlan.class, VanillaToolSchemas.CRAFTING_PLAN),
         ToolCapabilities.supportedSingleplayer(),
         craftingPlanner::plan);
@@ -294,8 +303,8 @@ public final class VanillaIntegration implements ThreadIntegration {
         "Finds matching live items across the player's main inventory, offhand and armor, plus "
             + "bounded nearby loaded containers. Results aggregate counts by item and source with "
             + "deterministic slots, container positions, and distances; unopened loot is skipped "
-            + "and crafting tools still use only the player's main inventory. Use this to locate "
-            + "items without moving them or changing crafting calculations.",
+            + "and crafting includes nearby storage only when its scope explicitly requests it. "
+            + "Use this to locate items without moving them.",
         JsonCodec.of(FindItemQuery.class, VanillaToolSchemas.FIND_ITEM_QUERY),
         JsonCodec.of(FindItemResult.class, VanillaToolSchemas.FIND_ITEM_RESULT),
         ToolCapabilities.supportedSingleplayer(),

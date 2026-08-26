@@ -64,7 +64,7 @@ only already-loaded state and never force-load chunks.
 Recipes come from the integrated server's final live `RecipeManager`, including active datapack and
 installed-mod changes. Thread has no static vanilla recipe catalog.
 
-## Nearby containers are bounded context, not crafting inventory
+## Nearby containers are bounded context and explicit crafting input
 
 `minecraft.get_nearby_containers` scans only already-loaded chunks within a hard 16-block ceiling
 and returns at most 64 distance-ordered summaries. Each summary includes at most four occupied
@@ -74,21 +74,27 @@ machine state. `minecraft.find_item` reuses one full bounded scan to aggregate m
 container stacks with structured source locations; it does not inspect containers one by one.
 
 Unopened loot containers remain unresolved because reading their slots would mutate world state.
-The tools run on the integrated-server thread, never force-load chunks, and remain independent of
-crafting: `CraftingService` and `CraftingPlanner` continue to read only the player's 36-slot main
-inventory. The transport-independent `ItemSource` boundary exists for live search composition, not
-as a storage-aware crafting or third-party storage contract.
+The tools run on the integrated-server thread and never force-load chunks. Crafting defaults to the
+player's 36-slot main inventory; only explicit `PLAYER_AND_NEARBY` requests add eligible containers
+through the same full bounded snapshot path. Truncation and skipped unresolved/content-limited
+containers make the source status incomplete instead of silently overstating certainty.
+
+The transport-independent `ItemSource` boundary is shared by live search and scoped crafting.
+`CraftingItemSourceProvider` accepts explicit source composition so future integration wiring can
+add storage without rewriting the allocation/planning algorithms, but base Thread registers no
+third-party storage source and exposes no public storage contribution point yet.
 
 ## Crafting intelligence remains deterministic and bounded
 
 Direct craftability uses maximum-flow allocation so overlapping alternatives cannot spend the same
-inventory unit twice. Recursive planning uses one shared inventory/crafted-surplus ledger,
-active-path cycle detection, deterministic local variant scoring, and hard depth/work/quantity
-limits.
+item unit twice. Recursive planning uses one shared item/crafted-surplus ledger, active-path cycle
+detection, deterministic local variant scoring, and hard depth/work/quantity limits. Every call
+captures one detached source snapshot before recipe assessment. Live allocations preserve player
+slot or container provenance; planned intermediate output has no live source location.
 
 This complexity is retained because greedy allocation, global visited sets, or unbounded recursion
-produce incorrect or unsafe results. Planning does not inspect nearby storage, model stations/fuel,
-globally optimize all combinations, or craft items.
+produce incorrect or unsafe results. Equipment is not eligible crafting supply. Planning does not
+model stations/fuel, globally optimize all combinations, move items, or craft items.
 
 ## Optional integrations load metadata first
 

@@ -9,20 +9,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.TreeMap;
+import me.clutchy.thread.core.model.crafting.CraftingQuery;
 import me.clutchy.thread.core.model.crafting.CraftingResult;
 import me.clutchy.thread.core.model.crafting.IngredientAllocation;
 import me.clutchy.thread.core.model.crafting.IngredientAvailability;
 import me.clutchy.thread.core.model.crafting.RecipeCraftability;
-import me.clutchy.thread.core.model.player.InventorySlotInfo;
-import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
-import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
-import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
+import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
 import me.clutchy.thread.core.tool.ToolResult;
 
-/** Compares live recipe requirements with a detached player-inventory snapshot. */
+/** Compares live recipe requirements with one detached scoped item-source snapshot. */
 public final class CraftingService {
   private static final Comparator<IngredientKey> INGREDIENT_ORDER =
       Comparator.comparingInt((IngredientKey value) -> value.itemIds().size())
@@ -34,18 +32,26 @@ public final class CraftingService {
           .thenComparingInt(recipe -> recipe.result().count())
           .thenComparing(CraftingService::ingredientSignature);
 
-  private final PlayerProvider players;
+  private final CraftingItemSourceProvider itemSources;
   private final RecipeProvider recipes;
 
   /** Creates a transport-independent crafting service over existing provider contracts. */
-  public CraftingService(PlayerProvider players, RecipeProvider recipes) {
-    this.players = Objects.requireNonNull(players, "players");
+  public CraftingService(CraftingItemSourceProvider itemSources, RecipeProvider recipes) {
+    this.itemSources = Objects.requireNonNull(itemSources, "itemSources");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
   }
 
   /** Assesses one execution of every live recipe that produces the requested item. */
-  public ToolResult<CraftingResult> assess(RecipeLookupQuery query) {
+  public ToolResult<CraftingResult> assess(CraftingQuery query) {
     Objects.requireNonNull(query, "query");
+    ToolResult<CraftingItemSourceProvider.Snapshot> sourceResult =
+        itemSources.snapshot(query.scope());
+    if (!sourceResult.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(sourceResult.error()));
+    }
+    CraftingItemSourceProvider.Snapshot sourceSnapshot =
+        Objects.requireNonNull(sourceResult.value());
+
     ToolResult<List<RecipeInfo>> recipeResult = recipes.recipesFor(query.itemId());
     if (!recipeResult.successful()) {
       return ToolResult.failure(Objects.requireNonNull(recipeResult.error()));
@@ -53,23 +59,21 @@ public final class CraftingService {
 
     List<RecipeInfo> matchingRecipes = Objects.requireNonNull(recipeResult.value());
     if (matchingRecipes.isEmpty()) {
-      return ToolResult.success(new CraftingResult(query.itemId(), false, List.of()));
+      return ToolResult.success(
+          new CraftingResult(
+              query.itemId(), query.scope(), sourceSnapshot.sourceStatus(), false, List.of()));
     }
 
-    ToolResult<InventorySnapshot> inventoryResult = players.inventory();
-    if (!inventoryResult.successful()) {
-      return ToolResult.failure(Objects.requireNonNull(inventoryResult.error()));
-    }
-
-    Map<String, Integer> inventory =
-        inventoryCounts(Objects.requireNonNull(inventoryResult.value()));
+    CraftingSupplyLedger supplies = new CraftingSupplyLedger(sourceSnapshot.entries());
     List<RecipeInfo> orderedRecipes = orderedRecipes(matchingRecipes);
     List<RecipeCraftability> assessments = new ArrayList<>();
     for (int index = 0; index < orderedRecipes.size(); index++) {
-      assessments.add(assessRecipe(index + 1, orderedRecipes.get(index), 1, inventory));
+      assessments.add(assessRecipe(index + 1, orderedRecipes.get(index), 1, supplies));
     }
     boolean craftable = assessments.stream().anyMatch(RecipeCraftability::craftable);
-    return ToolResult.success(new CraftingResult(query.itemId(), craftable, assessments));
+    return ToolResult.success(
+        new CraftingResult(
+            query.itemId(), query.scope(), sourceSnapshot.sourceStatus(), craftable, assessments));
   }
 
   /** Returns recipe definitions in Thread's stable variant order. */
@@ -88,32 +92,41 @@ public final class CraftingService {
    * same alternative-aware maximum-flow allocation.
    */
   RecipeCraftability assessRecipe(
-      int variant, RecipeInfo recipe, int executions, Map<String, Integer> availableItems) {
+      int variant, RecipeInfo recipe, int executions, CraftingSupplyLedger availableItems) {
     Objects.requireNonNull(recipe, "recipe");
     Objects.requireNonNull(availableItems, "availableItems");
     if (executions <= 0) {
       throw new IllegalArgumentException("executions must be positive");
     }
     TreeMap<String, Integer> normalizedItems = new TreeMap<>();
-    availableItems.forEach(
-        (itemId, count) -> {
-          Objects.requireNonNull(itemId, "availableItems key");
-          Objects.requireNonNull(count, "availableItems value");
-          if (count < 0) {
-            throw new IllegalArgumentException("available item counts must not be negative");
-          }
-          normalizedItems.put(itemId, count);
-        });
+    availableItems
+        .counts()
+        .forEach(
+            (itemId, count) -> {
+              Objects.requireNonNull(itemId, "availableItems key");
+              Objects.requireNonNull(count, "availableItems value");
+              if (count < 0) {
+                throw new IllegalArgumentException("available item counts must not be negative");
+              }
+              normalizedItems.put(itemId, count);
+            });
     List<NormalizedIngredient> ingredients =
         normalizedIngredients(recipe.ingredients(), executions);
     Allocation allocation = allocate(normalizedItems, ingredients);
+    CraftingSupplyLedger allocationLedger = availableItems.copy();
     List<IngredientAvailability> availability = new ArrayList<>();
     for (int index = 0; index < ingredients.size(); index++) {
       NormalizedIngredient ingredient = ingredients.get(index);
       Map<String, Integer> assigned = allocation.byIngredient().get(index);
       List<IngredientAllocation> itemAllocations =
           assigned.entrySet().stream()
-              .map(entry -> new IngredientAllocation(entry.getKey(), entry.getValue()))
+              .map(
+                  entry -> {
+                    CraftingSupplyLedger.Consumption consumed =
+                        allocationLedger.consumeExact(entry.getKey(), entry.getValue());
+                    return new IngredientAllocation(
+                        entry.getKey(), entry.getValue(), consumed.sourceAllocations());
+                  })
               .toList();
       int available = assigned.values().stream().mapToInt(Integer::intValue).sum();
       availability.add(
@@ -133,14 +146,6 @@ public final class CraftingService {
         Math.multiplyExact(recipe.result().count(), executions),
         craftable,
         availability);
-  }
-
-  private static Map<String, Integer> inventoryCounts(InventorySnapshot inventory) {
-    TreeMap<String, Integer> counts = new TreeMap<>();
-    for (InventorySlotInfo slot : inventory.slots()) {
-      counts.merge(slot.stack().itemId(), slot.stack().count(), Math::addExact);
-    }
-    return Map.copyOf(counts);
   }
 
   private static List<NormalizedIngredient> normalizedIngredients(

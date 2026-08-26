@@ -6,9 +6,12 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Opt-in `PLAYER_AND_NEARBY` scope for all three crafting analysis tools, with the existing
+  player-only behavior retained by default, one consistent bounded source snapshot, structured
+  container allocations, and explicit incomplete-discovery status.
 - Unified `minecraft.find_item` search across player inventory, offhand/armor, and nearby loaded
   containers, with exact-ID and friendly text matching, aggregate counts, structured locations,
-  deterministic ordering, and unchanged player-inventory-only crafting semantics.
+  and deterministic ordering.
 - Safe nearby loaded-container discovery and individual inspection across common vanilla storage
   and machines, with compact summaries, full bounded inventory snapshots, selected furnace/brewing
   state, and no chunk loading or crafting changes.

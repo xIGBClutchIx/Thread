@@ -162,21 +162,25 @@ capability metadata, and an execution function. `ToolRegistry` validates input b
 and validates serialized output before returning it to MCP.
 
 `CraftingService` uses maximum-flow allocation so overlapping alternatives cannot spend the same
-inventory item twice. `CraftingPlanner` uses one inventory/surplus ledger, active-path cycle
-detection, deterministic local variant scoring, and hard depth/work/quantity limits.
+item twice. `CraftingPlanner` uses one item/surplus ledger, active-path cycle detection,
+deterministic local variant scoring, and hard depth/work/quantity limits. Both consume one detached
+`CraftingItemSourceProvider` snapshot per invocation. The default snapshot contains only the
+36-slot main inventory; an explicit expanded scope adds eligible nearby containers.
 
 Nearby container discovery and inspection remain `WorldProvider` operations. Discovery walks a
 distance-ordered, hard-capped set of block positions, skips unloaded chunks, and returns compact
 summaries. Individual inspection reuses `BlockInfo`, `BlockEntityInfo`, and the existing
 `MinecraftBlockEntityInspectorRegistry`, so contributed inspectors can enrich future custom
-machines without a second registry. These snapshots are not inputs to `CraftingService` or
-`CraftingPlanner`.
+machines without a second registry. The crafting source provider reuses the full bounded snapshot
+path only for explicit expanded-scope requests and reports truncation or excluded unsafe contents.
 
-`ItemFinder` composes small transport-independent `ItemSource` snapshots. V1 supplies player and
-nearby-container sources; the nearby source uses one full bounded container scan on the integrated
-server thread. Main hand is not counted as equipment because it aliases the selected hotbar slot.
-Matched item IDs and source locations are ordered deterministically. This composition boundary can
-support a future external storage integration without making storage an input to crafting today.
+`ItemFinder` and `CraftingItemSourceProvider` compose small transport-independent `ItemSource`
+snapshots. V1 supplies player inventory, equipment, and nearby-container sources; the nearby source
+uses one full bounded container scan on the integrated-server thread. Item search includes offhand
+and armor, while crafting intentionally excludes equipment. Main hand is not counted as equipment
+because it aliases the selected hotbar slot. Entries and reported source locations are ordered
+deterministically. Explicit source composition can accept a future external storage source without
+changing the crafting algorithms or making third-party storage part of base Thread.
 
 External packages advertise metadata through the loader-specific catalog (`thread:integrations`
 on Fabric and a Java service provider on NeoForge or Forge). Common `IntegrationRegistry` performs enabled,

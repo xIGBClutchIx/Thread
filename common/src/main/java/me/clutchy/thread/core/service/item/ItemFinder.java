@@ -1,6 +1,5 @@
 package me.clutchy.thread.core.service.item;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -17,13 +16,8 @@ import me.clutchy.thread.core.model.item.find.FoundItem;
 import me.clutchy.thread.core.model.item.find.FoundItemSource;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
 import me.clutchy.thread.core.model.player.EquipmentPosition;
-import me.clutchy.thread.core.model.player.EquipmentSnapshot;
-import me.clutchy.thread.core.model.player.InventorySnapshot;
-import me.clutchy.thread.core.model.world.BlockEntityInfo;
-import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
-import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -54,7 +48,10 @@ public final class ItemFinder {
   /** Creates the built-in player and nearby-loaded-container source set. */
   public static ItemFinder vanilla(PlayerProvider player, WorldProvider world) {
     return new ItemFinder(
-        List.of(new PlayerItemSource(player), new NearbyContainerItemSource(world)));
+        List.of(
+            ItemSources.playerInventory(player),
+            ItemSources.playerEquipment(player),
+            ItemSources.nearbyContainers(world)));
   }
 
   /** Returns matched item identities with totals and deterministic source locations. */
@@ -73,8 +70,10 @@ public final class ItemFinder {
 
     TreeMap<String, MatchAccumulator> matches = new TreeMap<>();
     boolean containersTruncated = false;
+    ItemSource.Request request =
+        ItemSource.Request.nearby(new NearbyContainerQuery(query.radius(), query.containerLimit()));
     for (ItemSource source : sources) {
-      ToolResult<ItemSource.Snapshot> result = source.read(query);
+      ToolResult<ItemSource.Snapshot> result = source.read(request);
       if (!result.successful()) {
         return ToolResult.failure(Objects.requireNonNull(result.error()));
       }
@@ -110,103 +109,6 @@ public final class ItemFinder {
             containersTruncated,
             itemsTruncated,
             returned));
-  }
-
-  private static final class PlayerItemSource implements ItemSource {
-    private final PlayerProvider player;
-
-    private PlayerItemSource(PlayerProvider player) {
-      this.player = Objects.requireNonNull(player, "player");
-    }
-
-    @Override
-    public ToolResult<Snapshot> read(FindItemQuery query) {
-      ToolResult<InventorySnapshot> inventoryResult = player.inventory();
-      if (!inventoryResult.successful()) {
-        return ToolResult.failure(Objects.requireNonNull(inventoryResult.error()));
-      }
-      ToolResult<EquipmentSnapshot> equipmentResult = player.equipment();
-      if (!equipmentResult.successful()) {
-        return ToolResult.failure(Objects.requireNonNull(equipmentResult.error()));
-      }
-
-      List<Entry> entries = new ArrayList<>();
-      Objects.requireNonNull(inventoryResult.value())
-          .slots()
-          .forEach(
-              slot ->
-                  entries.add(
-                      new Entry(
-                          slot.stack(),
-                          FoundItemSourceType.PLAYER_INVENTORY,
-                          slot.slot(),
-                          null,
-                          null,
-                          null,
-                          null,
-                          null)));
-      Objects.requireNonNull(equipmentResult.value())
-          .slots()
-          .forEach(
-              slot -> {
-                // Main hand aliases the selected hotbar stack already present in inventory.
-                if (slot.slot() != EquipmentPosition.MAIN_HAND && slot.item() != null) {
-                  entries.add(
-                      new Entry(
-                          slot.item(),
-                          FoundItemSourceType.PLAYER_EQUIPMENT,
-                          null,
-                          slot.slot(),
-                          null,
-                          null,
-                          null,
-                          null));
-                }
-              });
-      return ToolResult.success(new Snapshot(false, entries));
-    }
-  }
-
-  private static final class NearbyContainerItemSource implements ItemSource {
-    private final WorldProvider world;
-
-    private NearbyContainerItemSource(WorldProvider world) {
-      this.world = Objects.requireNonNull(world, "world");
-    }
-
-    @Override
-    public ToolResult<Snapshot> read(FindItemQuery query) {
-      ToolResult<NearbyContainerSnapshotResult> result =
-          world.nearbyContainerSnapshots(
-              new NearbyContainerQuery(query.radius(), query.containerLimit()));
-      if (!result.successful()) {
-        return ToolResult.failure(Objects.requireNonNull(result.error()));
-      }
-      NearbyContainerSnapshotResult containers = Objects.requireNonNull(result.value());
-      List<Entry> entries = new ArrayList<>();
-      for (BlockInfo container : containers.containers()) {
-        BlockEntityInfo blockEntity = Objects.requireNonNull(container.blockEntity());
-        if ("false".equals(blockEntity.state().get("contentsResolved"))
-            || "true".equals(blockEntity.state().get("itemsTruncated"))) {
-          continue;
-        }
-        blockEntity
-            .items()
-            .forEach(
-                item ->
-                    entries.add(
-                        new Entry(
-                            item.item(),
-                            FoundItemSourceType.NEARBY_CONTAINER,
-                            null,
-                            null,
-                            item.slot(),
-                            container.position(),
-                            blockEntity.typeId(),
-                            container.distance())));
-      }
-      return ToolResult.success(new Snapshot(containers.truncated(), entries));
-    }
   }
 
   private static final class MatchAccumulator {

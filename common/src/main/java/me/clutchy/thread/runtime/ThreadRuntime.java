@@ -16,6 +16,7 @@ import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
 import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.PlayerProvider;
@@ -191,6 +192,7 @@ public final class ThreadRuntime implements AutoCloseable {
             playerProvider,
             worldProvider,
             recipeProvider,
+            new NearbyContainerQuery(limits.maxContainerRadius(), limits.maxContainerResults()),
             config::toolEnabled,
             () -> integrationRegistry.capabilities(info.threadVersion())));
     int activatedCandidates =
