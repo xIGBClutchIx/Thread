@@ -1,23 +1,18 @@
 package me.clutchy.thread.platform.fabric;
 
+import static me.clutchy.thread.gametest.LoaderParityAssertions.recipeOccurrences;
+
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
-import me.clutchy.thread.config.ThreadConfig;
-import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
-import me.clutchy.thread.platform.fabric.integration.ExternalProofIntegration;
+import me.clutchy.thread.gametest.ExternalProofIntegration;
+import me.clutchy.thread.gametest.LoaderParityAssertions;
+import me.clutchy.thread.runtime.ThreadRuntime;
 import me.clutchy.thread.transport.mcp.McpHttpServer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -37,8 +32,6 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       "thread:native_command_block_from_earth";
   private static final String NATIVE_CHAIN_COMMAND_BLOCK_RECIPE =
       "thread:native_chain_command_block_from_command_block";
-  private static final String EXPECT_MCP_DISABLED = "thread.gametest.expectMcpDisabled";
-  private static final String EXPECTED_MCP_PORT = "thread.gametest.expectedMcpPort";
 
   @Override
   public void runTest(ClientGameTestContext context) {
@@ -50,112 +43,21 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             .map(container -> (ThreadFabricClient) container.getEntrypoint())
             .findFirst()
             .orElseThrow();
-    ToolRegistry tools = entrypoint.tools();
-    ThreadConfig expectedConfig = expectedConfig();
-    assertEquals(expectedConfig, readRuntimeConfig(), "persisted runtime configuration");
-    assertEquals(2, entrypoint.integrations().integrations().size(), "active integration count");
-    assertEquals(
-        "external-fabric-entrypoint",
-        entrypoint.integrations().integrations().stream()
-            .filter(integration -> integration.id().value().equals("gametest-bridge"))
-            .findFirst()
-            .orElseThrow()
-            .metadata()
-            .get("gametest.source"),
-        "external candidate provider registration");
-    assertEquals(
-        "13",
-        entrypoint.integrations().integrations().stream()
-            .filter(integration -> integration.id().value().equals("vanilla"))
-            .findFirst()
-            .orElseThrow()
-            .metadata()
-            .get("thread.tool_count"),
-        "vanilla contribution metadata");
-    if (Boolean.getBoolean(EXPECT_MCP_DISABLED)) {
-      assertTrue(!entrypoint.mcpRunning(), "MCP remains stopped when configured off");
-      assertEquals(13, tools.descriptors().size(), "tools initialize independently of MCP");
+    ThreadRuntime runtime = entrypoint.runtime();
+    ToolRegistry tools = runtime.tools();
+    LoaderParityAssertions.verifyConfiguration(
+        FabricLoader.getInstance().getConfigDir().resolve("thread.json"));
+    if (Boolean.getBoolean(LoaderParityAssertions.EXPECT_MCP_DISABLED)) {
+      LoaderParityAssertions.verifyDisabledRuntime(runtime, "external-loader-discovery");
       return;
     }
-    McpHttpServer mcp = entrypoint.mcpServer();
-
-    assertEquals(13, tools.descriptors().size(), "registered vanilla tool count");
-    JsonObject menuStatus = invokeSuccessfully(context, tools, "minecraft.get_status", "{}");
-    assertEquals("MAIN_MENU", menuStatus.get("state").getAsString(), "menu status");
-    assertEquals(
-        "26.2",
-        invokeSuccessfully(context, tools, "minecraft.get_game_info", "{}")
-            .get("minecraftVersion")
-            .getAsString(),
-        "live Minecraft version");
-    assertEquals(
-        13,
-        invokeSuccessfully(context, tools, "minecraft.get_capabilities", "{}")
-            .getAsJsonArray("tools")
-            .size(),
-        "live capability catalog");
-
-    assertTrue(mcp.running(), "MCP listener running");
-    assertEquals(expectedConfig.mcpPort(), mcp.endpoint().getPort(), "configured MCP port");
-    JsonObject initialize = mcpInitialize(context, mcp.endpoint(), 0).body();
-    assertEquals(
-        "2026-07-28",
-        initialize.getAsJsonObject("result").get("protocolVersion").getAsString(),
-        "MCP initialize protocol");
-    assertEquals(
-        "Thread",
-        initialize
-            .getAsJsonObject("result")
-            .getAsJsonObject("serverInfo")
-            .get("name")
-            .getAsString(),
-        "MCP initialize server identity");
-    McpResponse initialized = mcpInitialized(context, mcp.endpoint());
-    assertEquals(202, initialized.status(), "MCP initialized notification");
-    assertTrue(initialized.body() == null, "MCP initialized notification has no response body");
-    JsonObject discovery =
-        mcpRequest(context, mcp.endpoint(), 1, "server/discover", null, null).body();
-    assertEquals(
-        "2026-07-28",
-        discovery
-            .getAsJsonObject("result")
-            .getAsJsonArray("supportedVersions")
-            .get(0)
-            .getAsString(),
-        "MCP protocol discovery");
-    JsonObject catalog = mcpRequest(context, mcp.endpoint(), 2, "tools/list", null, null).body();
-    assertEquals(
-        13,
-        catalog.getAsJsonObject("result").getAsJsonArray("tools").size(),
-        "MCP vanilla catalog");
-    assertEquals(
-        "MAIN_MENU",
-        mcpTool(context, mcp.endpoint(), 3, "minecraft.get_status", new JsonObject())
-            .get("state")
-            .getAsString(),
-        "MCP menu status");
-    assertEquals(
-        "26.2",
-        mcpTool(context, mcp.endpoint(), 4, "minecraft.get_game_info", new JsonObject())
-            .get("minecraftVersion")
-            .getAsString(),
-        "MCP live Minecraft version");
-
-    McpResponse missing =
-        mcpRequest(context, mcp.endpoint(), 5, "tools/call", "minecraft.missing", new JsonObject());
-    assertEquals(400, missing.status(), "unknown MCP tool status");
-    assertEquals(
-        -32_602,
-        missing.body().getAsJsonObject("error").get("code").getAsInt(),
-        "unknown MCP tool error");
-    assertTrue(mcp.running(), "invalid MCP call leaves listener running");
-
-    assertToolError(
-        mcpToolResult(context, mcp.endpoint(), 18, "minecraft.get_inventory", new JsonObject()),
-        "WORLD_NOT_AVAILABLE",
-        "No Minecraft world is currently available.",
-        true,
-        "menu gameplay rejection");
+    awaitExternal(
+        context,
+        () -> {
+          LoaderParityAssertions.verifyMenu(runtime, "fabric", "external-loader-discovery");
+          return null;
+        });
+    McpHttpServer mcp = runtime.mcpServer();
 
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
       singleplayer.getClientLevel().waitForChunksDownload();
@@ -196,6 +98,13 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
                   && client.player != null
                   && client.player.getMainHandItem().is(Items.DIAMOND_PICKAXE));
       context.waitFor(FabricProviderClientGameTest::targetsKnownFurnace);
+
+      awaitExternal(
+          context,
+          () -> {
+            LoaderParityAssertions.verifyWorld(runtime, true);
+            return null;
+          });
 
       assertTrue(
           invokeSuccessfully(context, tools, "minecraft.get_status", "{}")
@@ -438,23 +347,12 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             client.level == null
                 && client.player == null
                 && client.getSingleplayerServer() == null);
-    assertEquals(
-        "MAIN_MENU",
-        invokeSuccessfully(context, tools, "minecraft.get_status", "{}").get("state").getAsString(),
-        "return-to-menu status");
-    assertEquals(
-        "MAIN_MENU",
-        mcpTool(context, mcp.endpoint(), 19, "minecraft.get_status", new JsonObject())
-            .get("state")
-            .getAsString(),
-        "MCP return-to-menu status");
-    assertToolError(
-        mcpToolResult(context, mcp.endpoint(), 20, "minecraft.get_inventory", new JsonObject()),
-        "WORLD_NOT_AVAILABLE",
-        "No Minecraft world is currently available.",
-        true,
-        "return-to-menu gameplay rejection");
-    assertTrue(mcp.running(), "MCP listener survives world close");
+    awaitExternal(
+        context,
+        () -> {
+          LoaderParityAssertions.verifyReturnedToMenu(runtime);
+          return null;
+        });
   }
 
   private static void verifyNativeRecipes(ClientGameTestContext context, ToolRegistry tools) {
@@ -506,20 +404,14 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
   private static JsonObject mcpTool(
       ClientGameTestContext context, URI endpoint, long id, String name, JsonObject arguments) {
-    JsonObject result = mcpToolResult(context, endpoint, id, name, arguments);
-    if (result.get("isError").getAsBoolean()) {
-      throw new AssertionError(name + " returned an MCP tool error: " + result);
-    }
-    return result.getAsJsonObject("structuredContent");
+    return awaitExternal(
+        context, () -> LoaderParityAssertions.mcpTool(endpoint, id, name, arguments));
   }
 
   private static JsonObject mcpToolResult(
       ClientGameTestContext context, URI endpoint, long id, String name, JsonObject arguments) {
-    McpResponse response = mcpRequest(context, endpoint, id, "tools/call", name, arguments);
-    if (response.status() != 200) {
-      throw new AssertionError(name + " MCP call failed: " + response.body());
-    }
-    return response.body().getAsJsonObject("result");
+    return awaitExternal(
+        context, () -> LoaderParityAssertions.mcpToolResult(endpoint, id, name, arguments));
   }
 
   private static void assertToolError(
@@ -530,87 +422,6 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     assertEquals(message, error.get("message").getAsString(), description + " message");
     assertEquals(retryable, error.get("retryable").getAsBoolean(), description + " retryability");
     assertTrue(error.getAsJsonObject("details").isEmpty(), description + " safe details");
-  }
-
-  private static McpResponse mcpRequest(
-      ClientGameTestContext context,
-      URI endpoint,
-      long id,
-      String method,
-      String name,
-      JsonObject arguments) {
-    return awaitExternal(
-        context,
-        () -> {
-          JsonObject params = new JsonObject();
-          if (name != null) {
-            params.addProperty("name", name);
-            params.add("arguments", arguments);
-          }
-          JsonObject requestBody = new JsonObject();
-          requestBody.addProperty("jsonrpc", "2.0");
-          requestBody.addProperty("id", id);
-          requestBody.addProperty("method", method);
-          requestBody.add("params", params);
-          return mcpPost(endpoint, requestBody, "2026-07-28");
-        });
-  }
-
-  private static McpResponse mcpInitialize(ClientGameTestContext context, URI endpoint, long id) {
-    return awaitExternal(
-        context,
-        () -> {
-          JsonObject params = new JsonObject();
-          params.addProperty("protocolVersion", "2026-07-28");
-          params.add("capabilities", new JsonObject());
-          JsonObject clientInfo = new JsonObject();
-          clientInfo.addProperty("name", "Thread packaged game test");
-          clientInfo.addProperty("version", "1.0.0");
-          params.add("clientInfo", clientInfo);
-          JsonObject requestBody = new JsonObject();
-          requestBody.addProperty("jsonrpc", "2.0");
-          requestBody.addProperty("id", id);
-          requestBody.addProperty("method", "initialize");
-          requestBody.add("params", params);
-          return mcpPost(endpoint, requestBody, null);
-        });
-  }
-
-  private static McpResponse mcpInitialized(ClientGameTestContext context, URI endpoint) {
-    return awaitExternal(
-        context,
-        () -> {
-          JsonObject notification = new JsonObject();
-          notification.addProperty("jsonrpc", "2.0");
-          notification.addProperty("method", "notifications/initialized");
-          return mcpPost(endpoint, notification, "2026-07-28");
-        });
-  }
-
-  private static McpResponse mcpPost(URI endpoint, JsonObject requestBody, String protocolVersion) {
-    HttpRequest.Builder request =
-        HttpRequest.newBuilder(endpoint)
-            .timeout(Duration.ofSeconds(10))
-            .header("Accept", "application/json, text/event-stream")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()));
-    if (protocolVersion != null) {
-      request.header("MCP-Protocol-Version", protocolVersion);
-    }
-    try {
-      HttpResponse<String> response =
-          HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
-      JsonObject body =
-          response.body().isBlank()
-              ? null
-              : JsonParser.parseString(response.body()).getAsJsonObject();
-      return new McpResponse(response.statusCode(), body);
-    } catch (InterruptedException exception) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("MCP game-test request was interrupted", exception);
-    } catch (IOException exception) {
-      throw new IllegalStateException("MCP game-test request failed", exception);
-    }
   }
 
   private static JsonObject invokeSuccessfully(
@@ -643,32 +454,6 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       throw new AssertionError("external provider call did not finish within 200 game ticks");
     }
     return result.join();
-  }
-
-  private static ThreadConfig readRuntimeConfig() {
-    Path configPath = FabricLoader.getInstance().getConfigDir().resolve("thread.json");
-    assertTrue(Files.isRegularFile(configPath), "runtime config file was created before the test");
-    try {
-      return ThreadConfigLoader.loadOrCreate(configPath);
-    } catch (IOException exception) {
-      throw new AssertionError("runtime config could not be read", exception);
-    }
-  }
-
-  private static ThreadConfig expectedConfig() {
-    ThreadConfig defaults = ThreadConfig.defaults();
-    return new ThreadConfig(
-        !Boolean.getBoolean(EXPECT_MCP_DISABLED),
-        defaults.mcpBindHost(),
-        Integer.getInteger(EXPECTED_MCP_PORT, defaults.mcpPort()),
-        defaults.enabledTools(),
-        defaults.disabledIntegrations(),
-        defaults.maxEntityRadius(),
-        defaults.maxEntityResults(),
-        defaults.maxItemSearchResults(),
-        defaults.maxRequestBytes(),
-        defaults.gameThreadTimeoutMillis(),
-        defaults.maxConcurrentRequests());
   }
 
   private static boolean hasInventoryStack(Minecraft client, Item item, int count) {
@@ -735,20 +520,6 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         .sum();
   }
 
-  private static int recipeOccurrences(JsonObject recipeResult, String itemId) {
-    return recipeResult.getAsJsonArray("recipes").asList().stream()
-        .map(JsonElement::getAsJsonObject)
-        .flatMap(recipe -> recipe.getAsJsonArray("ingredients").asList().stream())
-        .map(JsonElement::getAsJsonObject)
-        .filter(
-            ingredient ->
-                ingredient.getAsJsonArray("itemIds").asList().stream()
-                    .map(JsonElement::getAsString)
-                    .anyMatch(itemId::equals))
-        .mapToInt(ingredient -> ingredient.get("count").getAsInt())
-        .sum();
-  }
-
   private static void assertTrue(boolean condition, String description) {
     if (!condition) {
       throw new AssertionError(description);
@@ -760,6 +531,4 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       throw new AssertionError(description + ": expected " + expected + " but was " + actual);
     }
   }
-
-  private record McpResponse(int status, JsonObject body) {}
 }

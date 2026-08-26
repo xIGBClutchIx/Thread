@@ -32,7 +32,9 @@ Focused module commands are also available:
 
 The architecture suite runs in `:common:test` and inspects every source tree. It rejects loader
 imports in common, Minecraft/loader imports in core or MCP, cross-loader imports, and production
-Java outside each loader adapter package.
+Java outside each loader adapter package. Shared packaged assertions live under
+`common/src/gametest/java`; both loader test source sets compile them into their separate proof JARs,
+and the boundary suite verifies those fixtures contain no loader API imports.
 
 ## Outputs
 
@@ -73,3 +75,7 @@ NeoForge has parallel packaged proofs:
 
 These stage `thread-neoforge-<version>.jar` plus a separately packaged external proof mod in a fresh
 `mods` directory while explicitly loading no Thread development source set.
+
+The Fabric and NeoForge launch tasks remain separate, but both execute the same loader-neutral
+parity assertions for catalog, configuration, lifecycle state, MCP, tools, recipes, crafting, and
+integration behavior.

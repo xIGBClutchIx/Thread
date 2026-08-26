@@ -14,6 +14,6 @@ public final class ExternalCandidateProvider implements ThreadIntegrationCandida
             IntegrationId.of("gametest-bridge"),
             "thread-gametest",
             ">=1.0.0",
-            "me.clutchy.thread.platform.fabric.integration.ExternalProofIntegration"));
+            "me.clutchy.thread.gametest.ExternalProofIntegration"));
   }
 }

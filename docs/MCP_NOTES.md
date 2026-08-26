@@ -88,9 +88,10 @@ The real local HTTP tests cover:
 - request envelope, JSON, content negotiation, origin, size, and concurrency failures;
 - tool schemas, annotations, structured success/error mapping, disconnects, and shutdown.
 
-Packaged client tests repeat initialization against the actual loader-specific JAR in a temporary
-single-player world; Fabric calls all thirteen tools and NeoForge covers representative tools plus
-the shared recipe/crafting and integration paths.
+Packaged client tests repeat initialization against each actual loader-specific JAR. A shared
+loader-neutral parity fixture verifies the exact catalog, exercises all thirteen tool paths across
+the menu/world/menu lifecycle, and repeats representative status, player, recipe, and crafting
+calls through MCP on both Fabric and NeoForge.
 
 ## Deliberately absent MCP features
 

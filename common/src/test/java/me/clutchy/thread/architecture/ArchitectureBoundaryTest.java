@@ -16,6 +16,7 @@ class ArchitectureBoundaryTest {
   private static final Path PROJECT_ROOT =
       Path.of(System.getProperty("thread.rootDir")).toAbsolutePath().normalize();
   private static final Path COMMON_SOURCE_ROOT = PROJECT_ROOT.resolve("common/src/main/java");
+  private static final Path SHARED_GAMETEST_ROOT = PROJECT_ROOT.resolve("common/src/gametest/java");
   private static final List<Path> FABRIC_SOURCE_ROOTS =
       List.of(
           PROJECT_ROOT.resolve("fabric/src/main/java"),
@@ -79,6 +80,8 @@ class ArchitectureBoundaryTest {
     assertTrue(neoForgeBuild.contains("project(':common')"), "NeoForge must consume common");
     assertFalse(commonBuild.contains("project(':fabric')"), "common must not consume Fabric");
     assertFalse(commonBuild.contains("project(':neoforge')"), "common must not consume NeoForge");
+    assertFalse(fabricBuild.contains("project(':neoforge')"), "Fabric must not consume NeoForge");
+    assertFalse(neoForgeBuild.contains("project(':fabric')"), "NeoForge must not consume Fabric");
     assertFalse(
         Files.exists(PROJECT_ROOT.resolve("src")), "legacy root source tree must stay absent");
   }
@@ -90,6 +93,7 @@ class ArchitectureBoundaryTest {
       assertTrue(
           normalizedPath(source).contains("/me/clutchy/thread/platform/fabric/"), source::toString);
       assertFalse(contents.contains("import net.neoforged."), source::toString);
+      assertFalse(contents.contains("me.clutchy.thread.platform.neoforge"), source::toString);
     }
   }
 
@@ -101,7 +105,30 @@ class ArchitectureBoundaryTest {
           normalizedPath(source).contains("/me/clutchy/thread/platform/neoforge/"),
           source::toString);
       assertFalse(contents.contains("import net.fabricmc."), source::toString);
+      assertFalse(contents.contains("me.clutchy.thread.platform.fabric"), source::toString);
     }
+  }
+
+  @Test
+  void sharedPackagedParityCodeDoesNotImportLoaderApis() throws IOException {
+    for (Path source : javaSourcesUnder(SHARED_GAMETEST_ROOT)) {
+      String contents = Files.readString(source, StandardCharsets.UTF_8);
+      assertFalse(contents.contains("import net.fabricmc."), source::toString);
+      assertFalse(contents.contains("import net.neoforged."), source::toString);
+      assertFalse(contents.contains("me.clutchy.thread.platform.fabric"), source::toString);
+      assertFalse(contents.contains("me.clutchy.thread.platform.neoforge"), source::toString);
+    }
+
+    String fabricBuild =
+        Files.readString(PROJECT_ROOT.resolve("fabric/build.gradle"), StandardCharsets.UTF_8);
+    String neoForgeBuild =
+        Files.readString(PROJECT_ROOT.resolve("neoforge/build.gradle"), StandardCharsets.UTF_8);
+    assertTrue(
+        fabricBuild.contains("common/src/gametest/java"),
+        "Fabric packaged tests must compile the shared parity contract");
+    assertTrue(
+        neoForgeBuild.contains("common/src/gametest/java"),
+        "NeoForge packaged tests must compile the shared parity contract");
   }
 
   @Test

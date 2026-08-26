@@ -32,6 +32,7 @@ sourceSets {
         runtimeClasspath += sourceSets.client.output
     }
     gametest {
+        java.srcDir rootProject.file('common/src/gametest/java')
         compileClasspath += sourceSets.client.output
         runtimeClasspath += sourceSets.client.output
     }

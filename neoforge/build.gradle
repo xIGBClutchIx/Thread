@@ -7,7 +7,9 @@ base {
 }
 
 sourceSets {
-    gametest
+    gametest {
+        java.srcDir rootProject.file('common/src/gametest/java')
+    }
 }
 
 configurations {

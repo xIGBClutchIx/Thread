@@ -1,15 +1,18 @@
 package me.clutchy.thread.runtime;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import me.clutchy.thread.config.ThreadConfig;
+import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.integration.IntegrationCandidate;
 import me.clutchy.thread.core.integration.IntegrationEnvironment;
 import me.clutchy.thread.core.integration.IntegrationLoader;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
+import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
 import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
@@ -36,6 +39,8 @@ import net.minecraft.client.Minecraft;
 
 /** Shared assembly and lifecycle for one loader-provided Thread client runtime. */
 public final class ThreadRuntime implements AutoCloseable {
+  private static final System.Logger LOGGER = System.getLogger(ThreadRuntime.class.getName());
+
   private final ThreadConfig config;
   private final ThreadRuntimeInfo info;
   private final ToolRegistry tools;
@@ -55,6 +60,66 @@ public final class ThreadRuntime implements AutoCloseable {
     this.tools = tools;
     this.integrations = integrations;
     this.optionalIntegrationCount = optionalIntegrationCount;
+  }
+
+  /**
+   * Starts one client runtime from loader-resolved metadata and paths.
+   *
+   * <p>The loader edge remains responsible only for resolving its APIs. Configuration fallback,
+   * shared assembly, optional integration loading, MCP startup, and startup logging are identical
+   * on every loader and therefore live here.
+   */
+  public static ThreadRuntime start(
+      Minecraft client,
+      Path configPath,
+      ThreadRuntimeInfo info,
+      List<IntegrationCandidate> candidates,
+      IntegrationEnvironment integrationEnvironment,
+      ClassLoader integrationClassLoader) {
+    Objects.requireNonNull(configPath, "configPath");
+    Objects.requireNonNull(integrationClassLoader, "integrationClassLoader");
+    ThreadConfig config = loadConfig(configPath);
+    ThreadRuntime runtime =
+        create(
+            client,
+            config,
+            info,
+            candidates,
+            integrationEnvironment,
+            new ReflectiveIntegrationLoader(integrationClassLoader));
+
+    if (config.mcpEnabled()) {
+      try {
+        LOGGER.log(
+            System.Logger.Level.INFO,
+            "Thread MCP listener started at {0}",
+            runtime.startMcp().endpoint());
+      } catch (IOException exception) {
+        // A local port conflict must not take down Minecraft. Do not include request or game state.
+        LOGGER.log(
+            System.Logger.Level.ERROR,
+            "Thread MCP listener could not bind to {0}:{1} ({2})",
+            config.mcpBindHost(),
+            config.mcpPort(),
+            exception.getClass().getSimpleName());
+      }
+    }
+
+    LOGGER.log(System.Logger.Level.INFO, info.startupMessage());
+    LOGGER.log(
+        System.Logger.Level.DEBUG,
+        "Thread configuration loaded (MCP enabled: {0})",
+        config.mcpEnabled());
+    LOGGER.log(
+        System.Logger.Level.DEBUG,
+        "Thread live providers and {0} vanilla tools initialized",
+        runtime.tools().descriptors().size());
+    LOGGER.log(
+        System.Logger.Level.DEBUG,
+        "Thread integrations initialized ({0} active, {1} optional candidates)",
+        runtime.integrations().integrations().size(),
+        runtime.optionalIntegrationCount());
+    return runtime;
   }
 
   /**
@@ -130,7 +195,7 @@ public final class ThreadRuntime implements AutoCloseable {
   }
 
   /** Starts the loopback MCP listener using the validated shared configuration. */
-  public McpHttpServer startMcp() throws IOException {
+  public synchronized McpHttpServer startMcp() throws IOException {
     if (!config.mcpEnabled()) {
       throw new IllegalStateException("MCP is disabled by configuration");
     }
@@ -175,9 +240,27 @@ public final class ThreadRuntime implements AutoCloseable {
 
   /** Stops the listener without coupling the shared runtime to any loader lifecycle API. */
   @Override
-  public void close() {
+  public synchronized void close() {
+    boolean listenerWasRunning = mcpRunning();
     if (mcpServer != null) {
       mcpServer.close();
+      mcpServer = null;
+    }
+    if (listenerWasRunning) {
+      LOGGER.log(System.Logger.Level.INFO, "Thread MCP listener stopped");
+    }
+  }
+
+  private static ThreadConfig loadConfig(Path configPath) {
+    try {
+      return ThreadConfigLoader.loadOrCreate(configPath);
+    } catch (IOException | IllegalArgumentException exception) {
+      // Keep Minecraft usable and preserve invalid player input for correction.
+      LOGGER.log(
+          System.Logger.Level.ERROR,
+          "Thread configuration could not be loaded; safe defaults will be used ({0})",
+          exception.getClass().getSimpleName());
+      return ThreadConfig.defaults();
     }
   }
 }

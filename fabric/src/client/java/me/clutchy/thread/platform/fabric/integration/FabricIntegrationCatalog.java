@@ -30,18 +30,12 @@ public final class FabricIntegrationCatalog {
    */
   public static List<IntegrationCandidate> candidates(FabricLoader loader) {
     Objects.requireNonNull(loader, "loader");
-    List<Supplier<ThreadIntegrationCandidateProvider>> providers =
+    return IntegrationCandidateCatalog.candidatesFromProviders(
         loader
             .getEntrypointContainers(ENTRYPOINT_KEY, ThreadIntegrationCandidateProvider.class)
             .stream()
             .<Supplier<ThreadIntegrationCandidateProvider>>map(
                 container -> container::getEntrypoint)
-            .toList();
-    return candidatesFromProviders(providers);
-  }
-
-  static List<IntegrationCandidate> candidatesFromProviders(
-      List<? extends Supplier<ThreadIntegrationCandidateProvider>> providers) {
-    return IntegrationCandidateCatalog.candidatesFromProviders(providers);
+            .toList());
   }
 }

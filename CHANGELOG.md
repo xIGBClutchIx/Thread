@@ -17,6 +17,8 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Changed
 
+- Consolidated loader-neutral config, startup, MCP, logging, and shutdown behavior in the shared
+  runtime, with one packaged parity contract exercised by both Fabric and NeoForge.
 - Split the project into `:common`, `:fabric`, and `:neoforge`, moved loader-neutral Minecraft
   providers and runtime assembly into common, and kept both loader adapters limited to
   loader/lifecycle/discovery wiring.

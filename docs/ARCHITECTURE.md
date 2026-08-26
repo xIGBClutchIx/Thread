@@ -60,12 +60,14 @@ open hidden containers, resolve unopened loot tables, or mutate Minecraft.
 
 `me.clutchy.thread.runtime.ThreadRuntime` performs loader-neutral assembly:
 
-1. create logical-thread dispatch, session guards, limits, mappers, and extension registries;
-2. construct the shared Minecraft providers and composite recipe provider;
-3. register the built-in vanilla integration;
-4. activate compatible enabled candidates supplied by the loader adapter;
-5. expose the final tool/integration registries;
-6. start and close MCP when requested by the loader lifecycle.
+1. load the loader-supplied config path, preserving invalid files while falling back safely;
+2. create logical-thread dispatch, session guards, limits, mappers, and extension registries;
+3. construct the shared Minecraft providers and composite recipe provider;
+4. register the built-in vanilla integration;
+5. activate compatible enabled candidates supplied by the loader adapter;
+6. start the configured MCP listener and report consistent startup diagnostics;
+7. expose the final tool/integration registries and close shared resources when the loader signals
+   shutdown.
 
 `ThreadRuntimeInfo` carries the running Thread, Minecraft, and loader identity/version without
 depending on a loader API. There is no global service locator or background integration lifecycle.
@@ -87,7 +89,7 @@ ceilings. Each loader adapter supplies its config-file location.
 - `ThreadFabricClient`, the Fabric client entrypoint;
 - Fabric Loader lookups for Thread, Minecraft, loader, and installed-mod versions;
 - the Fabric config-directory path;
-- the Fabric client-stopping event that closes `ThreadRuntime`;
+- the Fabric client-stopping event that tells `ThreadRuntime` to close;
 - `thread:integrations` entrypoint discovery;
 - Fabric version-predicate evaluation for optional integration candidates.
 
@@ -102,9 +104,35 @@ bounded read, so loader lifecycle differences do not leak into core APIs.
 
 `neoforge/src/main/java/me/clutchy/thread/platform/neoforge` mirrors the same narrow boundary. It
 owns the `@Mod` client bootstrap, `ModList` and Maven-version-range queries, `FMLPaths` config path,
-client/integrated-server shutdown observations, and Java `ServiceLoader` candidate-provider
-discovery. Candidate providers expose metadata only; compatible implementation classes remain
-deferred until the shared integration registry has checked the target mod and version.
+the NeoForge game-shutdown event, and Java `ServiceLoader` candidate-provider discovery. Candidate
+providers expose metadata only; compatible implementation classes remain deferred until the shared
+integration registry has checked the target mod and version.
+
+NeoForge does not maintain a second integrated-server lifecycle state. The shared providers resolve
+Minecraft's current integrated server for each bounded read, which is the same source used on
+Fabric and avoids loader-specific state drifting from the game.
+
+## Loader behavior contract
+
+Every supported loader must hand its metadata, config path, integration candidates, environment,
+and mod classloader to the same `ThreadRuntime`. That common path guarantees identical config
+fallback, runtime assembly, tool registration, MCP bind handling, diagnostics, and resource close
+behavior.
+
+Packaged parity coverage requires each loader to prove:
+
+- the exact same thirteen-tool catalog and active vanilla integration;
+- correct loader identity plus menu, single-player, and return-to-menu status;
+- MCP-enabled, restarted-config, and MCP-disabled startup;
+- standard MCP initialization, discovery, tool listing, calls, and controlled menu rejection;
+- native live recipes, direct crafting, recursive planning, and external integration discovery;
+- centralized single-player safety, with multiplayer rejection covered by the shared session guard;
+- clean process exit so the listener can bind again on restart.
+
+The assertions are shared, but launch mechanics remain local: Fabric uses its client game-test API,
+while NeoForge drives its client lifecycle through NeoForge events and screens. Version parsing,
+candidate enumeration, config-path lookup, and shutdown event registration also remain local
+because those are genuine loader APIs rather than portable behavior.
 
 ## Session and threading rules
 
@@ -146,6 +174,8 @@ Architecture and release tests enforce that:
 - optional implementations remain deferred class-name strings;
 - each installable JAR contains common plus exactly one loader adapter, with no tests or bundled
   third-party adapter;
+- neither loader module imports or depends on the other loader implementation;
+- shared packaged parity fixtures import neither loader API;
 - each loader's packaged-client tests exercise its final JAR through menu/world/menu, restart, and
   MCP-disabled lifecycles.
 

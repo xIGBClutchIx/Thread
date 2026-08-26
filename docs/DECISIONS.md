@@ -26,6 +26,10 @@ unchanged across client loaders. `:fabric` and `:neoforge` own only their entryp
 lifecycle, config-path, version-predicate, and integration-discovery wiring. Each release JAR merges
 common classes; common is not installed or published independently.
 
+Both entrypoints resolve those loader-specific values and call `ThreadRuntime.start`. Configuration
+fallback, reflective integration activation, MCP bind handling, startup diagnostics, and resource
+close behavior are one shared lifecycle rather than parallel loader implementations.
+
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
 component map, or optional-mod type. Shared Minecraft adapters convert live game objects into
 detached DTOs. MCP maps only the tool registry. Common source has no Fabric imports or runtime
@@ -33,8 +37,8 @@ dependencies.
 
 Thread does not use Architectury or a custom platform god object, and it does not wrap every
 Minecraft class. Config-directory and lifecycle abstractions are intentionally absent because the
-thin loader entrypoints consume those values directly. Add another contract only when a concrete
-loader difference requires shared behavior.
+thin loader entrypoints resolve those values once and pass them into the existing shared runtime.
+Add another contract only when a concrete loader difference requires shared behavior.
 
 Java type documentation belongs on public types and architecture documentation belongs under
 `docs/`; `package-info.java` is not used.
@@ -102,4 +106,6 @@ Legacy GET/SSE and non-tool MCP feature surfaces are absent.
 Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and
 three packaged-client runs per loader are mandatory. Each normal test uses the final runtime JAR in
 a real temporary single-player world; restart proves persisted configuration reload, and disabled
-startup proves tools initialize without MCP. A release is not validated by compilation alone.
+startup proves tools initialize without MCP. Both loader proof mods compile one shared parity
+fixture for the exact catalog, config, lifecycle, MCP, recipes/crafting, and integration contract;
+only their launch mechanics remain separate. A release is not validated by compilation alone.

@@ -14,6 +14,6 @@ public final class ExternalCandidateProvider implements ThreadIntegrationCandida
             IntegrationId.of("gametest-bridge"),
             "thread_neoforge_gametest",
             "[1.0,)",
-            "me.clutchy.thread.gametest.neoforge.integration.ExternalProofIntegration"));
+            "me.clutchy.thread.gametest.ExternalProofIntegration"));
   }
 }

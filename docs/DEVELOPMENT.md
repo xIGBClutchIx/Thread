@@ -8,6 +8,7 @@ releases.
 Thread is built as `:common` plus thin `:fabric` and `:neoforge` adapters. Shared core,
 configuration, MCP, runtime assembly, and loader-neutral Minecraft providers belong in `:common`.
 Loader API access, lifecycle events, metadata, and integration discovery stay in their adapter.
+Both entrypoints call the same `ThreadRuntime.start` path after resolving those loader values.
 
 Root Gradle tasks aggregate all modules and remain the normal contributor interface. See
 [Build](BUILD.md) for module-specific commands and outputs.
@@ -51,10 +52,11 @@ change pass; narrow a noisy rule only when the code has a documented legitimate 
 
 ### Unit and architecture tests
 
-The root `test` task runs `:common:test`, `:fabric:test`, and `:neoforge:test`. They cover core services, schemas,
-registries, configuration, integration activation/isolation, shared Minecraft conversion/support,
-both loader discovery paths, and the real loopback MCP HTTP server without launching Minecraft. Fake
-providers should prove core behavior whenever live Minecraft is unnecessary.
+The root `test` task runs `:common:test`, `:fabric:test`, and `:neoforge:test`. They cover core
+services, schemas, registries, configuration, integration activation/isolation, shared Minecraft
+conversion/support, loader-specific discovery/version handling, and the real loopback MCP HTTP
+server without launching Minecraft. Fake providers should prove core behavior whenever live
+Minecraft is unnecessary.
 
 Important regression areas include:
 
@@ -68,7 +70,8 @@ Important regression areas include:
 - MCP initialize and stateless discovery, protocol validation, request/origin limits, shutdown, and
   same-port restart;
 - package/import and release-artifact boundaries.
-- loader-to-common module direction and the absence of Fabric/NeoForge imports in common.
+- loader-to-common module direction, cross-loader isolation, and the absence of Fabric/NeoForge
+  imports in common or the shared packaged parity fixture.
 
 Run focused unit coverage with:
 
@@ -97,10 +100,16 @@ but is not the release proof.
 ```
 
 Each normal test launches a temporary client with the final loader-specific Thread JAR and a
-separately packaged proof integration/game-test mod. It creates a temporary single-player world,
-checks native recipe additions/replacements, activates the external proof candidate, initializes
-the real MCP endpoint, lists the catalog, calls representative live tools (all thirteen on Fabric),
-then closes the world and proves gameplay calls return controlled errors at the menu.
+separately packaged proof integration/game-test mod. Both compile the same loader-neutral parity
+fixture from `common/src/gametest/java`. It verifies the exact thirteen-tool catalog, config,
+loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
+recipes and crafting, external integration activation, and controlled gameplay rejection at the
+menu.
+
+Launch control remains loader-specific because the APIs are genuinely different: Fabric uses the
+Fabric client game-test context, while NeoForge uses a bounded event-driven state machine. Fabric
+also retains richer deterministic payload assertions for inventory, equipment, target blocks, and
+entities; those are provider regression coverage, not a different loader contract.
 
 The restart test launches that packaged client again from the same instance and proves an existing
 configuration is reloaded, including a changed MCP port. The disabled tests use separate fresh
