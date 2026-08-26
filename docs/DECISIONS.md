@@ -336,7 +336,7 @@ catalog does not import optional implementations, use class literals, or use eag
 discovery.
 
 `ThreadIntegration.register` receives one transactional `IntegrationContext`. It may contribute
-read-only tools, bounded contexts, additional recipe definitions, typed platform extensions, and
+read-only tools, bounded contexts, preferred recipe definitions, typed platform extensions, and
 bounded capability metadata. Successful callbacks commit as one startup unit; callback, duplicate,
 metadata, linkage, or construction failures leave no partial registration and do not stop later
 optional candidates.
@@ -375,5 +375,32 @@ after metadata-first discovery succeeds.
 Thread accepts only layouts it can represent truthfully: a stable ID, one item output, and consumed
 item-stack inputs with consistent counts. Alternatives and source tags are retained; custom
 ingredient types, multiple or ambiguous outputs, missing IDs, malformed layouts, and excessive
-results are skipped. A successful guarded vanilla result remains authoritative fallback whenever
+results are skipped. A successful guarded native result remains authoritative fallback whenever
 JEI is absent, disabled, unavailable, or fails at runtime.
+
+## D025: Live native recipes are the deterministic base and fallback
+
+**Status:** Accepted
+
+`FabricRecipeProvider` reads the integrated server's resolved live `RecipeManager` on its owning
+thread. That manager is the gameplay-authoritative composition of vanilla definitions and active
+datapack/Fabric-mod additions, replacements, and removals. Thread does not ship or consult a static
+vanilla recipe catalog.
+
+`CompositeRecipeProvider` first captures this native result so session rejection and native safety
+limits cannot be bypassed. It then considers optional recipe contributions in stable integration-ID
+order. The first successful, non-empty result replaces the native result for that item. Empty
+results, controlled failures, runtime exceptions, and linkage errors decline the item and preserve
+the captured native result unchanged.
+
+This policy gives JEI deterministic precedence where it supplies representable, modpack-aware
+recipes while preserving the native manager whenever JEI is absent, disabled, initializing,
+unsupported for that item, or faulty. `CraftingService`, `CraftingPlanner`, tool handlers, and MCP
+continue to depend only on `RecipeProvider`.
+
+The packaged test mod proves the boundary with real recipe resources: it adds a two-step custom
+recipe chain and replaces the vanilla diamond-pickaxe recipe. Both absent-JEI and disabled-JEI runs
+must observe those resources through all four existing recipe/crafting tools. The enabled-JEI run
+additionally proves JEI-only recipes take precedence. JEI slot conversion uses the public
+`getAllIngredients()` API rather than the cycling displayed ingredient so alternatives remain
+complete.

@@ -28,6 +28,10 @@ import net.minecraft.world.phys.BlockHitResult;
 /** End-to-end proof that the vanilla catalog reads a real integrated game session. */
 @SuppressWarnings("UnstableApiUsage")
 public final class FabricProviderClientGameTest implements FabricClientGameTest {
+  private static final String NATIVE_COMMAND_BLOCK_RECIPE =
+      "thread:native_command_block_from_earth";
+  private static final String NATIVE_CHAIN_COMMAND_BLOCK_RECIPE =
+      "thread:native_chain_command_block_from_command_block";
   private static final String EXPECT_MCP_DISABLED = "thread.gametest.expectMcpDisabled";
   private static final String EXPECT_JEI = "thread.gametest.expectJei";
   private static final String EXPECT_JEI_DISABLED = "thread.gametest.expectJeiDisabled";
@@ -198,6 +202,12 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           invokeSuccessfully(
               context, tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
       assertTrue(!recipes.getAsJsonArray("recipes").isEmpty(), "diamond pickaxe recipe present");
+      assertEquals(1, recipeOccurrences(recipes, "minecraft:dirt"), "datapack override dirt input");
+      if (!expectJei) {
+        assertEquals(
+            0, recipeOccurrences(recipes, "minecraft:diamond"), "replaced vanilla diamonds");
+        assertEquals(0, recipeOccurrences(recipes, "minecraft:stick"), "replaced vanilla sticks");
+      }
       JsonObject directCraftability =
           invokeSuccessfully(
               context, tools, "minecraft.can_craft", "{\"itemId\":\"minecraft:diamond_pickaxe\"}");
@@ -229,15 +239,18 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       assertTrue(directPlan.getAsJsonArray("missingMaterials").isEmpty(), "no raw shortages");
       assertTrue(directPlan.getAsJsonArray("issues").isEmpty(), "no planning safety issues");
 
+      verifyNativeRecipes(context, tools);
       if (expectJei) {
         verifyJeiRecipes(context, tools);
-      } else if (expectJeiDisabled) {
+      } else {
         JsonObject disabledRecipes =
             invokeSuccessfully(
                 context, tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:barrier\"}");
         assertTrue(
             disabledRecipes.getAsJsonArray("recipes").isEmpty(),
-            "disabled JEI recipes do not enter the vanilla fallback");
+            expectJeiDisabled
+                ? "disabled JEI recipes do not enter the native fallback"
+                : "absent JEI recipes do not enter the native fallback");
       }
 
       JsonObject search =
@@ -354,14 +367,11 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           mcpTool(context, mcp.endpoint(), 12, "minecraft.get_recipe", recipeArguments);
       assertTrue(!mcpRecipe.getAsJsonArray("recipes").isEmpty(), "MCP diamond pickaxe recipe");
       assertTrue(
-          recipeOccurrences(mcpRecipe, "minecraft:diamond") >= 3,
-          "MCP recipe requires three diamonds");
+          recipeOccurrences(mcpRecipe, "minecraft:dirt") == 1,
+          "MCP recipe sees the datapack override");
       assertTrue(
-          recipeOccurrences(mcpRecipe, "minecraft:stick") >= 2, "MCP recipe requires two sticks");
-      assertTrue(
-          itemCount(mcpInventory, "minecraft:diamond") >= 3
-              && itemCount(mcpInventory, "minecraft:stick") >= 2,
-          "MCP inventory and recipe prove the player has pickaxe materials");
+          itemCount(mcpInventory, "minecraft:dirt") >= 1,
+          "MCP inventory has the overridden recipe material");
 
       JsonObject mcpCraftability =
           mcpTool(context, mcp.endpoint(), 13, "minecraft.can_craft", recipeArguments);
@@ -415,6 +425,53 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         assertEquals(2, jeiRecipe.getAsJsonArray("recipes").size(), "MCP JEI recipe variants");
       }
     }
+  }
+
+  private static void verifyNativeRecipes(ClientGameTestContext context, ToolRegistry tools) {
+    JsonObject recipes =
+        invokeSuccessfully(
+            context, tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:command_block\"}");
+    JsonObject nativeRecipe = recipe(recipes, NATIVE_COMMAND_BLOCK_RECIPE);
+    JsonObject nativeIngredient =
+        nativeRecipe.getAsJsonArray("ingredients").get(0).getAsJsonObject();
+    assertEquals(
+        2, nativeIngredient.getAsJsonArray("itemIds").size(), "native recipe alternatives");
+    assertEquals(1, nativeIngredient.get("count").getAsInt(), "native recipe input count");
+    assertEquals(1, recipeOccurrences(recipes, "minecraft:dirt"), "custom recipe dirt option");
+    assertEquals(1, recipeOccurrences(recipes, "minecraft:stone"), "custom recipe stone option");
+
+    JsonObject craftability =
+        invokeSuccessfully(
+            context, tools, "minecraft.can_craft", "{\"itemId\":\"minecraft:command_block\"}");
+    assertTrue(craftability.get("craftable").getAsBoolean(), "native recipe craftability");
+    JsonObject missing =
+        invokeSuccessfully(
+            context,
+            tools,
+            "minecraft.get_missing_ingredients",
+            "{\"itemId\":\"minecraft:command_block\"}");
+    assertTrue(missing.get("craftable").getAsBoolean(), "native recipe missing ingredients");
+    JsonObject plan =
+        invokeSuccessfully(
+            context,
+            tools,
+            "minecraft.get_crafting_plan",
+            "{\"itemId\":\"minecraft:chain_command_block\"}");
+    assertTrue(plan.get("craftable").getAsBoolean(), "native recursive crafting plan");
+    assertTrue(
+        plan.getAsJsonArray("steps").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(step -> step.get("recipeId").getAsString())
+            .anyMatch(NATIVE_COMMAND_BLOCK_RECIPE::equals),
+        "native recursive intermediate recipe");
+    assertTrue(
+        plan.getAsJsonArray("steps").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(step -> step.get("recipeId").getAsString())
+            .anyMatch(NATIVE_CHAIN_COMMAND_BLOCK_RECIPE::equals),
+        "native recursive final recipe");
+    assertTrue(plan.getAsJsonArray("missingMaterials").isEmpty(), "native plan raw shortages");
+    assertTrue(plan.getAsJsonArray("issues").isEmpty(), "native plan safety limits");
   }
 
   private static void verifyJeiRecipes(ClientGameTestContext context, ToolRegistry tools) {
@@ -631,6 +688,14 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         .filter(candidate -> candidate.get("entityType").getAsString().equals(entityType))
         .findFirst()
         .orElseThrow();
+  }
+
+  private static JsonObject recipe(JsonObject result, String recipeId) {
+    return result.getAsJsonArray("recipes").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("recipeId").getAsString().equals(recipeId))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("missing recipe " + recipeId));
   }
 
   private static int itemCount(JsonObject inventory, String itemId) {

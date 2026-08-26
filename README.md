@@ -64,6 +64,7 @@ Codex-specific repository instructions live in [`AGENTS.md`](AGENTS.md).
 | 8 | Bounded recursive crafting plans with cycle-safe explanations |
 | 9 | Optional mod integration discovery, isolation, and typed contribution framework |
 | 10 | Optional JEI recipe integration through the existing crafting tools |
+| 11 | Live native recipe fallback and deterministic optional-provider precedence |
 
 A slice is complete only when its acceptance criteria in `docs/SLICES.md` pass.
 
@@ -80,8 +81,9 @@ Thread 0.1.0 requires Minecraft 26.2, Java 25, Fabric Loader 0.19.3 or newer, an
    `Thread MCP listener started at http://127.0.0.1:25580/mcp`.
 
 To include modpack-aware recipes, install JEI `30.26.0.182` or a newer compatible `30.x` Fabric
-build in the same instance. Thread remains fully functional with vanilla recipe behavior when JEI
-is absent or when `"jei"` is listed in `disabledIntegrations`.
+build in the same instance. Thread remains fully functional when JEI is absent or disabled: the
+native provider reads Minecraft's live recipe manager, including active datapack and Fabric-mod
+recipe additions, replacements, and removals.
 
 PowerShell checksum verification:
 

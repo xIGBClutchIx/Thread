@@ -16,6 +16,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 ### Changed
 
 - Raised the Minecraft 26.2 Fabric API minimum to `0.155.0+26.2`, matching the supported JEI line.
+- Made recipe-source precedence deterministic: the first usable optional provider wins per item,
+  while Minecraft's live recipe manager remains the guarded base and fallback.
+- JEI conversion now reads each slot's complete ingredient set instead of its cycling display state.
 
 ## 0.1.0 - 2026-08-24
 

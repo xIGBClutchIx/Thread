@@ -42,7 +42,13 @@ import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.item.crafting.display.SlotDisplayContext;
 import net.minecraft.world.level.Level;
 
-/** Reads item identities and live recipe definitions from the running Fabric game. */
+/**
+ * Reads item identities and the final live recipe set from the running Fabric game.
+ *
+ * <p>The integrated server's recipe manager already reflects vanilla data plus active datapack and
+ * mod resource additions, replacements, and removals after reload. Thread does not maintain a
+ * parallel static vanilla recipe catalog.
+ */
 public final class FabricRecipeProvider implements RecipeProvider {
   private final Minecraft client;
   private final GameThreadExecutor clientThread;
@@ -121,6 +127,8 @@ public final class FabricRecipeProvider implements RecipeProvider {
           true);
     }
 
+    // Read the manager's resolved collection on the server thread. This is the same live snapshot
+    // gameplay uses after vanilla, datapack, and mod-provided recipe resources have been composed.
     Collection<RecipeHolder<?>> definitions = context.server().getRecipeManager().getRecipes();
     if (definitions.size() > limits.maxRecipeDefinitions()) {
       return ToolResult.failure(

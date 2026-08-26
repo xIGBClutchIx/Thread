@@ -555,7 +555,9 @@ is preferred over a cyclic one under the deterministic selection order.
 The planner does not inspect equipment or nearby storage, model crafting stations/fuel, perform
 automatic crafting, or mutate the game. It remains unaware of recipe-viewer APIs; when the optional
 JEI integration is active, supported JEI recipes arrive through the same `RecipeProvider` contract
-as vanilla recipes. REI and EMI are not integrated.
+as native recipes. Without a usable JEI result, the contract reads Minecraft's final live recipe
+manager, including active vanilla, datapack, and Fabric-mod additions, replacements, and removals.
+Thread does not use a static vanilla recipe list. REI and EMI are not integrated.
 
 ## `minecraft.search_items`
 

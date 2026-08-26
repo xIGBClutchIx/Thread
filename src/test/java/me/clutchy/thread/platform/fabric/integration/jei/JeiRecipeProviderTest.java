@@ -269,7 +269,7 @@ class JeiRecipeProviderTest {
         method ->
             switch (method.getName()) {
               case "getRole" -> slot.role();
-              case "getDisplayedIngredients" -> ingredients.stream();
+              case "getAllIngredients" -> ingredients.stream();
               case "getTagKey" -> Optional.ofNullable(slot.tag());
               default -> throw unexpected(method);
             });

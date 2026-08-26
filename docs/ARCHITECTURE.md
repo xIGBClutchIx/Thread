@@ -129,6 +129,11 @@ bounded rather than an exhaustive global optimizer. Steps are returned in depend
 
 Providers describe what Thread needs from Minecraft, not how Fabric exposes it.
 
+`FabricRecipeProvider` is the base recipe implementation. It reads the integrated server's live
+`RecipeManager` on the server thread after resource reload, so its resolved collection already
+contains vanilla recipes plus active datapack and Fabric-mod additions, replacements, and removals.
+Thread has no hard-coded fallback recipe list.
+
 Conceptual contracts:
 
 ```java
@@ -212,8 +217,8 @@ Dynamic state such as inventory should be requested through tools rather than co
 
 ### Integration registry
 
-Thread ships a clean optional-integration framework while still containing only the built-in
-vanilla gameplay integration. No substantial third-party mod support ships in this slice.
+Thread ships a clean optional-integration framework with the required built-in vanilla gameplay
+integration and one optional JEI recipe integration.
 
 Conceptually:
 
@@ -263,9 +268,10 @@ and their own bounded metadata rather than a parallel hard-coded feature list.
 ID plus its contribution contract. Contributions are returned in integration-ID order, preserving
 declaration order within one integration. The implemented points are:
 
-- `thread.recipe_provider`: adds detached recipe definitions after the guarded vanilla provider
-  succeeds. Optional provider failures are ignored so vanilla recipe behavior and session guards
-  remain authoritative.
+- `thread.recipe_provider`: supplies preferred detached recipe definitions after the guarded native
+  provider succeeds. Providers are considered in stable integration-ID order; the first successful,
+  non-empty result wins for that item. Empty results, controlled failures, runtime exceptions, and
+  linkage failures fall back to the native result unchanged.
 - `fabric.block_entity_inspector`: produces bounded structured data for a recognized block entity.
 - `fabric.block_enricher`: enriches an already-detached target-block snapshot.
 - `fabric.entity_enricher`: enriches an already-detached nearby-entity snapshot.
@@ -275,16 +281,24 @@ Minecraft implementation types on the owning logical thread. They must return Th
 not expose raw Minecraft, third-party, NBT, or component objects. Runtime exceptions and linkage
 errors from optional recipe/enrichment contributions are isolated per contributor.
 
-The first shipped optional adapter is JEI. Its flow is:
+Recipe source selection is explicit and transport-independent:
 
 ```text
-JEI IJeiRuntime / recipe layouts
-    -> platform.fabric.integration.jei
-    -> IntegrationRecipeProvider
-    -> CompositeRecipeProvider
-    -> CraftingService / CraftingPlanner
-    -> existing minecraft.* tools
+Minecraft RecipeManager -> FabricRecipeProvider ---------+
+                                                        +-> CompositeRecipeProvider
+JEI IJeiRuntime -> JeiRecipeProvider (when active) ------+          |
+                                                                   v
+                                                CraftingService / CraftingPlanner
+                                                                   |
+                                                                   v
+                                                    existing minecraft.* tools
 ```
+
+The native result is captured first to enforce the centralized session guard and server-side
+safety limits. A supported non-empty JEI result is then preferred for that item. If JEI is absent,
+disabled, unavailable, returns no representable recipes, or fails, the captured native result is
+returned. Core crafting services and MCP see only `RecipeProvider` and cannot distinguish the
+selected source.
 
 `FabricIntegrationLoader` supplies only the client-thread executor, fixed provider limits, and DTO
 mapper after discovery has accepted the candidate. This small platform constructor-injection layer
@@ -294,9 +308,9 @@ contracts did not change. All `mezz.jei` imports remain below `platform.fabric.i
 JEI exposes `IJeiRuntime` only through its plugin lifecycle. `ThreadJeiPlugin` therefore keeps one
 private lifecycle bridge that is cleared by `onRuntimeUnavailable`; the integration's recipe
 provider reads it only on Minecraft's client thread. Layout conversion accepts stable, single-item
-output recipes with fully item-backed consumed inputs, preserves item alternatives/tag provenance,
-and skips unrepresentable layouts. Base vanilla reads still run first, retaining the central
-single-player guard and fallback behavior.
+output recipes with fully item-backed consumed inputs, reads each slot's complete ingredient set,
+preserves item alternatives/tag provenance, and skips unrepresentable layouts. Base native reads
+still run first, retaining the central single-player guard and fallback behavior.
 
 Future integrations may define additional typed extension points and metadata keys. The framework
 does not implement EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other third-party

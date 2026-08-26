@@ -19,24 +19,16 @@ import org.junit.jupiter.api.Test;
 
 class CompositeRecipeProviderTest {
   @Test
-  void mergesSuccessfulContributionsAndIsolatesOptionalFailures() {
+  void firstSuccessfulNonEmptyIntegrationWinsInStableIdOrder() {
     IntegrationExtensionRegistry extensions = new IntegrationExtensionRegistry();
+    extensions.register(
+        IntegrationId.of("zeta"),
+        CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
+        itemId -> ToolResult.success(List.of(recipe("zeta:recipe", itemId))));
     extensions.register(
         IntegrationId.of("alpha"),
         CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
         itemId -> ToolResult.success(List.of(recipe("alpha:recipe", itemId))));
-    extensions.register(
-        IntegrationId.of("broken"),
-        CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
-        itemId -> {
-          throw new NoClassDefFoundError("optional recipe API");
-        });
-    extensions.register(
-        IntegrationId.of("controlled"),
-        CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
-        itemId ->
-            ToolResult.failure(
-                ToolError.of(ToolErrorCode.NOT_AVAILABLE, "Optional recipes unavailable.", true)));
     CompositeRecipeProvider provider =
         new CompositeRecipeProvider(new FakeBaseProvider(), extensions);
 
@@ -44,8 +36,36 @@ class CompositeRecipeProviderTest {
 
     assertTrue(result.successful());
     assertEquals(
-        List.of("minecraft:base", "alpha:recipe"),
-        result.value().stream().map(RecipeInfo::recipeId).toList());
+        List.of("alpha:recipe"), result.value().stream().map(RecipeInfo::recipeId).toList());
+  }
+
+  @Test
+  void fallsBackToBaseWhenOptionalProvidersDeclineOrFail() {
+    IntegrationExtensionRegistry extensions = new IntegrationExtensionRegistry();
+    extensions.register(
+        IntegrationId.of("empty"),
+        CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
+        itemId -> ToolResult.success(List.of()));
+    extensions.register(
+        IntegrationId.of("failed"),
+        CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
+        itemId ->
+            ToolResult.failure(
+                ToolError.of(ToolErrorCode.NOT_AVAILABLE, "Optional recipes unavailable.", true)));
+    extensions.register(
+        IntegrationId.of("throwing"),
+        CoreIntegrationExtensionPoints.RECIPE_PROVIDER,
+        itemId -> {
+          throw new NoClassDefFoundError("optional recipe API");
+        });
+    CompositeRecipeProvider provider =
+        new CompositeRecipeProvider(new FakeBaseProvider(), extensions);
+
+    ToolResult<List<RecipeInfo>> result = provider.recipesFor("minecraft:stick");
+
+    assertTrue(result.successful());
+    assertEquals(
+        List.of("minecraft:base"), result.value().stream().map(RecipeInfo::recipeId).toList());
   }
 
   @Test

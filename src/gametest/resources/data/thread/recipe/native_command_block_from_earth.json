@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    [
+      "minecraft:dirt",
+      "minecraft:stone"
+    ]
+  ],
+  "result": {
+    "id": "minecraft:command_block"
+  }
+}

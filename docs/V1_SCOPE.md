@@ -48,7 +48,7 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - current dimension and position
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
-- vanilla recipe lookup plus optional supported JEI item recipes
+- live native recipe lookup, including datapack/mod changes, plus optional supported JEI item recipes
 - deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - deterministic recursive crafting plans with bounded cycle/depth handling
 - vanilla item search
@@ -123,8 +123,9 @@ reports each recipe variant independently with required, allocated, and missing 
 Thread recursively plans intermediate recipes with one shared inventory ledger and reports final raw
 shortages plus structured cycle/depth/work-limit issues. Both are read-only analyses: Thread does not
 craft items, search nearby storage, model workstation/fuel feasibility, or globally optimize every
-recipe combination. When supported JEI is active, the same tools also consider safe item-only JEI
-recipes without changing their contracts.
+recipe combination. The base recipe source is Minecraft's final live recipe manager, not a static
+vanilla list, so supported datapack and Fabric-mod recipe changes work without JEI. When supported
+JEI is active, its safe item-only results take precedence per item without changing tool contracts.
 
 ## Non-goals that protect the architecture
 

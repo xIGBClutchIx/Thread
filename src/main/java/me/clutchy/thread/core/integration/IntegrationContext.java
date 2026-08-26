@@ -71,7 +71,7 @@ public final class IntegrationContext {
     stagedContexts.add(contextProvider);
   }
 
-  /** Stages an additional recipe provider without replacing the guarded vanilla provider. */
+  /** Stages a preferred recipe provider that is considered only after the guarded base read. */
   public void registerRecipeProvider(IntegrationRecipeProvider recipeProvider) {
     contribute(CoreIntegrationExtensionPoints.RECIPE_PROVIDER, recipeProvider);
   }

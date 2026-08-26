@@ -261,18 +261,18 @@ final class JeiRecipeProvider implements IntegrationRecipeProvider {
   }
 
   private static Optional<List<ItemStack>> itemCandidates(IRecipeSlotView slot) {
-    List<ITypedIngredient<?>> displayed =
-        slot.getDisplayedIngredients().limit((long) MAX_ALTERNATIVES_PER_SLOT + 1).toList();
-    if (displayed.size() > MAX_ALTERNATIVES_PER_SLOT) {
+    List<ITypedIngredient<?>> typedIngredients =
+        slot.getAllIngredients().limit((long) MAX_ALTERNATIVES_PER_SLOT + 1).toList();
+    if (typedIngredients.size() > MAX_ALTERNATIVES_PER_SLOT) {
       return Optional.empty();
     }
     List<ItemStack> stacks =
-        displayed.stream()
+        typedIngredients.stream()
             .map(ingredient -> ingredient.getIngredient(VanillaTypes.ITEM_STACK))
             .flatMap(Optional::stream)
             .filter(stack -> !stack.isEmpty())
             .toList();
-    if (stacks.size() != displayed.size()) {
+    if (stacks.size() != typedIngredients.size()) {
       return Optional.empty();
     }
     return Optional.of(stacks);

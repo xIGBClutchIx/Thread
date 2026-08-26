@@ -5,13 +5,16 @@ import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /**
- * Optional source of additional detached recipe definitions for an item.
+ * Optional preferred source of detached recipe definitions for an item.
  *
  * <p>The vanilla provider remains authoritative for session and safety failures. Integrations may
- * augment successful vanilla results but cannot replace the base provider or bypass session guards.
+ * replace a successful base result only by returning a non-empty list. An empty result or
+ * controlled failure declines the item and preserves the base provider's live recipes.
  */
 @FunctionalInterface
 public interface IntegrationRecipeProvider {
-  /** Returns additional read-only recipes for the canonical result item ID. */
+  /**
+   * Returns preferred read-only recipes, or an empty result when this source does not handle it.
+   */
   ToolResult<List<RecipeInfo>> recipesFor(String itemId);
 }

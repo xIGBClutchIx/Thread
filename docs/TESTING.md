@@ -60,7 +60,8 @@ Cover:
 - recursive crafting plans for simple and deep dependencies, partial inventory, repeated
   cross-branch materials, deterministic variants and repeated IDs, direct/indirect/tag cycles,
   cyclic-versus-safe variants, maximum depth, empty inventory, no recipes, and session failures
-- optional recipe-provider merging with base session failures remaining authoritative
+- optional recipe-provider precedence and native fallback with base session failures remaining
+  authoritative
 - JEI layout conversion for stable variants, item/tag alternatives, counts, unavailable runtime,
   and safe rejection of non-item inputs
 
@@ -102,6 +103,7 @@ Critical edge cases:
 - target becomes invalid
 - empty inventory
 - recipe not found
+- datapack/mod recipe additions and replacements
 - entity result cap reached
 
 The isolated Fabric client game test under `src/gametest` creates a temporary single-player world
@@ -113,6 +115,13 @@ craftability/missing-ingredient results, a recursive crafting-table plan from an
 capability discovery, and MCP calls from both menu and
 supported-world states. Separate unit tests preserve no-world and multiplayer rejection plus
 nearby-entity radius/result caps.
+
+The game-test mod also supplies normal recipe data resources. Two `thread:*` recipes form a custom
+command-block -> chain-command-block dependency, and a `data/minecraft/recipe/diamond_pickaxe.json`
+resource replaces the vanilla diamond-pickaxe definition with a dirt input. The normal and
+JEI-disabled packaged runs prove that the live native manager exposes the addition and replacement,
+preserves dirt/stone alternatives, and drives recipe lookup, craftability, missing-ingredient, and
+recursive-plan tools without JEI.
 
 The same packaged test also verifies that the integration registry initializes with only the
 required `vanilla` integration when JEI is absent, and that its generated capability metadata
@@ -130,12 +139,15 @@ never packaged in the runtime mod.
 `./gradlew runJeiProductionClientGameTest` adds the pinned full JEI runtime and a game-test-only JEI
 plugin. That plugin registers two stable modified recipe variants for a barrier and a second-level
 structure-void recipe absent from Minecraft's recipe manager. The test proves JEI capability
-metadata, recipe alternatives/variants, direct craftability, missing counts, recursive planning,
-and MCP recipe access through the packaged Thread JAR.
+metadata, preferred-provider selection, complete recipe alternatives/variants, direct craftability,
+missing counts, recursive planning, and MCP recipe access through the packaged Thread JAR. Core
+tests prove stable integration-ID precedence and native fallback for empty, controlled-failure, and
+crashing optional providers.
 
 `./gradlew runJeiDisabledProductionClientGameTest` installs the same JEI runtime but writes an
 isolated Thread config containing `disabledIntegrations: ["jei"]`. It proves only `vanilla` becomes
-active and the game-test-only JEI recipe does not enter Thread's vanilla fallback.
+active, the game-test-only JEI recipe does not enter Thread's native fallback, and the custom native
+recipes remain available to all four recipe/crafting tools.
 
 ## Threading tests
 

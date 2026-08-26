@@ -427,10 +427,10 @@ Add:
 - a test-only reflective proof integration
 
 The built-in vanilla integration remains required and owns the existing thirteen tools. Optional
-recipe providers augment successful guarded vanilla recipe results; they cannot replace session
-guards. Minecraft-facing enrichment points remain in Fabric packages and return detached Thread
-DTOs. This slice adds no generic lifecycle beyond startup registration and ships no JEI, EMI, REI,
-FTB Quests, Create, Mekanism, or other substantial mod support.
+recipe providers are considered only after a successful guarded native read, so they cannot replace
+session guards. Minecraft-facing enrichment points remain in Fabric packages and return detached
+Thread DTOs. This slice adds no generic lifecycle beyond startup registration and ships no JEI,
+EMI, REI, FTB Quests, Create, Mekanism, or other substantial mod support.
 
 ### Acceptance criteria
 
@@ -488,3 +488,47 @@ isolated so supported single-player vanilla behavior remains available.
   contributed recipes without duplicate JEI-specific tools
 - normal, MCP-disabled, JEI-present, and JEI-disabled packaged client tests pass
 - formatting, lint, unit/integration tests, clean build, and release artifact checks pass
+
+---
+
+## Slice 11: Live native recipe fallback and deterministic precedence
+
+### Goal
+
+Prove that Minecraft's resolved runtime recipe system remains Thread's authoritative base source
+when JEI is absent, disabled, unavailable, or cannot represent an item, while making optional
+provider precedence explicit.
+
+### Work
+
+Add:
+
+- an explicit first-successful-non-empty policy for optional recipe providers in stable
+  integration-ID order
+- unchanged native fallback for empty, failed, crashing, or unavailable optional providers
+- documentation that `FabricRecipeProvider` reads the integrated server's live `RecipeManager`, not
+  a static vanilla catalog
+- game-test-mod recipe resources containing a custom two-step recipe chain and a vanilla recipe
+  replacement
+- packaged assertions covering native recipe lookup, alternatives, overrides, craftability,
+  missing ingredients, recursive planning, JEI absence, JEI disablement, and JEI precedence
+- JEI conversion through `IRecipeSlotView.getAllIngredients()` so cycling display state cannot omit
+  valid alternatives
+
+The base provider still runs first so the centralized single-player guard and native query limits
+remain authoritative. A non-empty optional result replaces the base result only for that item. No
+core crafting service or MCP tool knows which source was selected.
+
+### Acceptance criteria
+
+- absent and disabled JEI return recipes from the live native manager
+- the native path observes a game-test-mod recipe addition and a replacement of a vanilla recipe
+- `get_recipe`, `can_craft`, `get_missing_ingredients`, and recursive planning all consume the
+  custom native recipes
+- native ingredient alternatives remain complete and deterministic
+- enabled JEI takes precedence for items it can represent, including JEI-only test recipes
+- empty or failed optional results restore the already-captured native result unchanged
+- core and MCP remain decoupled from recipe-source choice and MCP transport is unchanged
+- safety, cycle, depth, query, and plan limits remain enforced
+- formatting, lint, unit/integration tests, clean build, release verification, and all four packaged
+  client tests pass
