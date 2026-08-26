@@ -41,5 +41,5 @@ Read-only local Thread should remain a supported mode even if action-capable pro
 ## Parked ideas
 
 Voice, persistent semantic world memory, automated gameplay, global build planning, remote
-observability, and multi-loader support remain parked. The current architecture should not block
+observability, and additional loaders remain parked. The current architecture should not block
 them, but V1 should not prebuild frameworks for speculative work.

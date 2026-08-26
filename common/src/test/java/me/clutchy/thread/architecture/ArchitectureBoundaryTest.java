@@ -20,8 +20,12 @@ class ArchitectureBoundaryTest {
       List.of(
           PROJECT_ROOT.resolve("fabric/src/main/java"),
           PROJECT_ROOT.resolve("fabric/src/client/java"));
+  private static final Path NEOFORGE_SOURCE_ROOT = PROJECT_ROOT.resolve("neoforge/src/main/java");
   private static final List<Path> PRODUCTION_SOURCE_ROOTS =
-      Stream.concat(Stream.of(COMMON_SOURCE_ROOT), FABRIC_SOURCE_ROOTS.stream()).toList();
+      Stream.concat(
+              Stream.concat(Stream.of(COMMON_SOURCE_ROOT), FABRIC_SOURCE_ROOTS.stream()),
+              Stream.of(NEOFORGE_SOURCE_ROOT))
+          .toList();
   private static final Path CORE_MODEL_ROOT =
       COMMON_SOURCE_ROOT.resolve("me/clutchy/thread/core/model");
   private static final Set<String> MODEL_DOMAINS =
@@ -41,17 +45,20 @@ class ArchitectureBoundaryTest {
   }
 
   @Test
-  void commonModuleDoesNotImportFabric() throws IOException {
+  void commonModuleDoesNotImportLoaderApis() throws IOException {
     for (Path source : javaSourcesUnder(COMMON_SOURCE_ROOT)) {
       String contents = Files.readString(source, StandardCharsets.UTF_8);
       assertFalse(contents.contains("import net.fabricmc."), source::toString);
+      assertFalse(contents.contains("import net.neoforged."), source::toString);
       assertFalse(contents.contains("me.clutchy.thread.platform.fabric"), source::toString);
+      assertFalse(contents.contains("me.clutchy.thread.platform.neoforge"), source::toString);
     }
 
     String commonBuild =
         Files.readString(PROJECT_ROOT.resolve("common/build.gradle"), StandardCharsets.UTF_8);
     assertFalse(commonBuild.contains("fabric-loader"), "common must not depend on Fabric Loader");
     assertFalse(commonBuild.contains("fabric-api"), "common must not depend on Fabric API");
+    assertFalse(commonBuild.contains("neoforge"), "common must not depend on NeoForge");
   }
 
   @Test
@@ -62,11 +69,16 @@ class ArchitectureBoundaryTest {
         Files.readString(PROJECT_ROOT.resolve("common/build.gradle"), StandardCharsets.UTF_8);
     String fabricBuild =
         Files.readString(PROJECT_ROOT.resolve("fabric/build.gradle"), StandardCharsets.UTF_8);
+    String neoForgeBuild =
+        Files.readString(PROJECT_ROOT.resolve("neoforge/build.gradle"), StandardCharsets.UTF_8);
 
     assertTrue(
-        settings.contains("include 'common', 'fabric'"), "settings must declare both modules");
+        settings.contains("include 'common', 'fabric', 'neoforge'"),
+        "settings must declare all modules");
     assertTrue(fabricBuild.contains("project(':common')"), "Fabric must consume common");
+    assertTrue(neoForgeBuild.contains("project(':common')"), "NeoForge must consume common");
     assertFalse(commonBuild.contains("project(':fabric')"), "common must not consume Fabric");
+    assertFalse(commonBuild.contains("project(':neoforge')"), "common must not consume NeoForge");
     assertFalse(
         Files.exists(PROJECT_ROOT.resolve("src")), "legacy root source tree must stay absent");
   }
@@ -74,8 +86,21 @@ class ArchitectureBoundaryTest {
   @Test
   void fabricProductionCodeStaysInsideTheFabricAdapterPackage() throws IOException {
     for (Path source : javaSourcesUnder(FABRIC_SOURCE_ROOTS)) {
+      String contents = Files.readString(source, StandardCharsets.UTF_8);
       assertTrue(
           normalizedPath(source).contains("/me/clutchy/thread/platform/fabric/"), source::toString);
+      assertFalse(contents.contains("import net.neoforged."), source::toString);
+    }
+  }
+
+  @Test
+  void neoForgeProductionCodeStaysInsideTheNeoForgeAdapterPackage() throws IOException {
+    for (Path source : javaSourcesUnder(NEOFORGE_SOURCE_ROOT)) {
+      String contents = Files.readString(source, StandardCharsets.UTF_8);
+      assertTrue(
+          normalizedPath(source).contains("/me/clutchy/thread/platform/neoforge/"),
+          source::toString);
+      assertFalse(contents.contains("import net.fabricmc."), source::toString);
     }
   }
 
@@ -95,6 +120,7 @@ class ArchitectureBoundaryTest {
       if (normalizedPath(source).contains("/transport/mcp/")) {
         String contents = Files.readString(source, StandardCharsets.UTF_8);
         assertFalse(contents.contains("import net.fabricmc."), source::toString);
+        assertFalse(contents.contains("import net.neoforged."), source::toString);
         assertFalse(contents.contains("import net.minecraft."), source::toString);
       }
     }
@@ -168,8 +194,10 @@ class ArchitectureBoundaryTest {
             PROJECT_ROOT.resolve("build.gradle"),
             PROJECT_ROOT.resolve("common/build.gradle"),
             PROJECT_ROOT.resolve("fabric/build.gradle"),
+            PROJECT_ROOT.resolve("neoforge/build.gradle"),
             PROJECT_ROOT.resolve("gradle.properties"),
-            PROJECT_ROOT.resolve("fabric/src/main/resources/fabric.mod.json"))) {
+            PROJECT_ROOT.resolve("fabric/src/main/resources/fabric.mod.json"),
+            PROJECT_ROOT.resolve("neoforge/src/main/resources/META-INF/neoforge.mods.toml"))) {
       String contents = Files.readString(artifactInput, StandardCharsets.UTF_8).toLowerCase();
       assertFalse(contents.contains("jei"), artifactInput::toString);
     }

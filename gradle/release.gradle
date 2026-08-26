@@ -1,13 +1,15 @@
 def fabricProject = project(':fabric')
-def runtimeJar = fabricProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
+def neoForgeProject = project(':neoforge')
+def fabricJar = fabricProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
+def neoForgeJar = neoForgeProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
 def releaseDirectory = layout.buildDirectory.dir('release')
-def releaseJarName = "thread-fabric-${project.version}.jar"
+def fabricReleaseJarName = "thread-fabric-${project.version}.jar"
+def neoForgeReleaseJarName = "thread-neoforge-${project.version}.jar"
 def semanticVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 
 tasks.register('validateReleaseVersion') {
     group = 'verification'
     description = 'Validates the configured release version.'
-
     doLast {
         if (!(project.version.toString() ==~ semanticVersionPattern)) {
             throw new GradleException(
@@ -20,7 +22,6 @@ tasks.register('verifyReleaseVersion') {
     group = 'verification'
     description = 'Verifies that the release tag matches the configured mod version.'
     dependsOn tasks.named('validateReleaseVersion')
-
     doLast {
         def actualTag = providers.gradleProperty('releaseTag')
                 .orElse(providers.environmentVariable('GITHUB_REF_NAME'))
@@ -38,56 +39,66 @@ tasks.register('verifyReleaseVersion') {
     }
 }
 
-tasks.register('verifyReleaseArtifact') {
-    group = 'verification'
-    description = 'Validates the installable runtime JAR and Fabric metadata.'
-    dependsOn fabricProject.tasks.named('jar'), tasks.named('validateReleaseVersion')
-    inputs.file(runtimeJar)
+def requiredSharedEntries = [
+        'me/clutchy/thread/core/integration/ThreadIntegration.class',
+        'me/clutchy/thread/core/integration/ThreadIntegrationCandidateProvider.class',
+        'me/clutchy/thread/core/integration/IntegrationCandidateCatalog.class',
+        'me/clutchy/thread/core/integration/extension/IntegrationExtensionPoint.class',
+        'me/clutchy/thread/core/integration/extension/IntegrationRecipeProvider.class',
+        'me/clutchy/thread/platform/minecraft/integration/MinecraftIntegrationExtensionPoints.class',
+        'me/clutchy/thread/platform/minecraft/game/MinecraftGameProvider.class',
+        'me/clutchy/thread/runtime/ThreadRuntime.class',
+        'me/clutchy/thread/transport/mcp/McpHttpServer.class'
+]
 
-    doLast {
-        def jarFile = runtimeJar.get().asFile
-        if (jarFile.name != releaseJarName) {
-            throw new GradleException("Unexpected runtime JAR name: ${jarFile.name}")
+def validateArchiveShape = { Set<String> entries, String ownPrefix, String forbiddenPrefix ->
+    requiredSharedEntries.each { entry ->
+        if (!entries.contains(entry)) {
+            throw new GradleException("Runtime JAR is missing ${entry}")
         }
+    }
+    if (entries.any { it.contains('/gametest/') || it.endsWith('.java') }
+            || entries.any { it.startsWith(forbiddenPrefix) }) {
+        throw new GradleException(
+                'Runtime JAR contains test, source, or other-loader implementation content.')
+    }
+    def integrationPrefix = "${ownPrefix}integration/"
+    if (entries.any { it.startsWith(integrationPrefix)
+        && it.substring(integrationPrefix.length()).contains('/') }) {
+        throw new GradleException('Runtime JAR contains bundled third-party integration content.')
+    }
+}
 
+tasks.register('verifyFabricReleaseArtifact') {
+    group = 'verification'
+    description = 'Validates the installable Fabric JAR independently.'
+    dependsOn fabricProject.tasks.named('jar'), tasks.named('validateReleaseVersion')
+    inputs.file(fabricJar)
+    doLast {
+        def jarFile = fabricJar.get().asFile
+        if (jarFile.name != fabricReleaseJarName) {
+            throw new GradleException("Unexpected Fabric runtime JAR name: ${jarFile.name}")
+        }
         new java.util.zip.ZipFile(jarFile).withCloseable { archive ->
             def entries = archive.entries().collect { it.name }.toSet()
-            [
-                    'fabric.mod.json',
-                    'me/clutchy/thread/core/integration/ThreadIntegration.class',
-                    'me/clutchy/thread/core/integration/ThreadIntegrationCandidateProvider.class',
-                    'me/clutchy/thread/core/integration/extension/IntegrationExtensionPoint.class',
-                    'me/clutchy/thread/core/integration/extension/IntegrationRecipeProvider.class',
-                    'me/clutchy/thread/platform/minecraft/integration/MinecraftIntegrationExtensionPoints.class',
-                    'me/clutchy/thread/platform/minecraft/game/MinecraftGameProvider.class',
-                    'me/clutchy/thread/runtime/ThreadRuntime.class',
-                    'me/clutchy/thread/platform/fabric/ThreadFabricClient.class',
-                    'me/clutchy/thread/transport/mcp/McpHttpServer.class'
-            ].each { entry ->
-                if (!entries.contains(entry)) {
-                    throw new GradleException("Runtime JAR is missing ${entry}")
-                }
+            validateArchiveShape(
+                    entries,
+                    'me/clutchy/thread/platform/fabric/',
+                    'me/clutchy/thread/platform/neoforge/')
+            if (!entries.contains('fabric.mod.json')
+                    || !entries.contains('me/clutchy/thread/platform/fabric/ThreadFabricClient.class')
+                    || entries.contains('META-INF/neoforge.mods.toml')) {
+                throw new GradleException('Fabric runtime identity or loader isolation is incorrect.')
             }
-
-            def integrationPrefix = 'me/clutchy/thread/platform/fabric/integration/'
-            if (entries.any { it.contains('/gametest/') || it.endsWith('.java') }
-                    || entries.any { it.startsWith(integrationPrefix)
-                        && it.substring(integrationPrefix.length()).contains('/') }) {
-                throw new GradleException(
-                        'Runtime JAR contains test, source, or bundled integration content.')
-            }
-
             def metadata = new groovy.json.JsonSlurper().parse(
                     archive.getInputStream(archive.getEntry('fabric.mod.json')), 'UTF-8')
             if (metadata.id != 'thread'
                     || metadata.version != project.version.toString()
-                    || metadata.environment != 'client') {
-                throw new GradleException('Runtime JAR metadata identity/version is incorrect.')
-            }
-            if (metadata.entrypoints != [
-                    client: ['me.clutchy.thread.platform.fabric.ThreadFabricClient']
-            ]) {
-                throw new GradleException('Runtime JAR has unexpected entrypoints.')
+                    || metadata.environment != 'client'
+                    || metadata.entrypoints != [
+                        client: ['me.clutchy.thread.platform.fabric.ThreadFabricClient']
+                    ]) {
+                throw new GradleException('Fabric runtime metadata identity/version is incorrect.')
             }
             if (metadata.depends != [
                     fabricloader: ">=${project.loader_version}",
@@ -95,32 +106,84 @@ tasks.register('verifyReleaseArtifact') {
                     java        : '>=25',
                     'fabric-api': ">=${project.fabric_api_version}"
             ]) {
-                throw new GradleException('Runtime JAR dependency metadata is incorrect.')
+                throw new GradleException('Fabric runtime dependency metadata is incorrect.')
             }
         }
     }
 }
 
+tasks.register('verifyNeoForgeReleaseArtifact') {
+    group = 'verification'
+    description = 'Validates the installable NeoForge JAR independently.'
+    dependsOn neoForgeProject.tasks.named('jar'), tasks.named('validateReleaseVersion')
+    inputs.file(neoForgeJar)
+    doLast {
+        def jarFile = neoForgeJar.get().asFile
+        if (jarFile.name != neoForgeReleaseJarName) {
+            throw new GradleException("Unexpected NeoForge runtime JAR name: ${jarFile.name}")
+        }
+        new java.util.zip.ZipFile(jarFile).withCloseable { archive ->
+            def entries = archive.entries().collect { it.name }.toSet()
+            validateArchiveShape(
+                    entries,
+                    'me/clutchy/thread/platform/neoforge/',
+                    'me/clutchy/thread/platform/fabric/')
+            def metadataEntry = archive.getEntry('META-INF/neoforge.mods.toml')
+            if (metadataEntry == null
+                    || !entries.contains(
+                        'me/clutchy/thread/platform/neoforge/ThreadNeoForgeClient.class')
+                    || entries.contains('fabric.mod.json')) {
+                throw new GradleException('NeoForge runtime identity or loader isolation is incorrect.')
+            }
+            def metadata = archive.getInputStream(metadataEntry).getText('UTF-8')
+            [
+                    'modLoader="javafml"',
+                    'modId="thread"',
+                    "version=\"${project.version}\"",
+                    'modId="neoforge"',
+                    "versionRange=\"[${project.neoforge_version},)\"",
+                    'modId="minecraft"',
+                    "versionRange=\"[${project.minecraft_version}]\"",
+                    'side="CLIENT"'
+            ].each { expected ->
+                if (!metadata.contains(expected)) {
+                    throw new GradleException("NeoForge metadata is missing ${expected}")
+                }
+            }
+        }
+    }
+}
+
+tasks.register('verifyReleaseArtifact') {
+    group = 'verification'
+    description = 'Validates the Fabric and NeoForge release artifacts independently.'
+    dependsOn tasks.named('verifyFabricReleaseArtifact'), tasks.named('verifyNeoForgeReleaseArtifact')
+}
+
 tasks.register('releaseBundle') {
     group = 'build'
-    description = 'Creates the validated runtime JAR and its SHA-256 checksum.'
+    description = 'Creates both validated loader JARs and SHA-256 checksums.'
     dependsOn tasks.named('verifyReleaseArtifact')
-    inputs.file(runtimeJar)
+    inputs.files(fabricJar, neoForgeJar)
     outputs.dir(releaseDirectory)
-
     doLast {
         def outputDirectory = releaseDirectory.get().asFile
         outputDirectory.deleteDir()
         outputDirectory.mkdirs()
-        def outputJar = new File(outputDirectory, releaseJarName)
-        java.nio.file.Files.copy(
-                runtimeJar.get().asFile.toPath(),
-                outputJar.toPath(),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        def digest = java.security.MessageDigest.getInstance('SHA-256')
-                .digest(java.nio.file.Files.readAllBytes(outputJar.toPath()))
-        def checksum = digest.collect { String.format('%02x', it) }.join()
-        new File(outputDirectory, "${releaseJarName}.sha256")
-                .setText("${checksum}  ${releaseJarName}\n", 'UTF-8')
+        [
+                (fabricReleaseJarName): fabricJar.get().asFile,
+                (neoForgeReleaseJarName): neoForgeJar.get().asFile
+        ].each { releaseName, sourceJar ->
+            def outputJar = new File(outputDirectory, releaseName)
+            java.nio.file.Files.copy(
+                    sourceJar.toPath(),
+                    outputJar.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(java.nio.file.Files.readAllBytes(outputJar.toPath()))
+            def checksum = digest.collect { String.format('%02x', it) }.join()
+            new File(outputDirectory, "${releaseName}.sha256")
+                    .setText("${checksum}  ${releaseName}\n", 'UTF-8')
+        }
     }
 }

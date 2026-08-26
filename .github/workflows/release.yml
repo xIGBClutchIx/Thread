@@ -32,12 +32,21 @@ jobs:
             - name: Verify Gradle wrapper permissions
               run: chmod +x gradlew
 
-            - name: Run clean release gate
+            - name: Run clean build and artifact gate
               run: >-
                   ./gradlew --no-daemon clean spotlessCheck check build
-                  runProductionClientGameTest runRestartProductionClientGameTest
-                  runMcpDisabledProductionClientGameTest
                   verifyReleaseVersion releaseBundle -PreleaseTag="${GITHUB_REF_NAME}"
+
+            - name: Test packaged Fabric artifact
+              run: >-
+                  ./gradlew --no-daemon runRestartProductionClientGameTest
+                  runMcpDisabledProductionClientGameTest
+
+            - name: Test packaged NeoForge artifact
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyNeoForgeRestartProductionClientGameTest
+                  verifyNeoForgeMcpDisabledProductionClientGameTest
 
             - name: Upload release bundle
               uses: actions/upload-artifact@v4

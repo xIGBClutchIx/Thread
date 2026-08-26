@@ -1,6 +1,6 @@
 # Thread Release
 
-Thread currently releases one Fabric client artifact. NeoForge, Forge, and a universal JAR are not
+Thread releases separate Fabric and NeoForge client artifacts. Forge and a universal JAR are not
 part of this release process.
 
 ## Release gate
@@ -11,6 +11,8 @@ From the repository root:
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
   verifyReleaseArtifact releaseBundle runProductionClientGameTest `
   runRestartProductionClientGameTest runMcpDisabledProductionClientGameTest `
+  verifyNeoForgeRestartProductionClientGameTest `
+  verifyNeoForgeMcpDisabledProductionClientGameTest `
   verifyReleaseVersion "-PreleaseTag=v0.1.0"
 git diff --check
 ```
@@ -18,13 +20,13 @@ git diff --check
 Change the tag argument when `mod_version` changes. Versions use `MAJOR.MINOR.PATCH`; tags use
 `vMAJOR.MINOR.PATCH`.
 
-`verifyReleaseArtifact` inspects the merged Fabric JAR. It proves that required public common
-contracts, shared Minecraft/runtime classes, the Fabric entrypoint, MCP transport, and expanded
-Fabric metadata are present. It rejects tests, source files, and bundled third-party integration
-implementations.
+`verifyReleaseArtifact` delegates to independent Fabric and NeoForge artifact checks. Each proves
+that required public common contracts, shared Minecraft/runtime classes, its loader entrypoint,
+MCP transport, and loader metadata are present. Each rejects tests, sources, bundled integrations,
+the other loader's classes, and the other loader's metadata.
 
-`releaseBundle` writes the JAR and SHA-256 checksum under `build/release/` using the filename
-`thread-fabric-<version>.jar`.
+`releaseBundle` writes both loader JARs and SHA-256 checksums under `build/release/` using
+`thread-fabric-<version>.jar` and `thread-neoforge-<version>.jar`.
 
 ## Publishing checklist
 
@@ -36,7 +38,7 @@ implementations.
 6. Tag that exact commit as `vMAJOR.MINOR.PATCH`, then push the commit and tag.
 
 The tag workflow repeats formatting, lint, compilation, unit/architecture tests, all three
-packaged-client lifecycles, artifact inspection, checksum generation, and version/tag matching
+packaged-client lifecycles on both loaders, artifact inspection, checksum generation, and version/tag matching
 before attaching files to the GitHub release.
 
 Automatic Modrinth, CurseForge, Maven, common-module, or other loader publishing is not currently

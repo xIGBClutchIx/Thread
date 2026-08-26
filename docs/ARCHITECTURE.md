@@ -10,14 +10,18 @@
 :common
     runtime assembly -> Minecraft providers -> core provider contracts
     MCP transport    -> tool registry      -> core services and DTOs
+       ^
+       |
+:neoforge
+    NeoForge entrypoint, Loader API, lifecycle events, Java-service candidate discovery
 ```
 
-The build produces one installable artifact: `thread-fabric-<version>.jar`. `:common` is an
-internal build module whose classes are merged into that Fabric JAR; it is not a separately
-installed mod and it is not a universal multi-loader JAR.
+The build produces two installable artifacts: `thread-fabric-<version>.jar` and
+`thread-neoforge-<version>.jar`. `:common` is an internal build module whose classes are merged into
+each loader JAR; it is not installed separately and there is no universal multi-loader JAR.
 
-Dependencies point from `:fabric` to `:common`. Common production source has no Fabric Loader or
-Fabric API imports or runtime dependencies. No NeoForge or Forge module exists yet.
+Dependencies point from each loader adapter to `:common`. Common production source has no Fabric
+or NeoForge imports or runtime dependencies. The loader modules do not depend on one another.
 
 ## Common ownership
 
@@ -74,7 +78,7 @@ See [MCP notes](MCP_NOTES.md).
 
 `me.clutchy.thread.config` owns the persisted schema and validation. It can disable the listener,
 filter tools/integrations, choose an explicit loopback address/port, and tune limits within hard
-ceilings. The Fabric adapter supplies the config-file location.
+ceilings. Each loader adapter supplies its config-file location.
 
 ## Fabric ownership
 
@@ -91,9 +95,16 @@ The entrypoint supplies loader metadata, configuration, candidates, and the acti
 to `ThreadRuntime`. It does not contain tool, crafting, MCP, mapping, or live-query behavior.
 
 No generic client-lifecycle or config-directory interface is introduced: those values are consumed
-once by the thin entrypoint. No integrated-server lifecycle abstraction is needed because shared
-providers resolve the current integrated server for each bounded read. These can become contracts
-only when a second loader proves a real behavioral difference.
+once by each thin entrypoint. Shared providers resolve the current integrated server for each
+bounded read, so loader lifecycle differences do not leak into core APIs.
+
+## NeoForge ownership
+
+`neoforge/src/main/java/me/clutchy/thread/platform/neoforge` mirrors the same narrow boundary. It
+owns the `@Mod` client bootstrap, `ModList` and Maven-version-range queries, `FMLPaths` config path,
+client/integrated-server shutdown observations, and Java `ServiceLoader` candidate-provider
+discovery. Candidate providers expose metadata only; compatible implementation classes remain
+deferred until the shared integration registry has checked the target mod and version.
 
 ## Session and threading rules
 
@@ -116,9 +127,9 @@ and validates serialized output before returning it to MCP.
 inventory item twice. `CraftingPlanner` uses one inventory/surplus ledger, active-path cycle
 detection, deterministic local variant scoring, and hard depth/work/quantity limits.
 
-External Fabric packages advertise metadata through `thread:integrations`. Fabric discovers those
-candidates, while common `IntegrationRegistry` performs enabled, mod-presence, version, reflective
-load, and transactional contribution handling. Shared Minecraft extension points use
+External packages advertise metadata through the loader-specific catalog (`thread:integrations`
+on Fabric and a Java service provider on NeoForge). Common `IntegrationRegistry` performs enabled,
+mod-presence, version, reflective load, and transactional contribution handling. Shared Minecraft extension points use
 `MinecraftIntegrationExtensionPoints`; they accept Minecraft inputs on the owning thread and return
 detached Thread DTOs.
 
@@ -126,16 +137,17 @@ detached Thread DTOs.
 
 Architecture and release tests enforce that:
 
-- common production source imports no Fabric API;
-- core imports no Minecraft, Fabric, or MCP API;
+- common production source imports no Fabric or NeoForge API;
+- core imports no Minecraft, loader, or MCP API;
 - MCP imports no Minecraft or loader API;
 - Fabric production code stays inside the Fabric adapter package;
+- NeoForge production code stays inside the NeoForge adapter package;
 - only the supported JDK HTTP server uses `com.sun` APIs;
 - optional implementations remain deferred class-name strings;
-- the installable JAR contains common and Fabric classes but no tests or bundled third-party
-  adapter;
-- packaged-client tests exercise the final JAR through menu/world/menu, restart, and MCP-disabled
-  lifecycles.
+- each installable JAR contains common plus exactly one loader adapter, with no tests or bundled
+  third-party adapter;
+- each loader's packaged-client tests exercise its final JAR through menu/world/menu, restart, and
+  MCP-disabled lifecycles.
 
-V1 remains Java-only, Fabric-only, read-only, single-player-only, bounded, and loopback-only. The
-module boundary prepares shared code for a future loader without claiming another loader exists.
+V1 remains Java-only, Fabric-and-NeoForge, read-only, single-player-only, bounded, and
+loopback-only. Forge and a universal artifact remain out of scope.

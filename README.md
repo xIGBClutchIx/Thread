@@ -3,8 +3,8 @@
 Thread is a read-only Minecraft context server for AI clients. It exposes structured facts from a
 running single-player world through MCP without embedding an AI model or automating gameplay.
 
-Thread 0.1.0 targets Minecraft 26.2, Java 25, Fabric Loader 0.19.3, and Fabric API
-0.154.0+26.2. V1 is Fabric-only, single-player-only, and bound to loopback.
+Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fabric API
+0.154.0+26.2, or NeoForge 26.2.0.62. V1 is single-player-only and bound to loopback.
 
 ## What it exposes
 
@@ -19,22 +19,24 @@ Thirteen `minecraft.*` tools cover:
 - direct craftability, missing ingredients, and bounded recursive crafting plans;
 - the active tool and integration capabilities.
 
-Recipes come from Minecraft's live integrated-server recipe manager, so active datapack and Fabric
-mod recipe additions, replacements, and removals are included. Queries never force-load chunks,
+Recipes come from Minecraft's live integrated-server recipe manager, so active datapack and mod
+recipe additions, replacements, and removals are included. Queries never force-load chunks,
 scan the wider world, use nearby storage, or mutate game state.
 
 ## Install
 
-1. Install Minecraft 26.2 with Java 25, Fabric Loader 0.19.3, and Fabric API 0.154.0+26.2.
-2. Download `thread-fabric-0.1.0.jar` and its matching `.sha256` file.
+1. Install Minecraft 26.2 with Java 25 and choose one loader: Fabric Loader 0.19.3 plus Fabric API
+   0.154.0+26.2, or NeoForge 26.2.0.62.
+2. Download the matching `thread-fabric-0.1.0.jar` or `thread-neoforge-0.1.0.jar` and its
+   `.sha256` file. Do not install both Thread JARs.
 3. Verify the checksum and copy only the JAR into the instance's `mods` directory.
 4. Launch Minecraft and confirm the log reports both Thread initialization and the MCP listener.
 
 PowerShell checksum verification:
 
 ```powershell
-(Get-FileHash .\thread-fabric-0.1.0.jar -Algorithm SHA256).Hash.ToLower()
-Get-Content .\thread-fabric-0.1.0.jar.sha256
+(Get-FileHash .\thread-neoforge-0.1.0.jar -Algorithm SHA256).Hash.ToLower()
+Get-Content .\thread-neoforge-0.1.0.jar.sha256
 ```
 
 ## Connect an MCP client
@@ -92,16 +94,18 @@ Set `mcpEnabled` to `false` to initialize Thread without opening the HTTP listen
   discovery, while all gameplay tools are unavailable outside an integrated single-player world.
 - **The configuration is rejected:** Thread preserves the invalid file and starts with safe
   defaults. Correct the field named in the Minecraft log, then restart the game.
-- **Minecraft reports incompatible mods:** Use the exact Minecraft, Fabric Loader, Fabric API, and
-  Java versions listed under Install; do not install both an older and newer Fabric API together.
+- **Minecraft reports incompatible mods:** Use the exact Minecraft, Java, and selected-loader
+  versions listed under Install. Fabric requires Fabric API; NeoForge does not. Install only the
+  Thread JAR for that loader.
 - **No listener is expected:** `mcpEnabled: false` keeps the tools initialized inside Thread but
   intentionally does not open an HTTP endpoint.
 
 ## Thread Integrations
 
 The base artifact includes no third-party gameplay-mod or recipe-viewer adapter. Separate optional
-mods can use the metadata-only `thread:integrations` Fabric entrypoint and Thread's public,
-transactional contribution contracts. Target-mod types remain outside Thread core and MCP.
+mods can use the metadata-only `thread:integrations` Fabric entrypoint or NeoForge Java service
+provider and Thread's public, transactional contribution contracts. Target-mod types remain
+outside Thread core and MCP.
 
 See [Thread Integrations](docs/INTEGRATIONS.md) for the supported API and packaging boundary.
 
@@ -119,8 +123,8 @@ multiplayer. Other gameplay tools require a supported integrated single-player s
 
 ## Development
 
-The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior and a thin `:fabric`
-adapter module. The release remains one Fabric-only JAR; there is no universal, NeoForge, or Forge
+The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior plus thin `:fabric`
+and `:neoforge` adapters. Releases are separate loader JARs; there is no universal or Forge
 artifact.
 
 Use the Gradle Wrapper. The normal local gate is:

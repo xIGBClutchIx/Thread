@@ -37,13 +37,23 @@ jobs:
             - name: Run quality gate
               run: ./gradlew --no-daemon clean spotlessCheck check build releaseBundle
 
-            - name: Test packaged mod with MCP enabled
+            - name: Test packaged Fabric mod with MCP enabled
               run: >-
                   ./gradlew --no-daemon
                   runProductionClientGameTest runRestartProductionClientGameTest
 
-            - name: Test packaged mod with MCP disabled
+            - name: Test packaged Fabric mod with MCP disabled
               run: ./gradlew --no-daemon runMcpDisabledProductionClientGameTest
+
+            - name: Test packaged NeoForge mod with MCP enabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyNeoForgeRestartProductionClientGameTest
+
+            - name: Test packaged NeoForge mod with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyNeoForgeMcpDisabledProductionClientGameTest
 
             - name: Upload failure reports
               if: failure()
@@ -54,6 +64,7 @@ jobs:
                       build/reports/
                       common/build/reports/
                       fabric/build/reports/
+                      neoforge/build/reports/
                       build/run/**/logs/
                       build/run/**/crash-reports/
                   if-no-files-found: ignore

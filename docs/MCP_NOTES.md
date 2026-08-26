@@ -74,9 +74,9 @@ or exceed hard ceilings.
 ## Lifecycle
 
 The shared `ThreadRuntime` starts MCP only after vanilla and external integration registration has
-produced the final tool registry. The Fabric entrypoint requests that start and logs a bind failure
-without taking down Minecraft. Its client-stopping event closes the shared runtime, listener, and
-virtual-thread executor; tests verify clean shutdown and same-port restart.
+produced the final tool registry. Each loader entrypoint requests that start and logs a bind
+failure without taking down Minecraft. Loader shutdown events close the shared runtime and
+listener; tests verify clean shutdown and same-port restart on both loaders.
 
 ## Tests that protect compatibility
 
@@ -88,8 +88,9 @@ The real local HTTP tests cover:
 - request envelope, JSON, content negotiation, origin, size, and concurrency failures;
 - tool schemas, annotations, structured success/error mapping, disconnects, and shutdown.
 
-The packaged client game test repeats initialization and calls all thirteen tools against the
-actual remapped mod JAR in a temporary single-player world.
+Packaged client tests repeat initialization against the actual loader-specific JAR in a temporary
+single-player world; Fabric calls all thirteen tools and NeoForge covers representative tools plus
+the shared recipe/crafting and integration paths.
 
 ## Deliberately absent MCP features
 

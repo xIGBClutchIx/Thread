@@ -13,9 +13,9 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 ## V1 target
 
 - Minecraft Java Edition
-- Fabric only
+- Fabric and NeoForge client loaders
 - Java implementation
-- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2
+- Minecraft 26.2 with either Fabric Loader 0.19.3 plus Fabric API 0.154.0+26.2, or NeoForge 26.2.0.62
 - Local MCP access only by default
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
@@ -48,14 +48,14 @@ project toolchain.
 - current dimension and position
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
-- live native recipe lookup, including datapack and Fabric-mod changes
+- live native recipe lookup, including datapack and installed-mod changes
 - deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - deterministic recursive crafting plans with bounded cycle/depth handling
 - vanilla item search
 
 ### Engineering baseline
 
-- Gradle `:common`/`:fabric` separation with one Fabric release JAR
+- Gradle `:common`/`:fabric`/`:neoforge` separation with one JAR per supported loader
 - meaningful comments for non-obvious implementation decisions
 - Javadocs on public Thread contracts/extension points
 - Spotless formatting
@@ -77,7 +77,6 @@ project toolchain.
 
 ## Explicitly out of scope
 
-- NeoForge
 - Forge
 - Quilt
 - multiple Minecraft versions
@@ -126,7 +125,7 @@ Thread recursively plans intermediate recipes with one shared inventory ledger a
 shortages plus structured cycle/depth/work-limit issues. Both are read-only analyses: Thread does not
 craft items, search nearby storage, model workstation/fuel feasibility, or globally optimize every
 recipe combination. The base recipe source is Minecraft's final live recipe manager, not a static
-vanilla list, so supported datapack and Fabric-mod recipe changes flow through the same tool
+vanilla list, so supported datapack and installed-mod recipe changes flow through the same tool
 contracts.
 
 ## Non-goals that protect the architecture

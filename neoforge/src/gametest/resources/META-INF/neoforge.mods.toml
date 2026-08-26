@@ -1,0 +1,15 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="thread_neoforge_gametest"
+version="1.0.0"
+displayName="Thread NeoForge Packaged Tests"
+
+[[dependencies.thread_neoforge_gametest]]
+modId="thread"
+type="required"
+versionRange="[0.1.0,)"
+ordering="AFTER"
+side="CLIENT"

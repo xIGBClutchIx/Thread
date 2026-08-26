@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="thread"
+version="${version}"
+displayName="Thread"
+authors="xigbclutchix"
+description='''
+Read-only Minecraft context for MCP-capable AI clients.
+'''
+
+[[dependencies.thread]]
+modId="neoforge"
+type="required"
+versionRange="[${neoForgeVersion},)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.thread]]
+modId="minecraft"
+type="required"
+versionRange="[${minecraftVersion}]"
+ordering="NONE"
+side="CLIENT"

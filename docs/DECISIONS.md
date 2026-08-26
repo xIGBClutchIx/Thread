@@ -11,20 +11,20 @@ not the core API.
 
 ## V1 is deliberately narrow
 
-V1 is Java 25, Fabric client, Minecraft 26.2, single-player, read-only, bounded, and loopback-only.
+V1 is Java 25, Fabric/NeoForge client, Minecraft 26.2, single-player, read-only, bounded, and loopback-only.
 Gameplay tools reject multiplayer before exposing state. `minecraft.get_status` remains available
 from every client state as the safe preflight.
 
 Thread does not implement remote access, authentication, actions, dedicated-server behavior,
-another loader, or multiple Minecraft versions until those products have their own trust and
+Forge, a universal artifact, or multiple Minecraft versions until those products have their own trust and
 compatibility designs.
 
-## Common and Fabric are separate modules without a portability framework
+## Common and loader adapters are separate modules without a portability framework
 
 `:common` owns core, configuration, MCP, runtime assembly, and Minecraft-facing code that can run
-unchanged when invoked by another client loader. `:fabric` owns only Fabric entrypoint, Loader API,
-lifecycle, config-path, version-predicate, and integration-entrypoint wiring. The Fabric release JAR
-merges common classes; common is not installed or published independently.
+unchanged across client loaders. `:fabric` and `:neoforge` own only their entrypoint, Loader API,
+lifecycle, config-path, version-predicate, and integration-discovery wiring. Each release JAR merges
+common classes; common is not installed or published independently.
 
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
 component map, or optional-mod type. Shared Minecraft adapters convert live game objects into
@@ -33,17 +33,17 @@ dependencies.
 
 Thread does not use Architectury or a custom platform god object, and it does not wrap every
 Minecraft class. Config-directory and lifecycle abstractions are intentionally absent because the
-thin Fabric entrypoint consumes those values directly. Add another contract only when a second
-loader proves a real difference.
+thin loader entrypoints consume those values directly. Add another contract only when a concrete
+loader difference requires shared behavior.
 
 Java type documentation belongs on public types and architecture documentation belongs under
 `docs/`; `package-info.java` is not used.
 
 ## Versions and dependencies are pinned
 
-The V1 baseline is Minecraft 26.2, Java 25, Fabric Loader 0.19.3, Fabric API 0.154.0+26.2, Loom
-1.17.19, Gradle 9.5.1, Spotless 8.10.0, google-java-format 1.36.0, Checkstyle 14.0.0, and JUnit
-6.1.2.
+The V1 baseline is Minecraft 26.2, Java 25, Fabric Loader 0.19.3, Fabric API 0.154.0+26.2, NeoForge
+26.2.0.62, Loom 1.17.19, ModDevGradle 2.0.144, Gradle 9.5.1, Spotless 8.10.0,
+google-java-format 1.36.0, Checkstyle 14.0.0, and JUnit 6.1.2.
 
 Minecraft supplies Gson 2.14.0. Thread uses it behind explicit Thread-owned JSON schemas rather
 than bundling another JSON library or generating schemas through reflection.
@@ -54,7 +54,7 @@ Providers pull bounded snapshots on the correct Minecraft logical thread. World 
 only already-loaded state and never force-load chunks.
 
 Recipes come from the integrated server's final live `RecipeManager`, including active datapack and
-Fabric-mod changes. Thread has no static vanilla recipe catalog.
+installed-mod changes. Thread has no static vanilla recipe catalog.
 
 ## Crafting intelligence remains deterministic and bounded
 
@@ -69,12 +69,13 @@ globally optimize all combinations, or craft items.
 
 ## Optional integrations load metadata first
 
-Third-party adapters ship as separate Thread Integrations JARs. Their Fabric entrypoint returns only
-`IntegrationCandidate` metadata. Thread applies enabled, mod-presence, and version checks before
+Third-party adapters ship as separate Thread Integrations JARs. Their Fabric entrypoint or NeoForge
+Java service returns only `IntegrationCandidate` metadata. Thread applies enabled, mod-presence, and version checks before
 `ReflectiveIntegrationLoader` resolves the implementation class name.
 
-Reflection is retained specifically to prevent absent optional APIs from linking early. Eager
-`ServiceLoader`, implementation imports, and class literals would break that guarantee.
+Reflection is retained specifically to prevent absent optional APIs from linking early. NeoForge
+uses `ServiceLoader` only for metadata providers; eager implementation imports and class literals
+would break that guarantee.
 
 Registration is transactional and contribution failures are isolated. Base Thread registers only
 the built-in vanilla integration.
@@ -99,6 +100,6 @@ Legacy GET/SSE and non-tool MCP feature surfaces are absent.
 ## Quality and release proofs are part of V1
 
 Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and
-three packaged-client runs are mandatory. The normal packaged test uses the merged Fabric runtime
-JAR in a real temporary single-player world; the restart run proves persisted configuration reload,
-and the final run proves MCP-disabled startup. A release is not validated by compilation alone.
+three packaged-client runs per loader are mandatory. Each normal test uses the final runtime JAR in
+a real temporary single-player world; restart proves persisted configuration reload, and disabled
+startup proves tools initialize without MCP. A release is not validated by compilation alone.

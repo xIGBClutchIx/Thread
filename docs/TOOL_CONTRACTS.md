@@ -98,7 +98,7 @@ Example result:
 ```json
 {
   "minecraftVersion": "<pinned-version>",
-  "loader": "fabric",
+  "loader": "<fabric-or-neoforge>",
   "loaderVersion": "<version>",
   "threadVersion": "0.1.0"
 }
@@ -285,7 +285,7 @@ The provider reads the block and its block entity from loaded integrated-server 
 Vanilla furnaces expose named `input`, `fuel`, and `output` positions; other vanilla containers use
 numeric positions. Empty positions are omitted and at most 64 item positions are inspected. An
 unopened loot container reports its loot-table identity without resolving or reading contents.
-Unknown block entities still report identity without raw NBT. Fabric integrations can register a
+Unknown block entities still report identity without raw NBT. Loader integrations can register a
 higher-priority safe inspector for richer mod-specific state later.
 
 When the normal client raycast has no valid block target, Thread returns a structured `NOT_FOUND`
@@ -330,7 +330,7 @@ Example result:
 ```
 
 Living entities include health and max health. Non-living entities use null for both fields.
-Classification is nullable. Fabric assigns it to Minecraft's hostile enemy, passive animal/ambient
+Classification is nullable. Thread assigns it to Minecraft's hostile enemy, passive animal/ambient
 creature/villager, and neutral-mob families. Thread does not infer labels for other entities or
 return entity NBT.
 
@@ -554,7 +554,7 @@ is preferred over a cyclic one under the deterministic selection order.
 
 The planner does not inspect equipment or nearby storage, model crafting stations/fuel, perform
 automatic crafting, or mutate the game. It remains unaware of recipe-viewer APIs. Base Thread reads
-Minecraft's final live recipe manager, including active vanilla, datapack, and Fabric-mod additions,
+Minecraft's final live recipe manager, including active vanilla, datapack, and installed-mod additions,
 replacements, and removals; it does not use a static vanilla recipe list. A future separate Thread
 Integrations package may contribute detached recipes through the same `RecipeProvider` extension
 without changing this contract.

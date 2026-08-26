@@ -6,18 +6,20 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate
+  release JAR, and real packaged-client lifecycle/MCP/recipe tests.
 - Deterministic direct craftability, missing-ingredient analysis, and bounded recursive crafting
   plans across thirteen read-only tools.
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
-- A `thread:integrations` Fabric entrypoint for metadata-only candidates from separately distributed
-  Thread Integrations packages.
+- Loader-specific metadata discovery for separately distributed Thread Integrations packages:
+  `thread:integrations` on Fabric and standard Java services on NeoForge.
 
 ### Changed
 
-- Split the project into `:common` and `:fabric`, moved loader-neutral Minecraft providers and
-  runtime assembly into common, and reduced Fabric to loader/lifecycle/discovery wiring while
-  preserving the single Fabric release artifact and all V1 behavior.
+- Split the project into `:common`, `:fabric`, and `:neoforge`, moved loader-neutral Minecraft
+  providers and runtime assembly into common, and kept both loader adapters limited to
+  loader/lifecycle/discovery wiring.
 - Renamed Minecraft-facing integration extension contracts from Fabric-specific names/IDs to
   loader-neutral `Minecraft*` contracts and `minecraft.*` extension IDs.
 - Restored the Minecraft 26.2 Fabric API minimum to the native `0.154.0+26.2` baseline.

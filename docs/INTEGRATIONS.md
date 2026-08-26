@@ -1,8 +1,8 @@
 # Thread Integrations
 
-Thread Integrations are separately distributed optional Fabric mods that contribute read-only
-capabilities to base Thread. The base JAR contains native Minecraft/Fabric support and the extension
-contracts, but no third-party gameplay-mod or recipe-viewer adapter.
+Thread Integrations are separately distributed optional mods that contribute read-only
+capabilities to base Thread. Each base loader JAR contains native Minecraft support and the
+extension contracts, but no third-party gameplay-mod or recipe-viewer adapter.
 
 ## Supported external API
 
@@ -10,7 +10,7 @@ The supported loader-neutral integration surface is:
 
 | Contract | Purpose |
 | --- | --- |
-| `ThreadIntegrationCandidateProvider` | Metadata-only `thread:integrations` entrypoint |
+| `ThreadIntegrationCandidateProvider` | Metadata-only loader discovery entrypoint |
 | `IntegrationCandidate` | Stable ID, target mod, version requirement, and deferred implementation class name |
 | `IntegrationId` | Stable ordering/configuration/capability identity |
 | `ThreadIntegration` | Identity plus one transactional registration callback |
@@ -20,7 +20,7 @@ The supported loader-neutral integration surface is:
 | `IntegrationExtensionPoint` | Typed extension key |
 | `CoreIntegrationExtensionPoints` | Core-owned extension keys such as recipe providers |
 
-These contracts expose only Java and Thread core types. They do not expose Fabric, Minecraft, MCP,
+These contracts expose only Java and Thread core types. They do not expose a loader, Minecraft, MCP,
 or target-mod types.
 
 Thread also provides shared Minecraft-edge contracts for integrations that must inspect an already
@@ -47,17 +47,17 @@ promises:
 - `IntegrationEnvironment`, `IntegrationLoader`, `IntegrationLoadException`, and
   `ReflectiveIntegrationLoader`;
 - `IntegrationExtensionRegistry` and `CompositeRecipeProvider`;
-- `FabricIntegrationCatalog`, `FabricIntegrationEnvironment`, shared Minecraft provider/enricher
+- loader integration catalogs/environments, shared Minecraft provider/enricher
   registries, client runtime/lifecycle wiring, configuration, and MCP classes;
 - the built-in `VanillaIntegration` implementation.
 
 External packages should not construct registries, loaders, platform providers, or transports.
-For the currently implemented Fabric artifact, their entry is the Fabric candidate provider
-followed by the loader-neutral `ThreadIntegration` callback.
+Their entry is a loader-discovered candidate provider followed by the loader-neutral
+`ThreadIntegration` callback.
 
 ## Packaging and discovery
 
-An external JAR declares a metadata-only entrypoint:
+An external Fabric JAR declares a metadata-only entrypoint:
 
 ```json
 {
@@ -86,6 +86,17 @@ The candidate provider loads before target compatibility is known. It must impor
 contracts and have no target-mod side effects. Thread isolates a broken provider and continues
 collecting candidates from other external JARs.
 
+An external NeoForge JAR lists the same provider in the standard Java service file
+`META-INF/services/me.clutchy.thread.core.integration.ThreadIntegrationCandidateProvider`:
+
+```text
+example.thread.integration.ExampleCandidateProvider
+```
+
+The provider class uses the same Java API shown above. NeoForge candidate requirements use Maven
+version-range syntax such as `[1.0,2.0)`; Fabric candidates use Fabric Loader predicate syntax such
+as `>=1 <2`. Implementations remain class-name strings on both loaders.
+
 For each candidate, Thread checks in this order:
 
 1. the stable integration ID is enabled;
@@ -95,8 +106,10 @@ For each candidate, Thread checks in this order:
 5. the implementation registers its contributions transactionally.
 
 The reflective loader is intentional. A class-name string is the narrow mechanism that prevents an
-absent optional API from being verified or linked before presence/version checks. Do not replace it
-with a class literal, eager `ServiceLoader`, or catalog import.
+absent optional API from being verified or linked before presence/version checks. Java
+`ServiceLoader` is used only to collect NeoForge candidate-provider metadata; it never constructs
+the deferred integration implementation. Do not replace the implementation class name with a class
+literal or eager implementation import.
 
 ## Transactional registration
 
