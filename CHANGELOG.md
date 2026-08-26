@@ -10,15 +10,21 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
   plans across thirteen read-only tools.
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
-- Optional JEI `30.x` recipe integration for supported modified recipes, alternatives, stable
-  variants, craftability, missing ingredients, and recursive plans.
+- A `thread:integrations` Fabric entrypoint for metadata-only candidates from separately distributed
+  Thread Integrations packages.
 
 ### Changed
 
-- Raised the Minecraft 26.2 Fabric API minimum to `0.155.0+26.2`, matching the supported JEI line.
+- Restored the Minecraft 26.2 Fabric API minimum to the native `0.154.0+26.2` baseline.
 - Made recipe-source precedence deterministic: the first usable optional provider wins per item,
   while Minecraft's live recipe manager remains the guarded base and fallback.
-- JEI conversion now reads each slot's complete ingredient set instead of its cycling display state.
+- Defined **Thread Integrations** as future separately distributed optional mods/packages rather
+  than code bundled into the base Thread artifact.
+
+### Removed
+
+- Removed the bundled JEI adapter, dependency repository/configuration, capability metadata,
+  plugin entrypoints, tests, packaged runs, CI tasks, and installation instructions.
 
 ## 0.1.0 - 2026-08-24
 

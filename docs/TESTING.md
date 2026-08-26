@@ -62,8 +62,6 @@ Cover:
   cyclic-versus-safe variants, maximum depth, empty inventory, no recipes, and session failures
 - optional recipe-provider precedence and native fallback with base session failures remaining
   authoritative
-- JEI layout conversion for stable variants, item/tag alternatives, counts, unavailable runtime,
-  and safe rejection of non-item inputs
 
 ## Architecture tests
 
@@ -78,6 +76,8 @@ Examples:
 - MCP transport must not import Fabric/Minecraft classes directly
 - optional integration catalogs must use implementation class-name strings, not class literals or
   eager `ServiceLoader` discovery
+- base artifact sources, metadata, and dependency declarations must contain no bundled
+  recipe-viewer implementation or dependency
 
 This can be done with module separation, dependency analysis, or lightweight source/package checks. Prefer the simplest reliable mechanism.
 
@@ -119,13 +119,13 @@ nearby-entity radius/result caps.
 The game-test mod also supplies normal recipe data resources. Two `thread:*` recipes form a custom
 command-block -> chain-command-block dependency, and a `data/minecraft/recipe/diamond_pickaxe.json`
 resource replaces the vanilla diamond-pickaxe definition with a dirt input. The normal and
-JEI-disabled packaged runs prove that the live native manager exposes the addition and replacement,
-preserves dirt/stone alternatives, and drives recipe lookup, craftability, missing-ingredient, and
-recursive-plan tools without JEI.
+packaged runs prove that the live native manager exposes the addition and replacement, preserves
+dirt/stone alternatives, and drives recipe lookup, craftability, missing-ingredient, and
+recursive-plan tools without a third-party recipe source.
 
 The same packaged test also verifies that the integration registry initializes with only the
-required `vanilla` integration when JEI is absent, and that its generated capability metadata
-reflects all thirteen committed tools. Core tests use a reflective test-only
+required `vanilla` integration, and that its generated capability metadata reflects all thirteen
+committed tools. Core tests use a reflective test-only
 proof integration to cover conditional activation, tool/context/recipe/typed-extension
 contributions, metadata reporting, atomic failure rollback, duplicate IDs, stable ordering, and
 classloading/linkage isolation. Fabric unit tests verify block, block-entity, and entity enrichment
@@ -136,18 +136,14 @@ order plus per-contributor runtime failure isolation.
 game-test JAR; production classes do not leak in through the harness. The game-test source set is
 never packaged in the runtime mod.
 
-`./gradlew runJeiProductionClientGameTest` adds the pinned full JEI runtime and a game-test-only JEI
-plugin. That plugin registers two stable modified recipe variants for a barrier and a second-level
-structure-void recipe absent from Minecraft's recipe manager. The test proves JEI capability
-metadata, preferred-provider selection, complete recipe alternatives/variants, direct craftability,
-missing counts, recursive planning, and MCP recipe access through the packaged Thread JAR. Core
-tests prove stable integration-ID precedence and native fallback for empty, controlled-failure, and
-crashing optional providers.
-
-`./gradlew runJeiDisabledProductionClientGameTest` installs the same JEI runtime but writes an
-isolated Thread config containing `disabledIntegrations: ["jei"]`. It proves only `vanilla` becomes
-active, the game-test-only JEI recipe does not enter Thread's native fallback, and the custom native
-recipes remain available to all four recipe/crafting tools.
+Core tests prove stable integration-ID precedence and native fallback for empty,
+controlled-failure, and crashing proof providers. `FabricIntegrationCatalogTest` proves the base
+artifact declares no bundled optional candidates, while configuration and registry tests preserve
+generic integration disabling and absent-class safety for future separate packages.
+Catalog tests also collect metadata from a proof `ThreadIntegrationCandidateProvider` and isolate a
+linkage-failing provider. The separately packaged game-test mod declares the real
+`thread:integrations` Fabric entrypoint, activates a metadata-only candidate, contributes an empty
+recipe provider, and proves live recipe lookups reach it without changing the native result.
 
 ## Threading tests
 
@@ -230,6 +226,6 @@ Do not tag V1 unless:
 - docs reflect actual behavior
 - tag/release workflow can produce the installable V1 JAR from a clean checkout
 
-The local release-equivalent gate is documented in [RELEASE.md](RELEASE.md). It adds all four
+The local release-equivalent gate is documented in [RELEASE.md](RELEASE.md). It adds both
 packaged client runs, the tag/version check, runtime artifact inspection, and checksum generation
 to the normal quality gate.

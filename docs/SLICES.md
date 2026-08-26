@@ -450,54 +450,22 @@ EMI, REI, FTB Quests, Create, Mekanism, or other substantial mod support.
 
 ---
 
-## Slice 10: Optional JEI recipe integration
+## Slice 10: Historical bundled recipe-viewer proof
 
-### Goal
+### Status
 
-Prove the optional integration framework against one supported third-party recipe viewer while
-letting the existing recipe and crafting tools understand safe modpack-aware recipes.
-
-### Work
-
-Add:
-
-- a metadata-only `jei` candidate for JEI `30.26.0.182` through compatible `30.x` Fabric builds
-- a Fabric integration loader that injects only the client-thread executor, provider limits, and
-  DTO mapper after candidate discovery
-- a JEI lifecycle bridge and bounded recipe-layout adapter isolated under
-  `platform.fabric.integration.jei`
-- conversion of stable single-item-output, item-input recipes with alternatives, counts, and tag
-  provenance into the existing Thread recipe model
-- safe skipping for missing IDs, custom/non-item inputs, ambiguous or multiple outputs, malformed
-  layouts, and excessive result/slot/alternative counts
-- packaged tests for JEI present, absent, and installed-but-disabled behavior
-
-The adapter contributes only an `IntegrationRecipeProvider`; it adds no MCP tools and does not
-change MCP transport. The guarded vanilla provider runs first. JEI runtime or layout failures are
-isolated so supported single-player vanilla behavior remains available.
-
-### Acceptance criteria
-
-- supported JEI activates after enabled/presence/version checks and appears in capabilities
-- absent or disabled JEI leaves startup, the thirteen tools, and vanilla recipes unchanged
-- no JEI implementation class is resolved by Thread when the candidate is absent or disabled
-- JEI API types stay within the JEI integration package and never enter core DTOs/services or MCP
-- supported modified recipes preserve stable IDs, variants, item alternatives, counts, and tags
-- unsupported recipe types/layouts are skipped without invented data or failed vanilla queries
-- `get_recipe`, `can_craft`, `get_missing_ingredients`, and the recursive planner consume the same
-  contributed recipes without duplicate JEI-specific tools
-- normal, MCP-disabled, JEI-present, and JEI-disabled packaged client tests pass
-- formatting, lint, unit/integration tests, clean build, and release artifact checks pass
+Removed by Slice 12. The experiment proved that `IntegrationRecipeProvider` contributions can flow
+through existing recipe and crafting tools without changing MCP, but its third-party implementation,
+dependency, metadata, tests, and packaged runs are no longer part of Thread.
 
 ---
 
-## Slice 11: Live native recipe fallback and deterministic precedence
+## Slice 11: Live native recipe authority and deterministic precedence
 
 ### Goal
 
-Prove that Minecraft's resolved runtime recipe system remains Thread's authoritative base source
-when JEI is absent, disabled, unavailable, or cannot represent an item, while making optional
-provider precedence explicit.
+Prove that Minecraft's resolved runtime recipe system is Thread's authoritative base source while
+making generic optional-provider precedence explicit.
 
 ### Work
 
@@ -511,24 +479,64 @@ Add:
 - game-test-mod recipe resources containing a custom two-step recipe chain and a vanilla recipe
   replacement
 - packaged assertions covering native recipe lookup, alternatives, overrides, craftability,
-  missing ingredients, recursive planning, JEI absence, JEI disablement, and JEI precedence
-- JEI conversion through `IRecipeSlotView.getAllIngredients()` so cycling display state cannot omit
-  valid alternatives
+  missing ingredients, and recursive planning
 
-The base provider still runs first so the centralized single-player guard and native query limits
-remain authoritative. A non-empty optional result replaces the base result only for that item. No
+The base provider runs first so the centralized single-player guard and native query limits remain
+authoritative. A non-empty contributed result may replace the base result only for that item. No
 core crafting service or MCP tool knows which source was selected.
 
 ### Acceptance criteria
 
-- absent and disabled JEI return recipes from the live native manager
 - the native path observes a game-test-mod recipe addition and a replacement of a vanilla recipe
 - `get_recipe`, `can_craft`, `get_missing_ingredients`, and recursive planning all consume the
   custom native recipes
 - native ingredient alternatives remain complete and deterministic
-- enabled JEI takes precedence for items it can represent, including JEI-only test recipes
+- proof providers establish deterministic optional precedence without a third-party dependency
 - empty or failed optional results restore the already-captured native result unchanged
 - core and MCP remain decoupled from recipe-source choice and MCP transport is unchanged
 - safety, cycle, depth, query, and plan limits remain enforced
-- formatting, lint, unit/integration tests, clean build, release verification, and all four packaged
+- formatting, lint, unit/integration tests, clean build, release verification, and both packaged
   client tests pass
+
+---
+
+## Slice 12: Base artifact integration boundary cleanup
+
+### Goal
+
+Keep Thread focused on native Minecraft/Fabric data and stable public extension hooks by removing
+the bundled third-party recipe-viewer adapter from the base artifact.
+
+### Work
+
+- remove all bundled JEI implementation classes, dependencies, repositories, plugin entrypoints,
+  capability metadata, tests, fixtures, packaged runs, CI tasks, and release paths
+- retain `ThreadIntegration`, metadata-first discovery, transactional registration, contribution
+  hooks, generic recipe-provider precedence/fallback, capability metadata, and integration disabling
+- keep `FabricRecipeProvider` on the integrated server's live `RecipeManager`
+- keep the native recipe game-test resources and all crafting intelligence/planner behavior
+- make the base Fabric integration catalog intentionally empty
+- add a metadata-only `thread:integrations` Fabric entrypoint contract so separate packages can
+  contribute candidates without bundling their implementations in base Thread
+- prove the external-mod entrypoint and recipe contribution path in the separately packaged
+  game-test mod
+- verify the release artifact contains the generic integration contracts but no third-party adapter
+- document **Thread Integrations** as future separately distributed optional mods/packages
+
+This slice creates no external integration project and makes no MCP transport change.
+
+### Acceptance criteria
+
+- base source, metadata, Gradle configuration, CI, release tasks, and runtime JAR contain no bundled
+  JEI implementation or dependency
+- the native recipe addition and vanilla replacement still drive recipe lookup, craftability,
+  missing ingredients, and recursive planning in the packaged game test
+- the generic integration framework remains covered by proof integrations, absent-class checks,
+  external candidate-provider collection, failure isolation, stable ordering, capability metadata,
+  and disabling tests
+- the base runtime and capabilities contain only the required `vanilla` integration
+- docs consistently describe native Minecraft/Fabric as the base data source and future
+  third-party support as separate Thread Integrations packages
+- MCP tests and behavior remain unchanged
+- formatting, lint, Javadocs, unit/integration tests, clean build, release verification, and both
+  packaged client tests pass

@@ -15,7 +15,7 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Minecraft Java Edition
 - Fabric only
 - Java implementation
-- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.155.0+26.2
+- Minecraft 26.2 with Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2
 - Local MCP access only by default
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
@@ -48,7 +48,7 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - current dimension and position
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
-- live native recipe lookup, including datapack/mod changes, plus optional supported JEI item recipes
+- live native recipe lookup, including datapack and Fabric-mod changes
 - deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - deterministic recursive crafting plans with bounded cycle/depth handling
 - vanilla item search
@@ -90,7 +90,7 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - command execution
 - remote/public MCP hosting
 - account/authentication systems
-- REI/EMI integration
+- JEI/REI/EMI integration in the base artifact
 - FTB Quests integration
 - Create/Mekanism/AE2/etc. integrations
 - broad chest/container scanning
@@ -100,8 +100,9 @@ compatibility. Minecraft 26.2 requires Java 25, which is also the project toolch
 - long-term player memory
 - voice input/output
 
-V1 includes the integration framework and one optional JEI recipe adapter. It still ships no EMI,
-REI, FTB Quests, Create, Mekanism, storage-network, or other substantial third-party support.
+V1 includes the generic integration framework but ships no third-party gameplay-mod or
+recipe-viewer adapter. Future JEI, FTB Quests, Create, AE2, Mekanism, storage-network, and similar
+support belongs in separately distributed **Thread Integrations** packages.
 
 ## V1 success criteria
 
@@ -124,8 +125,8 @@ Thread recursively plans intermediate recipes with one shared inventory ledger a
 shortages plus structured cycle/depth/work-limit issues. Both are read-only analyses: Thread does not
 craft items, search nearby storage, model workstation/fuel feasibility, or globally optimize every
 recipe combination. The base recipe source is Minecraft's final live recipe manager, not a static
-vanilla list, so supported datapack and Fabric-mod recipe changes work without JEI. When supported
-JEI is active, its safe item-only results take precedence per item without changing tool contracts.
+vanilla list, so supported datapack and Fabric-mod recipe changes flow through the same tool
+contracts.
 
 ## Non-goals that protect the architecture
 

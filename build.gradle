@@ -14,20 +14,6 @@ base {
 
 repositories {
     mavenCentral()
-    maven {
-        name = 'BlameJared'
-        url = 'https://maven.blamejared.com'
-        content {
-            includeGroup 'mezz.jei'
-        }
-    }
-}
-
-configurations {
-    jeiProductionRuntime {
-        canBeConsumed = false
-        canBeResolved = true
-    }
 }
 
 loom {
@@ -66,15 +52,9 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    compileOnly "mezz.jei:jei-26.2-fabric-api:${project.jei_version}"
-    gametestCompileOnly "mezz.jei:jei-26.2-fabric-api:${project.jei_version}"
-    jeiProductionRuntime("mezz.jei:jei-26.2-fabric:${project.jei_version}") {
-        transitive = false
-    }
 
     testImplementation platform("org.junit:junit-bom:${project.junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testImplementation "mezz.jei:jei-26.2-fabric-api:${project.jei_version}"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -216,9 +196,10 @@ tasks.register('verifyReleaseArtifact') {
             def entries = archive.entries().collect { it.name }.toSet()
             def requiredEntries = [
                     'fabric.mod.json',
+                    'me/clutchy/thread/core/integration/ThreadIntegration.class',
+                    'me/clutchy/thread/core/integration/ThreadIntegrationCandidateProvider.class',
+                    'me/clutchy/thread/core/integration/extension/IntegrationRecipeProvider.class',
                     'me/clutchy/thread/platform/fabric/ThreadFabricClient.class',
-                    'me/clutchy/thread/platform/fabric/integration/jei/JeiIntegration.class',
-                    'me/clutchy/thread/platform/fabric/integration/jei/ThreadJeiPlugin.class',
                     'me/clutchy/thread/transport/mcp/McpHttpServer.class'
             ]
             requiredEntries.each { entry ->
@@ -229,9 +210,14 @@ tasks.register('verifyReleaseArtifact') {
             def forbiddenEntries = [
                     'me/clutchy/thread/platform/fabric/FabricProviderClientGameTest.class'
             ]
+            def fabricIntegrationPrefix =
+                    'me/clutchy/thread/platform/fabric/integration/'
             if (entries.any { it.contains('/gametest/') || it.endsWith('.java') }
+                    || entries.any { it.startsWith(fabricIntegrationPrefix)
+                        && it.substring(fabricIntegrationPrefix.length()).contains('/') }
                     || forbiddenEntries.any { entries.contains(it) }) {
-                throw new GradleException('Runtime JAR contains test or source content.')
+                throw new GradleException(
+                        'Runtime JAR contains test, source, or bundled integration content.')
             }
 
             def metadataEntry = archive.getEntry('fabric.mod.json')
@@ -243,9 +229,11 @@ tasks.register('verifyReleaseArtifact') {
             if (metadata.environment != 'client') {
                 throw new GradleException('Thread V1 runtime JAR must remain client-only.')
             }
-            if (metadata.entrypoints.client !=
-                    ['me.clutchy.thread.platform.fabric.ThreadFabricClient']) {
-                throw new GradleException('Runtime JAR has an unexpected client entrypoint.')
+            def expectedEntrypoints = [
+                    client: ['me.clutchy.thread.platform.fabric.ThreadFabricClient']
+            ]
+            if (metadata.entrypoints != expectedEntrypoints) {
+                throw new GradleException('Runtime JAR has unexpected entrypoints.')
             }
             def expectedDependencies = [
                     fabricloader: ">=${project.loader_version}",
@@ -298,18 +286,6 @@ tasks.register(
     runDir = layout.buildDirectory.dir('run/productionClientGameTest').get().asFile
 }
 
-tasks.register(
-        'runJeiProductionClientGameTest',
-        net.fabricmc.loom.task.prod.ClientProductionRunTask) {
-    group = 'verification'
-    description = 'Proves the packaged client consumes live JEI recipe data.'
-    dependsOn tasks.named('build'), gametestJar
-    mods.from(gametestJar.flatMap { it.archiveFile })
-    mods.from(configurations.jeiProductionRuntime)
-    jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectJei=true')
-    runDir = layout.buildDirectory.dir('run/jeiProductionClientGameTest').get().asFile
-}
-
 def disabledMcpRunDirectory = layout.buildDirectory.dir('run/mcpDisabledClientGameTest')
 def disabledMcpConfig = disabledMcpRunDirectory.map { it.file('config/thread.json') }
 
@@ -333,30 +309,4 @@ tasks.register(
     mods.from(gametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectMcpDisabled=true')
     runDir = disabledMcpRunDirectory.get().asFile
-}
-
-def disabledJeiRunDirectory = layout.buildDirectory.dir('run/jeiDisabledClientGameTest')
-def disabledJeiConfig = disabledJeiRunDirectory.map { it.file('config/thread.json') }
-
-tasks.register('prepareJeiDisabledClientGameTest') {
-    outputs.file(disabledJeiConfig)
-    doLast {
-        def configFile = disabledJeiConfig.get().asFile
-        configFile.parentFile.mkdirs()
-        configFile.setText(
-                '{\n  "schemaVersion": 1,\n  "disabledIntegrations": ["jei"]\n}\n',
-                'UTF-8')
-    }
-}
-
-tasks.register(
-        'runJeiDisabledProductionClientGameTest',
-        net.fabricmc.loom.task.prod.ClientProductionRunTask) {
-    group = 'verification'
-    description = 'Proves installed JEI stays unloaded when its Thread integration is disabled.'
-    dependsOn tasks.named('build'), gametestJar, tasks.named('prepareJeiDisabledClientGameTest')
-    mods.from(gametestJar.flatMap { it.archiveFile })
-    mods.from(configurations.jeiProductionRuntime)
-    jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectJeiDisabled=true')
-    runDir = disabledJeiRunDirectory.get().asFile
 }

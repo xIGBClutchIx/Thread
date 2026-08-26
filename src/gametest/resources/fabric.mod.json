@@ -8,8 +8,8 @@
         "fabric-client-gametest": [
             "me.clutchy.thread.platform.fabric.FabricProviderClientGameTest"
         ],
-        "jei_mod_plugin": [
-            "me.clutchy.thread.platform.fabric.integration.jei.JeiTestPlugin"
+        "thread:integrations": [
+            "me.clutchy.thread.platform.fabric.integration.ExternalCandidateProvider"
         ]
     },
     "depends": {

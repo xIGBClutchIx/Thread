@@ -18,6 +18,13 @@ The goal is not to maximize tooling. The goal is to make changes from humans or 
 
 ## Optional integration development
 
+- Third-party gameplay-mod and recipe-viewer adapters belong in separately distributed **Thread
+  Integrations** projects. Do not add their APIs, implementations, plugin entrypoints, repositories,
+  runtime tasks, or release paths to the base Thread artifact.
+- Expose external candidate metadata through the `thread:integrations` Fabric entrypoint and a
+  `ThreadIntegrationCandidateProvider`. Keep that bootstrap free of target-mod imports and side
+  effects because Thread loads it before configuration/presence/version checks; place target-mod
+  types only in the named `ThreadIntegration` implementation loaded after those checks.
 - Declare optional integrations with `IntegrationCandidate` metadata and an implementation class
   name string. Do not import the implementation into `FabricIntegrationCatalog`, use its class
   literal, or discover optional implementations eagerly with `ServiceLoader`.

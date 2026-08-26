@@ -217,8 +217,8 @@ Dynamic state such as inventory should be requested through tools rather than co
 
 ### Integration registry
 
-Thread ships a clean optional-integration framework with the required built-in vanilla gameplay
-integration and one optional JEI recipe integration.
+Thread ships a clean optional-integration framework and the required built-in vanilla gameplay
+integration. The base artifact declares no third-party integration candidates or adapters.
 
 Conceptually:
 
@@ -258,6 +258,14 @@ what prevents an absent optional API from causing verification, linkage, or star
 Unavailable, disabled, incompatible, construction-failing, and registration-failing candidates are
 reported as isolated activation outcomes; discovery continues with the next stable ID.
 
+The base `FabricIntegrationCatalog` has no bundled candidates. Separately distributed **Thread
+Integrations** mods/packages expose a metadata-only `ThreadIntegrationCandidateProvider` through the
+`thread:integrations` Fabric entrypoint. The provider must depend only on Thread contracts; it
+returns class-name candidates that still pass configuration, target-mod presence, and version checks
+before `ReflectiveIntegrationLoader` resolves the actual no-argument integration implementation.
+Provider runtime/linkage failures are isolated so one broken external package cannot prevent native
+startup or hide other candidate providers.
+
 The built-in `VanillaIntegration` owns the thirteen V1 `minecraft.*` tools. Fabric startup supplies its
 loader-neutral providers, then activates it as a required integration through
 `IntegrationRegistry`. The capabilities tool reads the live tool and integration registries at
@@ -284,37 +292,25 @@ errors from optional recipe/enrichment contributions are isolated per contributo
 Recipe source selection is explicit and transport-independent:
 
 ```text
-Minecraft RecipeManager -> FabricRecipeProvider ---------+
-                                                        +-> CompositeRecipeProvider
-JEI IJeiRuntime -> JeiRecipeProvider (when active) ------+          |
-                                                                   v
-                                                CraftingService / CraftingPlanner
-                                                                   |
-                                                                   v
-                                                    existing minecraft.* tools
+Minecraft RecipeManager -> FabricRecipeProvider -> CompositeRecipeProvider
+                                                       ^          |
+                                                       |          v
+               IntegrationRecipeProvider extension ---+  CraftingService / CraftingPlanner
+                                                                  |
+                                                                  v
+                                                   existing minecraft.* tools
 ```
 
 The native result is captured first to enforce the centralized session guard and server-side
-safety limits. A supported non-empty JEI result is then preferred for that item. If JEI is absent,
-disabled, unavailable, returns no representable recipes, or fails, the captured native result is
-returned. Core crafting services and MCP see only `RecipeProvider` and cannot distinguish the
-selected source.
+safety limits. A successful non-empty contributed result may then be preferred for that item. If
+all contributions are empty, unavailable, or fail, the captured native result is returned. Base
+Thread registers no optional recipe provider, so native recipes always reach `CraftingService` and
+`CraftingPlanner`. Core crafting services and MCP see only `RecipeProvider` and cannot distinguish
+a future contributed source.
 
-`FabricIntegrationLoader` supplies only the client-thread executor, fixed provider limits, and DTO
-mapper after discovery has accepted the candidate. This small platform constructor-injection layer
-was the first real capability the no-argument proof loader could not provide; core integration
-contracts did not change. All `mezz.jei` imports remain below `platform.fabric.integration.jei`.
-
-JEI exposes `IJeiRuntime` only through its plugin lifecycle. `ThreadJeiPlugin` therefore keeps one
-private lifecycle bridge that is cleared by `onRuntimeUnavailable`; the integration's recipe
-provider reads it only on Minecraft's client thread. Layout conversion accepts stable, single-item
-output recipes with fully item-backed consumed inputs, reads each slot's complete ingredient set,
-preserves item alternatives/tag provenance, and skips unrepresentable layouts. Base native reads
-still run first, retaining the central single-player guard and fallback behavior.
-
-Future integrations may define additional typed extension points and metadata keys. The framework
-does not implement EMI, REI, FTB Quests, Create, Mekanism, storage-network, or other third-party
-behavior.
+Future integrations may define additional typed extension points and metadata keys. JEI, EMI, REI,
+FTB Quests, Create, AE2, Mekanism, storage networks, and other third-party behavior are absent from
+the base artifact and reserved for separate Thread Integrations packages.
 
 ## Platform boundary
 

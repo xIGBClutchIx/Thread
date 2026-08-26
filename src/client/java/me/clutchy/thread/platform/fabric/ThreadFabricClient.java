@@ -10,6 +10,7 @@ import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.integration.IntegrationActivation;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
+import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
 import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
@@ -23,8 +24,6 @@ import me.clutchy.thread.platform.fabric.inspection.FabricBlockEnricherRegistry;
 import me.clutchy.thread.platform.fabric.inspection.FabricBlockEntityInspectorRegistry;
 import me.clutchy.thread.platform.fabric.integration.FabricIntegrationCatalog;
 import me.clutchy.thread.platform.fabric.integration.FabricIntegrationEnvironment;
-import me.clutchy.thread.platform.fabric.integration.FabricIntegrationLoader;
-import me.clutchy.thread.platform.fabric.integration.FabricIntegrationServices;
 import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
 import me.clutchy.thread.platform.fabric.player.FabricPlayerProvider;
 import me.clutchy.thread.platform.fabric.recipe.FabricRecipeProvider;
@@ -108,12 +107,10 @@ public final class ThreadFabricClient implements ClientModInitializer {
             config::toolEnabled));
     List<IntegrationActivation> optionalIntegrations =
         integrationRegistry.discover(
-            FabricIntegrationCatalog.candidates(),
+            FabricIntegrationCatalog.candidates(loader),
             new FabricIntegrationEnvironment(loader),
             config::integrationEnabled,
-            new FabricIntegrationLoader(
-                new FabricIntegrationServices(clientThread, limits, mapper),
-                ThreadFabricClient.class.getClassLoader()));
+            new ReflectiveIntegrationLoader(ThreadFabricClient.class.getClassLoader()));
     tools = toolRegistry;
     integrations = integrationRegistry;
 

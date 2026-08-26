@@ -94,25 +94,37 @@ class ArchitectureBoundaryTest {
   }
 
   @Test
-  void optionalIntegrationCatalogUsesClassNamesInsteadOfClassLiterals() throws IOException {
+  void optionalIntegrationCatalogDoesNotReferenceImplementationClassLiterals() throws IOException {
     Path catalog =
         PROJECT_ROOT.resolve(
             "src/client/java/me/clutchy/thread/platform/fabric/integration/"
                 + "FabricIntegrationCatalog.java");
     String contents = Files.readString(catalog, StandardCharsets.UTF_8);
 
-    assertFalse(contents.contains(".class"), catalog::toString);
+    assertFalse(
+        contents
+            .replace("FabricIntegrationCatalog.class", "")
+            .replace("ThreadIntegrationCandidateProvider.class", "")
+            .contains(".class"),
+        catalog::toString);
     assertFalse(contents.contains("ServiceLoader"), catalog::toString);
   }
 
   @Test
-  void jeiApiTypesStayInsideTheJeiFabricIntegration() throws IOException {
+  void baseArtifactHasNoBundledRecipeViewerImplementationOrDependency() throws IOException {
     for (Path source : productionJavaSources()) {
       String contents = Files.readString(source, StandardCharsets.UTF_8);
-      if (contents.contains("import mezz.jei.")) {
-        assertTrue(
-            normalizedPath(source).contains("/platform/fabric/integration/jei/"), source::toString);
-      }
+      assertFalse(contents.contains("mezz.jei"), source::toString);
+      assertFalse(normalizedPath(source).contains("/integration/jei/"), source::toString);
+    }
+
+    for (Path artifactInput :
+        List.of(
+            PROJECT_ROOT.resolve("build.gradle"),
+            PROJECT_ROOT.resolve("gradle.properties"),
+            PROJECT_ROOT.resolve("src/main/resources/fabric.mod.json"))) {
+      String contents = Files.readString(artifactInput, StandardCharsets.UTF_8).toLowerCase();
+      assertFalse(contents.contains("jei"), artifactInput::toString);
     }
   }
 

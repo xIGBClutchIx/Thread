@@ -352,31 +352,17 @@ start, stop, reload, event bus, or background-task system exists until an implem
 proves one is required. This slice ships a test-only proof integration and no substantial
 third-party mod integration.
 
-## D024: JEI is the first recipe-viewer integration
+## D024: The bundled JEI proof is retired
 
-**Status:** Accepted
+**Status:** Superseded by D026
 
-Slice 10 supports JEI `30.26.0.182` through compatible `30.x` Fabric builds for Minecraft 26.2.
-JEI was selected because its current Fabric line publishes a separate API artifact, supplies a
-public runtime recipe lookup/layout API, and aligns with Thread's Java 25, Fabric Loader 0.19.3, and
-Minecraft 26.2 baseline. Fabric API moves from `0.154.0+26.2` to JEI's required
-`0.155.0+26.2`; JEI itself remains compile-only and optional for Thread.
+Slice 10 temporarily proved the generic recipe-provider extension against JEI. Slice 12 removes
+that adapter, its API/runtime dependencies, plugin entrypoints, capability metadata, test fixtures,
+packaged runs, CI/release paths, and installation support from base Thread.
 
-`JeiIntegration` contributes recipe definitions through `IntegrationRecipeProvider`. Existing
-`get_recipe`, craftability, missing-ingredient, and recursive-plan services use them automatically;
-there is no parallel JEI tool or MCP behavior. Core crafting classes have no JEI dependency.
-
-JEI's public Fabric plugin lifecycle is the only supported way to receive `IJeiRuntime`, so a
-private adapter-local bridge is the deliberate exception to the preference for injected state. It
-is cleared when JEI invalidates the runtime, queried only on the client thread, and never exposed to
-core. The platform integration loader injects the executor, mapper, and existing safety limits only
-after metadata-first discovery succeeds.
-
-Thread accepts only layouts it can represent truthfully: a stable ID, one item output, and consumed
-item-stack inputs with consistent counts. Alternatives and source tags are retained; custom
-ingredient types, multiple or ambiguous outputs, missing IDs, malformed layouts, and excessive
-results are skipped. A successful guarded native result remains authoritative fallback whenever
-JEI is absent, disabled, unavailable, or fails at runtime.
+The experiment established that existing recipe and crafting tools can consume contributed
+`IntegrationRecipeProvider` data without transport changes. That architectural result remains in
+the generic framework; JEI support itself is no longer an included or supported base feature.
 
 ## D025: Live native recipes are the deterministic base and fallback
 
@@ -393,14 +379,38 @@ order. The first successful, non-empty result replaces the native result for tha
 results, controlled failures, runtime exceptions, and linkage errors decline the item and preserve
 the captured native result unchanged.
 
-This policy gives JEI deterministic precedence where it supplies representable, modpack-aware
-recipes while preserving the native manager whenever JEI is absent, disabled, initializing,
-unsupported for that item, or faulty. `CraftingService`, `CraftingPlanner`, tool handlers, and MCP
-continue to depend only on `RecipeProvider`.
+This policy gives a future optional recipe contribution deterministic precedence for items it can
+represent while preserving the native manager whenever the contribution is empty, unavailable, or
+faulty. Base Thread registers no optional recipe provider. `CraftingService`, `CraftingPlanner`,
+tool handlers, and MCP continue to depend only on `RecipeProvider`.
 
 The packaged test mod proves the boundary with real recipe resources: it adds a two-step custom
-recipe chain and replaces the vanilla diamond-pickaxe recipe. Both absent-JEI and disabled-JEI runs
-must observe those resources through all four existing recipe/crafting tools. The enabled-JEI run
-additionally proves JEI-only recipes take precedence. JEI slot conversion uses the public
-`getAllIngredients()` API rather than the cycling displayed ingredient so alternatives remain
-complete.
+recipe chain and replaces the vanilla diamond-pickaxe recipe. The normal packaged run must observe
+those resources through all four existing recipe/crafting tools, including complete native
+ingredient alternatives. Unit tests prove first-successful-non-empty precedence and fallback with
+proof providers, without introducing a third-party dependency.
+
+## D026: Third-party adapters ship as separate Thread Integrations
+
+**Status:** Accepted
+
+The base Thread artifact contains native Minecraft/Fabric support and public integration hooks. It
+does not contain third-party gameplay-mod or recipe-viewer APIs, implementations, entrypoints,
+metadata, dependencies, or release tasks.
+
+Future JEI, FTB Quests, Create, AE2, storage-network, and similar support belongs in separately
+distributed optional mods/packages under the **Thread Integrations** concept. No external adapter
+project is created by Slice 12. Fabric discovers external packages through the
+`thread:integrations` entrypoint, whose `ThreadIntegrationCandidateProvider` returns metadata-only
+`IntegrationCandidate` values. That bootstrap must not link target-mod APIs; configuration,
+presence, and version checks still happen before Thread reflectively constructs the named
+`ThreadIntegration` implementation. Existing transactional contributions, recipe providers, typed
+extensions, capability metadata, failure isolation, and disabling then apply unchanged.
+
+Why:
+
+- keeps base Thread small and dependency-light;
+- prevents third-party types and lifecycle requirements from shaping core APIs;
+- lets players choose only the adapters their modpack needs;
+- allows each adapter to version and test against its own target mod independently;
+- preserves native Minecraft's live `RecipeManager` as the base data source.

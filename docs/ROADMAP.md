@@ -41,16 +41,17 @@ Possible work:
 Theme: understand the actual modpack rather than generic recipes.
 
 The metadata-first integration framework already provides safe discovery and typed contribution
-points. Slice 10 made it user-visible with the first optional JEI recipe integration. V2 expands
-modpack awareness without moving third-party types into core.
+points. Third-party adapters will ship as separate optional mods/packages under the **Thread
+Integrations** concept, not inside the base Thread artifact. The packaging/discovery contract for
+those external adapters will be designed with the first concrete integration.
 
 Priority candidates:
 
-1. FTB Quests
-2. storage systems such as Applied Energistics 2 / Refined Storage
-3. Create
-4. Mekanism
-5. another recipe viewer only if it adds proven coverage beyond JEI
+1. JEI or another recipe viewer where native recipe data is insufficient
+2. FTB Quests
+3. storage systems such as Applied Energistics 2 / Refined Storage
+4. Create
+5. Mekanism
 
 Examples:
 
@@ -60,7 +61,8 @@ Examples:
 - diagnose a machine/network state
 - calculate progression dependencies
 
-Avoid hard-coding every mod into core. Each integration should register capabilities/tools through the integration API.
+Avoid hard-coding any mod into core or the base artifact. Each separate integration package should
+register capabilities/tools through the public integration API and retain Thread's safety limits.
 
 ## V3: Player-facing assistant experience
 

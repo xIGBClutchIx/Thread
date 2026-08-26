@@ -5,45 +5,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.List;
 import java.util.function.Supplier;
 import me.clutchy.thread.core.integration.IntegrationCandidate;
-import me.clutchy.thread.core.integration.ThreadIntegration;
-import me.clutchy.thread.core.provider.GameThreadExecutor;
-import me.clutchy.thread.platform.fabric.game.FabricProviderLimits;
-import me.clutchy.thread.platform.fabric.mapping.FabricDtoMapper;
+import me.clutchy.thread.core.integration.IntegrationId;
+import me.clutchy.thread.core.integration.ThreadIntegrationCandidateProvider;
 import org.junit.jupiter.api.Test;
 
 class FabricIntegrationCatalogTest {
   @Test
-  void declaresTheSupportedJeiCandidateWithoutAClassLiteral() {
-    List<IntegrationCandidate> candidates = FabricIntegrationCatalog.candidates();
-
-    assertEquals(1, candidates.size());
-    IntegrationCandidate candidate = candidates.getFirst();
-    assertEquals("jei", candidate.id().value());
-    assertEquals("jei", candidate.targetModId());
-    assertEquals(">=30.26.0.182 <31", candidate.versionRequirement());
-    assertEquals(
-        "me.clutchy.thread.platform.fabric.integration.jei.JeiIntegration",
-        candidate.implementationClassName());
+  void baseArtifactDoesNotBundleOptionalIntegrationCandidates() {
+    assertEquals(0, FabricIntegrationCatalog.bundledCandidates().size());
   }
 
   @Test
-  void fabricLoaderInjectsOnlyPlatformServicesAfterDiscovery() throws Exception {
-    GameThreadExecutor direct =
-        new GameThreadExecutor() {
-          @Override
-          public <T> T call(Supplier<T> operation) {
-            return operation.get();
-          }
+  void collectsExternalCandidateMetadataAndIsolatesBrokenProviders() {
+    IntegrationCandidate candidate =
+        new IntegrationCandidate(
+            IntegrationId.of("proof"), "proof-target", ">=1", "example.ProofIntegration");
+    Supplier<ThreadIntegrationCandidateProvider> healthy = () -> () -> List.of(candidate);
+    Supplier<ThreadIntegrationCandidateProvider> broken =
+        () -> {
+          throw new NoClassDefFoundError("optional bootstrap dependency");
         };
-    FabricIntegrationServices services =
-        new FabricIntegrationServices(
-            direct, FabricProviderLimits.defaults(), new FabricDtoMapper());
-    FabricIntegrationLoader loader =
-        new FabricIntegrationLoader(services, getClass().getClassLoader());
 
-    ThreadIntegration integration =
-        loader.load("me.clutchy.thread.platform.fabric.integration.jei.JeiIntegration");
-
-    assertEquals("jei", integration.id().value());
+    assertEquals(
+        List.of(candidate),
+        FabricIntegrationCatalog.candidatesFromProviders(List.of(broken, healthy)));
   }
 }

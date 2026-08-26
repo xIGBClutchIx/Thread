@@ -553,11 +553,11 @@ step, explored-branch, and scaled-quantity ceilings provide additional bounds. A
 is preferred over a cyclic one under the deterministic selection order.
 
 The planner does not inspect equipment or nearby storage, model crafting stations/fuel, perform
-automatic crafting, or mutate the game. It remains unaware of recipe-viewer APIs; when the optional
-JEI integration is active, supported JEI recipes arrive through the same `RecipeProvider` contract
-as native recipes. Without a usable JEI result, the contract reads Minecraft's final live recipe
-manager, including active vanilla, datapack, and Fabric-mod additions, replacements, and removals.
-Thread does not use a static vanilla recipe list. REI and EMI are not integrated.
+automatic crafting, or mutate the game. It remains unaware of recipe-viewer APIs. Base Thread reads
+Minecraft's final live recipe manager, including active vanilla, datapack, and Fabric-mod additions,
+replacements, and removals; it does not use a static vanilla recipe list. A future separate Thread
+Integrations package may contribute detached recipes through the same `RecipeProvider` extension
+without changing this contract.
 
 ## `minecraft.search_items`
 
@@ -629,9 +629,9 @@ target mod/version requirement that passed discovery. Integration-owned metadata
 namespace. Disabled, absent, incompatible, or failed integrations never appear as active
 capabilities and their classes are not resolved before presence/compatibility checks.
 
-With supported JEI active, this list includes integration ID `jei`, contract version `1.0.0`,
-target-mod/version metadata, recipe-provider contribution metadata, and the adapter's safe recipe
-model/unsupported policy. The tool list remains the same thirteen `minecraft.*` tools.
+The base artifact reports only the required `vanilla` integration. Future separately installed
+Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
+changing the thirteen `minecraft.*` tool contracts.
 
 ## Tool descriptions
 
