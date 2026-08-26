@@ -1,6 +1,6 @@
 # Thread Build
 
-Thread uses a Gradle multi-project build with four modules:
+Thread uses a Gradle multi-project build with five modules:
 
 | Module | Purpose | Distributed |
 | --- | --- | --- |
@@ -8,9 +8,11 @@ Thread uses a Gradle multi-project build with four modules:
 | `:fabric` | Fabric entrypoint, Loader API access, events, metadata, and integration discovery | Yes |
 | `:neoforge` | NeoForge entrypoint, Loader API access, events, metadata, and integration discovery | Yes |
 | `:forge` | Forge entrypoint, Loader API access, events, metadata, and integration discovery | Yes |
+| `:universal` | Packages common plus all three loader outputs into the recommended artifact | Yes |
 
-All three loader modules depend on `:common`. Each JAR task merges common output into one installable
-client mod; the build does not create a universal multi-loader JAR.
+All three loader modules depend on `:common` and remain independent of one another. Each dedicated
+JAR merges common output into one installable client mod. The packaging-only `:universal` module
+combines source-set outputs directly and fails on unexpected duplicate entries.
 
 ## Common commands
 
@@ -44,6 +46,8 @@ Intermediate module artifacts are written under each module's `build/` directory
 release artifacts are copied to:
 
 ```text
+build/release/thread-universal-<version>.jar
+build/release/thread-universal-<version>.jar.sha256
 build/release/thread-fabric-<version>.jar
 build/release/thread-fabric-<version>.jar.sha256
 build/release/thread-neoforge-<version>.jar
@@ -54,6 +58,9 @@ build/release/thread-forge-<version>.jar.sha256
 
 `common/build/libs/thread-common-<version>.jar` is an internal build artifact. Do not install or
 publish it independently.
+
+Install exactly one Thread JAR. The universal artifact is the default download; dedicated artifacts
+remain available for modpacks, compatibility testing, and troubleshooting.
 
 ## Packaged client tests
 
@@ -94,3 +101,17 @@ common once; common is kept off Forge's runtime classpath so ModLauncher sees on
 The Fabric, NeoForge, and Forge launch tasks remain separate, but all execute the same loader-neutral
 parity assertions for catalog, configuration, lifecycle state, MCP, tools, recipes, crafting, and
 integration behavior.
+
+The universal artifact has the same normal, restart, and MCP-disabled proofs on every loader:
+
+```powershell
+.\gradlew.bat verifyUniversalFabricProductionClientGameTest
+.\gradlew.bat verifyUniversalFabricRestartProductionClientGameTest
+.\gradlew.bat verifyUniversalFabricMcpDisabledProductionClientGameTest
+.\gradlew.bat verifyUniversalNeoForgeProductionClientGameTest
+.\gradlew.bat verifyUniversalNeoForgeRestartProductionClientGameTest
+.\gradlew.bat verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat verifyUniversalForgeProductionClientGameTest
+.\gradlew.bat verifyUniversalForgeRestartProductionClientGameTest
+.\gradlew.bat verifyUniversalForgeMcpDisabledProductionClientGameTest
+```

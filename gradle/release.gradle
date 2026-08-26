@@ -1,13 +1,16 @@
 def fabricProject = project(':fabric')
 def neoForgeProject = project(':neoforge')
 def forgeProject = project(':forge')
+def universalProject = project(':universal')
 def fabricJar = fabricProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
 def neoForgeJar = neoForgeProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
 def forgeJar = forgeProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
+def universalJar = universalProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
 def releaseDirectory = layout.buildDirectory.dir('release')
 def fabricReleaseJarName = "thread-fabric-${project.version}.jar"
 def neoForgeReleaseJarName = "thread-neoforge-${project.version}.jar"
 def forgeReleaseJarName = "thread-forge-${project.version}.jar"
+def universalReleaseJarName = "thread-universal-${project.version}.jar"
 def semanticVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 
 tasks.register('validateReleaseVersion') {
@@ -211,25 +214,123 @@ tasks.register('verifyForgeReleaseArtifact') {
     }
 }
 
+tasks.register('verifyUniversalReleaseArtifact') {
+    group = 'verification'
+    description = 'Validates the installable universal JAR and its classloading boundaries.'
+    dependsOn universalProject.tasks.named('jar'), tasks.named('validateReleaseVersion')
+    inputs.file(universalJar)
+    doLast {
+        def jarFile = universalJar.get().asFile
+        if (jarFile.name != universalReleaseJarName) {
+            throw new GradleException("Unexpected universal runtime JAR name: ${jarFile.name}")
+        }
+        new java.util.zip.ZipFile(jarFile).withCloseable { archive ->
+            def entryNames = archive.entries().collect { it.name }
+            def entries = entryNames.toSet()
+            if (entryNames.size() != entries.size()) {
+                throw new GradleException('Universal runtime JAR contains duplicate entries.')
+            }
+            requiredSharedEntries.each { entry ->
+                if (!entries.contains(entry)) {
+                    throw new GradleException("Universal runtime JAR is missing ${entry}")
+                }
+            }
+            [
+                    'fabric.mod.json',
+                    'META-INF/neoforge.mods.toml',
+                    'META-INF/mods.toml',
+                    'pack.mcmeta',
+                    'me/clutchy/thread/platform/fabric/ThreadFabricClient.class',
+                    'me/clutchy/thread/platform/neoforge/ThreadNeoForgeClient.class',
+                    'me/clutchy/thread/platform/forge/ThreadForgeClient.class'
+            ].each { entry ->
+                if (!entries.contains(entry)) {
+                    throw new GradleException("Universal runtime JAR is missing ${entry}")
+                }
+            }
+            if (entries.any { it.contains('/gametest/') || it.endsWith('.java') }) {
+                throw new GradleException('Universal runtime JAR contains test or source content.')
+            }
+            [
+                    'me/clutchy/thread/platform/fabric/',
+                    'me/clutchy/thread/platform/neoforge/',
+                    'me/clutchy/thread/platform/forge/'
+            ].each { prefix ->
+                def integrationPrefix = "${prefix}integration/"
+                if (entries.any { it.startsWith(integrationPrefix)
+                    && it.substring(integrationPrefix.length()).contains('/') }) {
+                    throw new GradleException(
+                            'Universal runtime JAR contains bundled third-party integration content.')
+                }
+            }
+
+            def forbiddenCommonReferences = [
+                    'net/fabricmc/',
+                    'net/neoforged/',
+                    'net/minecraftforge/',
+                    'me/clutchy/thread/platform/fabric/',
+                    'me/clutchy/thread/platform/neoforge/',
+                    'me/clutchy/thread/platform/forge/'
+            ]
+            entries.findAll { entry ->
+                entry.endsWith('.class')
+                        && !entry.startsWith('me/clutchy/thread/platform/fabric/')
+                        && !entry.startsWith('me/clutchy/thread/platform/neoforge/')
+                        && !entry.startsWith('me/clutchy/thread/platform/forge/')
+            }.each { entry ->
+                def bytecode = new String(
+                        archive.getInputStream(archive.getEntry(entry)).readAllBytes(),
+                        java.nio.charset.StandardCharsets.ISO_8859_1)
+                forbiddenCommonReferences.each { reference ->
+                    if (bytecode.contains(reference)) {
+                        throw new GradleException(
+                                "Common class ${entry} eagerly references loader-specific ${reference}")
+                    }
+                }
+            }
+
+            def fabricMetadata = new groovy.json.JsonSlurper().parse(
+                    archive.getInputStream(archive.getEntry('fabric.mod.json')), 'UTF-8')
+            if (fabricMetadata.version != project.version.toString()) {
+                throw new GradleException('Universal Fabric metadata version is incorrect.')
+            }
+            def neoForgeMetadata = archive.getInputStream(
+                    archive.getEntry('META-INF/neoforge.mods.toml')).getText('UTF-8')
+            def forgeMetadata = archive.getInputStream(
+                    archive.getEntry('META-INF/mods.toml')).getText('UTF-8')
+            if (!neoForgeMetadata.contains("version=\"${project.version}\"")
+                    || !neoForgeMetadata.contains(
+                        "versionRange=\"[${project.neoforge_version},)\"")
+                    || !forgeMetadata.contains("version=\"${project.version}\"")
+                    || !forgeMetadata.contains(
+                        "versionRange=\"[${project.forge_version.split('-', 2)[1]},)\"")) {
+                throw new GradleException('Universal loader metadata versions are inconsistent.')
+            }
+        }
+    }
+}
+
 tasks.register('verifyReleaseArtifact') {
     group = 'verification'
-    description = 'Validates the Fabric, NeoForge, and Forge release artifacts independently.'
+    description = 'Validates the universal and dedicated release artifacts independently.'
     dependsOn tasks.named('verifyFabricReleaseArtifact'),
             tasks.named('verifyNeoForgeReleaseArtifact'),
-            tasks.named('verifyForgeReleaseArtifact')
+            tasks.named('verifyForgeReleaseArtifact'),
+            tasks.named('verifyUniversalReleaseArtifact')
 }
 
 tasks.register('releaseBundle') {
     group = 'build'
-    description = 'Creates all validated loader JARs and SHA-256 checksums.'
+    description = 'Creates all validated universal and dedicated JARs with SHA-256 checksums.'
     dependsOn tasks.named('verifyReleaseArtifact')
-    inputs.files(fabricJar, neoForgeJar, forgeJar)
+    inputs.files(universalJar, fabricJar, neoForgeJar, forgeJar)
     outputs.dir(releaseDirectory)
     doLast {
         def outputDirectory = releaseDirectory.get().asFile
         outputDirectory.deleteDir()
         outputDirectory.mkdirs()
         [
+                (universalReleaseJarName): universalJar.get().asFile,
                 (fabricReleaseJarName): fabricJar.get().asFile,
                 (neoForgeReleaseJarName): neoForgeJar.get().asFile,
                 (forgeReleaseJarName): forgeJar.get().asFile

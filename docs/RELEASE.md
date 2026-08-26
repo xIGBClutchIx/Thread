@@ -1,7 +1,7 @@
 # Thread Release
 
-Thread releases separate Fabric, NeoForge, and Forge client artifacts. A universal JAR is not part
-of this release process.
+Thread releases a recommended universal client artifact plus dedicated Fabric, NeoForge, and Forge
+artifacts. Users install exactly one of them.
 
 ## Release gate
 
@@ -9,27 +9,41 @@ From the repository root:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
-  verifyReleaseArtifact releaseBundle runProductionClientGameTest `
-  runRestartProductionClientGameTest runMcpDisabledProductionClientGameTest `
-  verifyNeoForgeRestartProductionClientGameTest `
-  verifyNeoForgeMcpDisabledProductionClientGameTest `
-  verifyForgeRestartProductionClientGameTest `
-  verifyForgeMcpDisabledProductionClientGameTest `
-  verifyReleaseVersion "-PreleaseTag=v0.1.0"
+  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
+.\gradlew.bat --no-daemon --console=plain runRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain runMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyNeoForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalFabricRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalFabricMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalNeoForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalForgeMcpDisabledProductionClientGameTest
 git diff --check
 ```
+
+Run each packaged task separately so real client processes cannot overlap on the MCP port or mutate
+another task's prepared instance.
 
 Change the tag argument when `mod_version` changes. Versions use `MAJOR.MINOR.PATCH`; tags use
 `vMAJOR.MINOR.PATCH`.
 
-`verifyReleaseArtifact` delegates to independent Fabric, NeoForge, and Forge artifact checks. Each proves
-that required public common contracts, shared Minecraft/runtime classes, its loader entrypoint,
-MCP transport, and loader metadata are present. Each rejects tests, sources, bundled integrations,
-the other loaders' classes and metadata.
+`verifyReleaseArtifact` delegates to independent universal, Fabric, NeoForge, and Forge checks. The
+dedicated checks prove loader purity. The universal check requires all adapters and metadata,
+rejects duplicate entries and development/bundled-integration content, and scans compiled common
+classes for eager loader-specific references.
 
-`releaseBundle` writes all three loader JARs and SHA-256 checksums under `build/release/` using
-`thread-fabric-<version>.jar`, `thread-neoforge-<version>.jar`, and
-`thread-forge-<version>.jar`.
+`releaseBundle` writes four JARs and SHA-256 checksums under `build/release/`:
+
+```text
+thread-universal-<version>.jar
+thread-fabric-<version>.jar
+thread-neoforge-<version>.jar
+thread-forge-<version>.jar
+```
 
 ## Publishing checklist
 
@@ -41,8 +55,9 @@ the other loaders' classes and metadata.
 6. Tag that exact commit as `vMAJOR.MINOR.PATCH`, then push the commit and tag.
 
 The tag workflow repeats formatting, lint, compilation, unit/architecture tests, all three
-packaged-client lifecycles on all three loaders, artifact inspection, checksum generation, and version/tag matching
-before attaching files to the GitHub release.
+packaged-client lifecycles for dedicated and universal artifacts on all three loaders, artifact
+inspection, checksum generation, and version/tag matching before attaching files to the GitHub
+release.
 
 Automatic Modrinth, CurseForge, Maven, common-module, or other loader publishing is not currently
 implemented.

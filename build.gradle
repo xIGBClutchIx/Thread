@@ -27,6 +27,39 @@ tasks.register('test') {
     dependsOn ':common:test', ':fabric:test', ':neoforge:test', ':forge:test'
 }
 
+[
+        'runUniversalProductionClientGameTest',
+        'runUniversalRestartProductionClientGameTest',
+        'runUniversalMcpDisabledProductionClientGameTest'
+].each { taskName ->
+    tasks.register("verifyUniversalFabric${taskName - 'runUniversal'}") {
+        group = 'verification'
+        dependsOn ":fabric:${taskName}"
+    }
+}
+
+[
+        'verifyUniversalNeoForgeProductionClientGameTest',
+        'verifyUniversalNeoForgeRestartProductionClientGameTest',
+        'verifyUniversalNeoForgeMcpDisabledProductionClientGameTest'
+].each { taskName ->
+    tasks.register(taskName) {
+        group = 'verification'
+        dependsOn ":neoforge:${taskName}"
+    }
+}
+
+[
+        'verifyUniversalForgeProductionClientGameTest',
+        'verifyUniversalForgeRestartProductionClientGameTest',
+        'verifyUniversalForgeMcpDisabledProductionClientGameTest'
+].each { taskName ->
+    tasks.register(taskName) {
+        group = 'verification'
+        dependsOn ":forge:${taskName}"
+    }
+}
+
 tasks.register('runClientGameTest') {
     group = 'verification'
     description = 'Runs the Fabric development client game test.'

@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- A recommended `thread-universal-<version>.jar` that packages common output and all three thin
+  loader adapters directly, with duplicate detection and the same packaged parity proofs on
+  Fabric, NeoForge, and Forge. Dedicated loader JARs remain available.
 - Forge 65.1.2 support with a thin loader adapter, Java-service integration discovery, a separate
   release JAR, and the same real packaged-client lifecycle/MCP/recipe proofs as the other loaders.
 - NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate

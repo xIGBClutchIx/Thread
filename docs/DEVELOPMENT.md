@@ -9,6 +9,7 @@ Thread is built as `:common` plus thin `:fabric`, `:neoforge`, and `:forge` adap
 configuration, MCP, runtime assembly, and loader-neutral Minecraft providers belong in `:common`.
 Loader API access, lifecycle events, metadata, and integration discovery stay in their adapter.
 All three entrypoints call the same `ThreadRuntime.start` path after resolving those loader values.
+The source-free `:universal` module packages these existing outputs and does not own runtime logic.
 
 Root Gradle tasks aggregate all modules and remain the normal contributor interface. See
 [Build](BUILD.md) for module-specific commands and outputs.
@@ -100,10 +101,16 @@ but is not the release proof.
 .\gradlew.bat verifyForgeProductionClientGameTest
 .\gradlew.bat verifyForgeRestartProductionClientGameTest
 .\gradlew.bat verifyForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat verifyUniversalFabricRestartProductionClientGameTest
+.\gradlew.bat verifyUniversalFabricMcpDisabledProductionClientGameTest
+.\gradlew.bat verifyUniversalNeoForgeRestartProductionClientGameTest
+.\gradlew.bat verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat verifyUniversalForgeRestartProductionClientGameTest
+.\gradlew.bat verifyUniversalForgeMcpDisabledProductionClientGameTest
 ```
 
-Each normal test launches a temporary client with the final loader-specific Thread JAR and a
-separately packaged proof integration/game-test mod. All three compile the same loader-neutral parity
+Each normal test launches a temporary client with a final dedicated or universal Thread JAR and a
+separately packaged proof integration/game-test mod. All three loaders compile the same loader-neutral parity
 fixture from `common/src/gametest/java`. It verifies the exact thirteen-tool catalog, config,
 loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
 recipes and crafting, external integration activation, and controlled gameplay rejection at the
@@ -125,28 +132,38 @@ Before committing a V1-complete change, run the release-equivalent gate from the
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
-  verifyReleaseArtifact releaseBundle runProductionClientGameTest `
-  runRestartProductionClientGameTest runMcpDisabledProductionClientGameTest `
-  verifyNeoForgeRestartProductionClientGameTest `
-  verifyNeoForgeMcpDisabledProductionClientGameTest `
-  verifyForgeRestartProductionClientGameTest `
-  verifyForgeMcpDisabledProductionClientGameTest `
-  verifyReleaseVersion "-PreleaseTag=v0.1.0"
+  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
+.\gradlew.bat --no-daemon --console=plain runRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain runMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyNeoForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalFabricRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalFabricMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalNeoForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalForgeRestartProductionClientGameTest
+.\gradlew.bat --no-daemon --console=plain verifyUniversalForgeMcpDisabledProductionClientGameTest
 git diff --check
 ```
+
+Keep each packaged task in its own Gradle invocation. Loader launch tasks use real client processes
+and must not overlap on the shared MCP port or test-instance preparation.
 
 Change the release tag argument when `mod_version` changes. Release versions and tags must use
 `MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH`, respectively. `verifyReleaseArtifact` rejects test
 classes, source files, and bundled third-party integrations while checking common contracts,
-shared runtime/provider classes, exactly one loader entrypoint, and loader metadata.
-`releaseBundle` writes all three loader JARs and their SHA-256 files to `build/release/`. See
+shared runtime/provider classes, dedicated loader purity, universal loader coverage, and metadata.
+`releaseBundle` writes the universal and three dedicated JARs plus SHA-256 files to
+`build/release/`. See
 [Release](RELEASE.md) for the publishing checklist.
 
 ## Manual MCP smoke test
 
 Use the release JAR, not a development run, for the final human check:
 
-1. Put one loader's release JAR and its loader requirements in a clean Minecraft 26.2 instance.
+1. Put the universal release JAR and its loader requirements in a clean Minecraft 26.2 instance.
 2. Launch to the menu and confirm `http://127.0.0.1:25580/mcp` is listening.
 3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm thirteen
    read-only `minecraft.*` tools.

@@ -56,7 +56,8 @@ project toolchain.
 
 ### Engineering baseline
 
-- Gradle `:common`/`:fabric`/`:neoforge`/`:forge` separation with one JAR per supported loader
+- Gradle `:common`/`:fabric`/`:neoforge`/`:forge` separation plus packaging-only `:universal`
+- a recommended universal JAR and independently installable dedicated JAR for each supported loader
 - meaningful comments for non-obvious implementation decisions
 - Javadocs on public Thread contracts/extension points
 - Spotless formatting

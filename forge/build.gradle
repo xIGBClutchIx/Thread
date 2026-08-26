@@ -24,6 +24,12 @@ configurations {
 def normalRunDirectory = rootProject.layout.buildDirectory.dir('run/forgeProductionClientGameTest')
 def disabledRunDirectory = rootProject.layout.buildDirectory.dir('run/forgeMcpDisabledClientGameTest')
 def reportDirectory = rootProject.layout.buildDirectory.dir('reports/forge-packaged-tests')
+def universalJar = rootProject.layout.projectDirectory.file(
+        "universal/build/libs/thread-universal-${project.version}.jar")
+def universalRunDirectory = rootProject.layout.buildDirectory.dir(
+        'run/universalForgeProductionClientGameTest')
+def universalDisabledRunDirectory = rootProject.layout.buildDirectory.dir(
+        'run/universalForgeMcpDisabledClientGameTest')
 def slimeMetadataDirectory = layout.buildDirectory.dir('forge/slime-launcher-metadata')
 def writePackagedClientConfig = { File runDirectory ->
     def configFile = new File(runDirectory, 'config/forge-client.toml')
@@ -67,6 +73,17 @@ minecraft {
         }
         register('forgeMcpDisabledProductionClientGameTest') { run ->
             configurePackagedClient(run, disabledRunDirectory, 'disabled.txt')
+            systemProperty 'thread.gametest.expectMcpDisabled', 'true'
+        }
+        register('universalForgeProductionClientGameTest') { run ->
+            configurePackagedClient(run, universalRunDirectory, 'universal-normal.txt')
+        }
+        register('universalForgeRestartProductionClientGameTest') { run ->
+            configurePackagedClient(run, universalRunDirectory, 'universal-restart.txt')
+            systemProperty 'thread.gametest.expectedMcpPort', '25581'
+        }
+        register('universalForgeMcpDisabledProductionClientGameTest') { run ->
+            configurePackagedClient(run, universalDisabledRunDirectory, 'universal-disabled.txt')
             systemProperty 'thread.gametest.expectMcpDisabled', 'true'
         }
     }
@@ -190,6 +207,68 @@ tasks.matching { it.name == 'runForgeMcpDisabledProductionClientGameTest' }.conf
     dependsOn tasks.named('prepareForgeMcpDisabledClientGameTest')
 }
 
+tasks.register('prepareFreshUniversalForgeProductionClientGameTest') {
+    group = 'verification'
+    dependsOn ':universal:jar', gametestJar
+    outputs.upToDateWhen { false }
+    doLast {
+        def runDirectory = universalRunDirectory.get().asFile
+        runDirectory.deleteDir()
+        def modsDirectory = new File(runDirectory, 'mods')
+        modsDirectory.mkdirs()
+        copy {
+            from universalJar
+            from gametestJar.flatMap { it.archiveFile }
+            into modsDirectory
+        }
+        writePackagedClientConfig(runDirectory)
+    }
+}
+
+tasks.register('prepareUniversalRestartForgeProductionClientGameTest') {
+    group = 'verification'
+    dependsOn 'runUniversalForgeProductionClientGameTest'
+    outputs.upToDateWhen { false }
+    doLast {
+        def configFile = universalRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText('{\n  "schemaVersion": 1,\n  "mcpPort": 25581\n}\n', 'UTF-8')
+    }
+}
+
+tasks.register('prepareUniversalForgeMcpDisabledClientGameTest') {
+    group = 'verification'
+    dependsOn ':universal:jar', gametestJar
+    outputs.upToDateWhen { false }
+    doLast {
+        def runDirectory = universalDisabledRunDirectory.get().asFile
+        runDirectory.deleteDir()
+        def modsDirectory = new File(runDirectory, 'mods')
+        modsDirectory.mkdirs()
+        copy {
+            from universalJar
+            from gametestJar.flatMap { it.archiveFile }
+            into modsDirectory
+        }
+        writePackagedClientConfig(runDirectory)
+        def configFile = new File(runDirectory, 'config/thread.json')
+        configFile.parentFile.mkdirs()
+        configFile.setText('{\n  "schemaVersion": 1,\n  "mcpEnabled": false\n}\n', 'UTF-8')
+    }
+}
+
+tasks.matching { it.name == 'runUniversalForgeProductionClientGameTest' }.configureEach {
+    dependsOn tasks.named('prepareFreshUniversalForgeProductionClientGameTest')
+}
+
+tasks.matching { it.name == 'runUniversalForgeRestartProductionClientGameTest' }.configureEach {
+    dependsOn tasks.named('prepareUniversalRestartForgeProductionClientGameTest')
+}
+
+tasks.matching { it.name == 'runUniversalForgeMcpDisabledProductionClientGameTest' }.configureEach {
+    dependsOn tasks.named('prepareUniversalForgeMcpDisabledClientGameTest')
+}
+
 [
         verifyForgeProductionClientGameTest: ['runForgeProductionClientGameTest', 'normal.txt'],
         verifyForgeRestartProductionClientGameTest: ['runForgeRestartProductionClientGameTest', 'restart.txt'],
@@ -203,6 +282,27 @@ tasks.matching { it.name == 'runForgeMcpDisabledProductionClientGameTest' }.conf
             def report = reportDirectory.get().file(details[1]).asFile
             if (!report.isFile() || !report.getText('UTF-8').startsWith('PASSED')) {
                 throw new GradleException("Forge packaged-client proof failed: ${report}")
+            }
+        }
+    }
+}
+
+[
+        verifyUniversalForgeProductionClientGameTest:
+                ['runUniversalForgeProductionClientGameTest', 'universal-normal.txt'],
+        verifyUniversalForgeRestartProductionClientGameTest:
+                ['runUniversalForgeRestartProductionClientGameTest', 'universal-restart.txt'],
+        verifyUniversalForgeMcpDisabledProductionClientGameTest:
+                ['runUniversalForgeMcpDisabledProductionClientGameTest', 'universal-disabled.txt']
+].each { taskName, details ->
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Validates the universal ${details[1]} Forge packaged-client report."
+        dependsOn details[0]
+        doLast {
+            def report = reportDirectory.get().file(details[1]).asFile
+            if (!report.isFile() || !report.getText('UTF-8').startsWith('PASSED')) {
+                throw new GradleException("Universal Forge packaged-client proof failed: ${report}")
             }
         }
     }

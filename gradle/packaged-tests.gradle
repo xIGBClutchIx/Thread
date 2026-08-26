@@ -78,3 +78,88 @@ tasks.register(
     jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectMcpDisabled=true')
     runDir = disabledRunDirectory.get().asFile
 }
+
+def universalJar = rootProject.layout.projectDirectory.file(
+        "universal/build/libs/thread-universal-${project.version}.jar")
+def universalRunDirectory = rootProject.layout.buildDirectory.dir(
+        'run/universalFabricProductionClientGameTest')
+
+tasks.register('prepareFreshUniversalProductionClientGameTest', Delete) {
+    mustRunAfter rootProject.tasks.named('clean')
+    delete universalRunDirectory
+}
+
+tasks.register(
+        'runUniversalProductionClientGameTest',
+        productionClientTaskType) {
+    group = 'verification'
+    description = 'Runs the Fabric client game test against the universal JAR.'
+    dependsOn ':universal:jar', gametestJar,
+            tasks.named('prepareFreshUniversalProductionClientGameTest')
+    mods.setFrom(
+            configurations.productionRuntimeMods,
+            universalJar,
+            gametestJar.flatMap { it.archiveFile })
+    jvmArgs.add('-Dfabric.client.gametest')
+    runDir = universalRunDirectory.get().asFile
+}
+
+tasks.register('prepareUniversalRestartProductionClientGameTest') {
+    dependsOn tasks.named('runUniversalProductionClientGameTest')
+    outputs.upToDateWhen { false }
+    doLast {
+        def configFile = universalRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText(
+                "{\n  \"schemaVersion\": 1,\n  \"mcpPort\": ${restartMcpPort}\n}\n",
+                'UTF-8')
+    }
+}
+
+tasks.register(
+        'runUniversalRestartProductionClientGameTest',
+        productionClientTaskType) {
+    group = 'verification'
+    description = 'Restarts the Fabric client against the universal JAR and existing config.'
+    dependsOn ':universal:jar', gametestJar,
+            tasks.named('prepareUniversalRestartProductionClientGameTest')
+    mods.setFrom(
+            configurations.productionRuntimeMods,
+            universalJar,
+            gametestJar.flatMap { it.archiveFile })
+    jvmArgs.addAll(
+            '-Dfabric.client.gametest',
+            "-Dthread.gametest.expectedMcpPort=${restartMcpPort}")
+    runDir = universalRunDirectory.get().asFile
+}
+
+def universalDisabledRunDirectory = rootProject.layout.buildDirectory.dir(
+        'run/universalFabricMcpDisabledClientGameTest')
+
+tasks.register('prepareUniversalMcpDisabledClientGameTest') {
+    mustRunAfter rootProject.tasks.named('clean')
+    outputs.upToDateWhen { false }
+    doLast {
+        universalDisabledRunDirectory.get().asFile.deleteDir()
+        def configFile = universalDisabledRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText(
+                '{\n  "schemaVersion": 1,\n  "mcpEnabled": false\n}\n',
+                'UTF-8')
+    }
+}
+
+tasks.register(
+        'runUniversalMcpDisabledProductionClientGameTest',
+        productionClientTaskType) {
+    group = 'verification'
+    description = 'Proves the universal JAR starts on Fabric with MCP disabled.'
+    dependsOn ':universal:jar', gametestJar,
+            tasks.named('prepareUniversalMcpDisabledClientGameTest')
+    mods.setFrom(
+            configurations.productionRuntimeMods,
+            universalJar,
+            gametestJar.flatMap { it.archiveFile })
+    jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectMcpDisabled=true')
+    runDir = universalDisabledRunDirectory.get().asFile
+}

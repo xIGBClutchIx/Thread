@@ -15,9 +15,8 @@ V1 is Java 25, Fabric/NeoForge/Forge client, Minecraft 26.2, single-player, read
 Gameplay tools reject multiplayer before exposing state. `minecraft.get_status` remains available
 from every client state as the safe preflight.
 
-Thread does not implement remote access, authentication, actions, dedicated-server behavior,
-a universal artifact, or multiple Minecraft versions until those products have their own trust and
-compatibility designs.
+Thread does not implement remote access, authentication, actions, dedicated-server behavior, or
+multiple Minecraft versions until those products have their own trust and compatibility designs.
 
 ## Common and loader adapters are separate modules without a portability framework
 
@@ -29,6 +28,11 @@ common classes; common is not installed or published independently.
 All three entrypoints resolve those loader-specific values and call `ThreadRuntime.start`. Configuration
 fallback, reflective integration activation, MCP bind handling, startup diagnostics, and resource
 close behavior are one shared lifecycle rather than parallel loader implementations.
+
+`:universal` is a packaging-only module. It combines common and all three adapter source-set outputs
+directly, keeps dedicated JARs canonical and independently installable, and adds no portability
+framework or cross-loader dependency. Unexpected duplicate entries fail the build; the one known
+loader-branded `pack.mcmeta` collision is replaced by a neutral universal descriptor.
 
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
 component map, or optional-mod type. Shared Minecraft adapters convert live game objects into
@@ -104,8 +108,11 @@ Legacy GET/SSE and non-tool MCP feature surfaces are absent.
 ## Quality and release proofs are part of V1
 
 Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and
-three packaged-client runs per loader are mandatory. Each normal test uses the final runtime JAR in
+three packaged-client runs per artifact/loader pairing are mandatory. Dedicated and universal
+normal tests use the final runtime JAR in
 a real temporary single-player world; restart proves persisted configuration reload, and disabled
 startup proves tools initialize without MCP. All three loader proof mods compile one shared parity
 fixture for the exact catalog, config, lifecycle, MCP, recipes/crafting, and integration contract;
-only their launch mechanics remain separate. A release is not validated by compilation alone.
+only their launch mechanics remain separate. Artifact inspection keeps dedicated JARs loader-pure,
+requires all adapters in the universal JAR, rejects duplicates, and scans compiled common classes
+for eager loader-specific references. A release is not validated by compilation alone.

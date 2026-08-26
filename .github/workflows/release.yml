@@ -37,22 +37,57 @@ jobs:
                   ./gradlew --no-daemon clean spotlessCheck check build
                   verifyReleaseVersion releaseBundle -PreleaseTag="${GITHUB_REF_NAME}"
 
-            - name: Test packaged Fabric artifact
-              run: >-
-                  ./gradlew --no-daemon runRestartProductionClientGameTest
-                  runMcpDisabledProductionClientGameTest
+            - name: Test packaged Fabric artifact with MCP enabled
+              run: ./gradlew --no-daemon runRestartProductionClientGameTest
 
-            - name: Test packaged NeoForge artifact
+            - name: Test packaged Fabric artifact with MCP disabled
+              run: ./gradlew --no-daemon runMcpDisabledProductionClientGameTest
+
+            - name: Test packaged NeoForge artifact with MCP enabled
               run: >-
                   xvfb-run -a ./gradlew --no-daemon
                   verifyNeoForgeRestartProductionClientGameTest
+
+            - name: Test packaged NeoForge artifact with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
                   verifyNeoForgeMcpDisabledProductionClientGameTest
 
-            - name: Test packaged Forge artifact
+            - name: Test packaged Forge artifact with MCP enabled
               run: >-
                   xvfb-run -a ./gradlew --no-daemon
                   verifyForgeRestartProductionClientGameTest
+
+            - name: Test packaged Forge artifact with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
                   verifyForgeMcpDisabledProductionClientGameTest
+
+            - name: Test universal artifact on Fabric with MCP enabled
+              run: ./gradlew --no-daemon verifyUniversalFabricRestartProductionClientGameTest
+
+            - name: Test universal artifact on Fabric with MCP disabled
+              run: ./gradlew --no-daemon verifyUniversalFabricMcpDisabledProductionClientGameTest
+
+            - name: Test universal artifact on NeoForge with MCP enabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalNeoForgeRestartProductionClientGameTest
+
+            - name: Test universal artifact on NeoForge with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+
+            - name: Test universal artifact on Forge with MCP enabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalForgeRestartProductionClientGameTest
+
+            - name: Test universal artifact on Forge with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalForgeMcpDisabledProductionClientGameTest
 
             - name: Upload release bundle
               uses: actions/upload-artifact@v4

@@ -38,9 +38,7 @@ jobs:
               run: ./gradlew --no-daemon clean spotlessCheck check build releaseBundle
 
             - name: Test packaged Fabric mod with MCP enabled
-              run: >-
-                  ./gradlew --no-daemon
-                  runProductionClientGameTest runRestartProductionClientGameTest
+              run: ./gradlew --no-daemon runRestartProductionClientGameTest
 
             - name: Test packaged Fabric mod with MCP disabled
               run: ./gradlew --no-daemon runMcpDisabledProductionClientGameTest
@@ -65,6 +63,32 @@ jobs:
                   xvfb-run -a ./gradlew --no-daemon
                   verifyForgeMcpDisabledProductionClientGameTest
 
+            - name: Test universal mod on Fabric with MCP enabled
+              run: ./gradlew --no-daemon verifyUniversalFabricRestartProductionClientGameTest
+
+            - name: Test universal mod on Fabric with MCP disabled
+              run: ./gradlew --no-daemon verifyUniversalFabricMcpDisabledProductionClientGameTest
+
+            - name: Test universal mod on NeoForge with MCP enabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalNeoForgeRestartProductionClientGameTest
+
+            - name: Test universal mod on NeoForge with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+
+            - name: Test universal mod on Forge with MCP enabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalForgeRestartProductionClientGameTest
+
+            - name: Test universal mod on Forge with MCP disabled
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyUniversalForgeMcpDisabledProductionClientGameTest
+
             - name: Upload failure reports
               if: failure()
               uses: actions/upload-artifact@v4
@@ -76,6 +100,7 @@ jobs:
                       fabric/build/reports/
                       neoforge/build/reports/
                       forge/build/reports/
+                      universal/build/reports/
                       build/run/**/logs/
                       build/run/**/crash-reports/
                   if-no-files-found: ignore

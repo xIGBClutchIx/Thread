@@ -13,6 +13,7 @@ spotless {
         target '*.gradle', 'gradle/**/*.gradle', '*.properties', '*.md', '*.json', '*.yml',
                 '*.yaml', '.github/**/*.yml', '.github/**/*.yaml', 'common/**/*.gradle',
                 'fabric/**/*.gradle', 'neoforge/**/*.gradle', 'forge/**/*.gradle',
+                'universal/**/*.gradle',
                 'config/**/*.xml', 'docs/**/*.md',
                 'common/src/**/*.json', 'fabric/src/**/*.json', 'neoforge/src/**/*.json',
                 'forge/src/**/*.json', 'neoforge/src/**/*.toml', 'forge/src/**/*.toml'

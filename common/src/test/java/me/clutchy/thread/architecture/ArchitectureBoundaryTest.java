@@ -78,9 +78,11 @@ class ArchitectureBoundaryTest {
         Files.readString(PROJECT_ROOT.resolve("neoforge/build.gradle"), StandardCharsets.UTF_8);
     String forgeBuild =
         Files.readString(PROJECT_ROOT.resolve("forge/build.gradle"), StandardCharsets.UTF_8);
+    String universalBuild =
+        Files.readString(PROJECT_ROOT.resolve("universal/build.gradle"), StandardCharsets.UTF_8);
 
     assertTrue(
-        settings.contains("include 'common', 'fabric', 'neoforge', 'forge'"),
+        settings.contains("include 'common', 'fabric', 'neoforge', 'forge', 'universal'"),
         "settings must declare all modules");
     assertTrue(fabricBuild.contains("project(':common')"), "Fabric must consume common");
     assertTrue(neoForgeBuild.contains("project(':common')"), "NeoForge must consume common");
@@ -94,6 +96,16 @@ class ArchitectureBoundaryTest {
     assertFalse(neoForgeBuild.contains("project(':forge')"), "NeoForge must not consume Forge");
     assertFalse(forgeBuild.contains("project(':fabric')"), "Forge must not consume Fabric");
     assertFalse(forgeBuild.contains("project(':neoforge')"), "Forge must not consume NeoForge");
+    assertTrue(universalBuild.contains("project(':common')"), "universal must package common");
+    assertTrue(universalBuild.contains("project(':fabric')"), "universal must package Fabric");
+    assertTrue(universalBuild.contains("project(':neoforge')"), "universal must package NeoForge");
+    assertTrue(universalBuild.contains("project(':forge')"), "universal must package Forge");
+    assertTrue(
+        universalBuild.contains("duplicatesStrategy = DuplicatesStrategy.FAIL"),
+        "universal must fail on unexpected duplicate entries");
+    assertFalse(
+        Files.exists(PROJECT_ROOT.resolve("universal/src/main/java")),
+        "universal must remain packaging-only");
     assertFalse(
         Files.exists(PROJECT_ROOT.resolve("src")), "legacy root source tree must stay absent");
   }
@@ -260,6 +272,7 @@ class ArchitectureBoundaryTest {
             PROJECT_ROOT.resolve("fabric/build.gradle"),
             PROJECT_ROOT.resolve("neoforge/build.gradle"),
             PROJECT_ROOT.resolve("forge/build.gradle"),
+            PROJECT_ROOT.resolve("universal/build.gradle"),
             PROJECT_ROOT.resolve("gradle.properties"),
             PROJECT_ROOT.resolve("fabric/src/main/resources/fabric.mod.json"),
             PROJECT_ROOT.resolve("neoforge/src/main/resources/META-INF/neoforge.mods.toml"),

@@ -27,8 +27,10 @@ scan the wider world, use nearby storage, or mutate game state.
 
 1. Install Minecraft 26.2 with Java 25 using Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2,
    NeoForge 26.2.0.62, or Forge 65.1.2.
-2. Put the matching `thread-fabric-0.1.0.jar`, `thread-neoforge-0.1.0.jar`, or
-   `thread-forge-0.1.0.jar` in your instance's `mods` folder. Install only one Thread JAR.
+2. Put `thread-universal-0.1.0.jar` in your instance's `mods` folder. It is the recommended download
+   and works on all three supported loaders. Dedicated `thread-fabric-0.1.0.jar`,
+   `thread-neoforge-0.1.0.jar`, and `thread-forge-0.1.0.jar` builds remain available for modpacks,
+   compatibility testing, and troubleshooting. Install exactly one Thread JAR.
 3. Launch Minecraft. Thread starts its MCP server automatically.
 
 ## Connect an MCP client
@@ -87,8 +89,8 @@ Set `mcpEnabled` to `false` to initialize Thread without opening the HTTP listen
 - **The configuration is rejected:** Thread preserves the invalid file and starts with safe
   defaults. Correct the field named in the Minecraft log, then restart the game.
 - **Minecraft reports incompatible mods:** Use the exact Minecraft, Java, and selected-loader
-  versions listed under Install. Fabric requires Fabric API; NeoForge and Forge do not. Install only the
-  Thread JAR for that loader.
+  versions listed under Install. Fabric requires Fabric API; NeoForge and Forge do not. Make sure
+  the `mods` folder contains only one universal or dedicated Thread JAR.
 - **No listener is expected:** `mcpEnabled: false` keeps the tools initialized inside Thread but
   intentionally does not open an HTTP endpoint.
 
@@ -115,9 +117,9 @@ multiplayer. Other gameplay tools require a supported integrated single-player s
 
 ## Development
 
-The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior plus thin `:fabric`,
-`:neoforge`, and `:forge` adapters. Releases are separate loader JARs; there is no universal
-artifact.
+The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior, thin `:fabric`,
+`:neoforge`, and `:forge` adapters, and a packaging-only `:universal` module. Releases contain the
+recommended universal JAR plus all three dedicated loader JARs.
 
 Use the Gradle Wrapper. The normal local gate is:
 

@@ -6,16 +6,18 @@
 :fabric   -- Fabric entrypoint, lifecycle, and integration discovery --\
 :neoforge -- NeoForge entrypoint, lifecycle, and integration discovery ---> :common
 :forge    -- Forge entrypoint, lifecycle, and integration discovery -----/
+:universal -- packaging only: common plus all three adapter outputs
 
 :common
     runtime assembly -> Minecraft providers -> core provider contracts
     MCP transport    -> tool registry      -> core services and DTOs
 ```
 
-The build produces three installable artifacts: `thread-fabric-<version>.jar`,
-`thread-neoforge-<version>.jar`, and `thread-forge-<version>.jar`. `:common` is an internal build
-module whose classes are merged into each loader JAR; it is not installed separately and there is
-no universal multi-loader JAR.
+The build produces the recommended `thread-universal-<version>.jar` plus dedicated
+`thread-fabric-<version>.jar`, `thread-neoforge-<version>.jar`, and
+`thread-forge-<version>.jar` artifacts. `:common` is internal and not installed separately.
+`:universal` contains no Java source: it packages intended source-set outputs and metadata directly
+without making loader modules depend on one another or merging their release JARs.
 
 Dependencies point from each loader adapter to `:common`. Common production source has no Fabric,
 NeoForge, or Forge imports or runtime dependencies. The loader modules do not depend on one another.
@@ -181,12 +183,14 @@ Architecture and release tests enforce that:
 - Forge production code stays inside the Forge adapter package;
 - only the supported JDK HTTP server uses `com.sun` APIs;
 - optional implementations remain deferred class-name strings;
-- each installable JAR contains common plus exactly one loader adapter, with no tests or bundled
-  third-party adapter;
+- each dedicated JAR contains common plus exactly one loader adapter, while the universal JAR
+  intentionally contains all three; none contains tests or a bundled third-party adapter;
+- universal packaging fails on unexpected duplicate entries, validates consistent metadata, and
+  scans compiled common classes for eager loader-specific references;
 - no loader module imports or depends on another loader implementation;
 - shared packaged parity fixtures import neither loader API;
-- each loader's packaged-client tests exercise its final JAR through menu/world/menu, restart, and
-  MCP-disabled lifecycles.
+- each loader's packaged-client tests exercise both its dedicated JAR and the universal JAR through
+  menu/world/menu, restart, and MCP-disabled lifecycles.
 
 V1 remains Java-only, Fabric/NeoForge/Forge, read-only, single-player-only, bounded, and
-loopback-only. A universal artifact remains out of scope.
+loopback-only.
