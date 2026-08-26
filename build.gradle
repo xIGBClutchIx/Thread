@@ -65,12 +65,6 @@ java {
     withSourcesJar()
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.release = 25
-    options.encoding = 'UTF-8'
-    options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
-}
-
 processResources {
     inputs.property 'version', project.version
     inputs.property 'minecraftVersion', project.minecraft_version
@@ -86,19 +80,9 @@ processResources {
     }
 }
 
-tasks.withType(Test).configureEach {
-    useJUnitPlatform()
-    testLogging {
-        events 'failed', 'skipped'
-        exceptionFormat = 'full'
-    }
-}
-
-tasks.withType(Javadoc).configureEach {
-    options.encoding = 'UTF-8'
-    // Keep doclint's structural checks while honoring the project rule that trivial accessors and
-    // record components do not need mechanical boilerplate tags.
-    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }
 
 tasks.named('compileTestJava') {
@@ -109,204 +93,9 @@ tasks.named('compileGametestJava') {
     dependsOn tasks.named('clientClasses')
 }
 
-spotless {
-    java {
-        target 'src/**/*.java'
-        googleJavaFormat(project.google_java_format_version)
-        removeUnusedImports()
-        forbidWildcardImports()
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
+// Applied scripts do not inherit Loom plugin classes on their compilation classpath.
+ext.productionClientTaskType = net.fabricmc.loom.task.prod.ClientProductionRunTask
 
-    format 'repositoryFiles', {
-        target '*.gradle', '*.properties', '*.md', '*.json', '*.yml', '*.yaml',
-                '.github/**/*.yml', '.github/**/*.yaml', 'config/**/*.xml', 'docs/**/*.md',
-                'src/**/*.json'
-        targetExclude '.gradle/**', 'build/**', 'run/**'
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
-}
-
-checkstyle {
-    toolVersion = project.checkstyle_version
-    configFile = file('config/checkstyle/checkstyle.xml')
-    maxWarnings = 0
-}
-
-tasks.withType(Checkstyle).configureEach {
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-tasks.named('check') {
-    dependsOn tasks.named('spotlessCheck')
-    dependsOn tasks.named('javadoc')
-}
-
-tasks.named('build') {
-    dependsOn tasks.named('spotlessCheck')
-}
-
-def runtimeJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
-def releaseDirectory = layout.buildDirectory.dir('release')
-def releaseJarName = "thread-${project.version}.jar"
-def gametestJar = tasks.register('gametestJar', Jar) {
-    group = 'build'
-    description = 'Packages the isolated client game-test harness for production-launch checks.'
-    dependsOn tasks.named('gametestClasses')
-    archiveClassifier = 'gametest'
-    from sourceSets.gametest.output
-}
-
-tasks.register('verifyReleaseVersion') {
-    group = 'verification'
-    description = 'Verifies that the release tag exactly matches the configured mod version.'
-
-    doLast {
-        def actualTag = providers.gradleProperty('releaseTag')
-                .orElse(providers.environmentVariable('GITHUB_REF_NAME'))
-                .getOrNull()
-        def expectedTag = "v${project.version}"
-        if (actualTag == null) {
-            throw new GradleException('Supply -PreleaseTag=v<version> or GITHUB_REF_NAME.')
-        }
-        if (actualTag != expectedTag) {
-            throw new GradleException("Release tag ${actualTag} does not match ${expectedTag}.")
-        }
-    }
-}
-
-tasks.register('verifyReleaseArtifact') {
-    group = 'verification'
-    description = 'Validates the installable runtime JAR and its expanded Fabric metadata.'
-    dependsOn tasks.named('jar')
-    inputs.file(runtimeJar)
-
-    doLast {
-        def jarFile = runtimeJar.get().asFile
-        if (jarFile.name != releaseJarName) {
-            throw new GradleException("Unexpected runtime JAR name: ${jarFile.name}")
-        }
-
-        new java.util.zip.ZipFile(jarFile).withCloseable { archive ->
-            def entries = archive.entries().collect { it.name }.toSet()
-            def requiredEntries = [
-                    'fabric.mod.json',
-                    'me/clutchy/thread/core/integration/ThreadIntegration.class',
-                    'me/clutchy/thread/core/integration/ThreadIntegrationCandidateProvider.class',
-                    'me/clutchy/thread/core/integration/extension/IntegrationRecipeProvider.class',
-                    'me/clutchy/thread/platform/fabric/ThreadFabricClient.class',
-                    'me/clutchy/thread/transport/mcp/McpHttpServer.class'
-            ]
-            requiredEntries.each { entry ->
-                if (!entries.contains(entry)) {
-                    throw new GradleException("Runtime JAR is missing ${entry}")
-                }
-            }
-            def forbiddenEntries = [
-                    'me/clutchy/thread/platform/fabric/FabricProviderClientGameTest.class'
-            ]
-            def fabricIntegrationPrefix =
-                    'me/clutchy/thread/platform/fabric/integration/'
-            if (entries.any { it.contains('/gametest/') || it.endsWith('.java') }
-                    || entries.any { it.startsWith(fabricIntegrationPrefix)
-                        && it.substring(fabricIntegrationPrefix.length()).contains('/') }
-                    || forbiddenEntries.any { entries.contains(it) }) {
-                throw new GradleException(
-                        'Runtime JAR contains test, source, or bundled integration content.')
-            }
-
-            def metadataEntry = archive.getEntry('fabric.mod.json')
-            def metadata = new groovy.json.JsonSlurper().parse(
-                    archive.getInputStream(metadataEntry), 'UTF-8')
-            if (metadata.id != 'thread' || metadata.version != project.version.toString()) {
-                throw new GradleException('Runtime JAR metadata identity/version is incorrect.')
-            }
-            if (metadata.environment != 'client') {
-                throw new GradleException('Thread V1 runtime JAR must remain client-only.')
-            }
-            def expectedEntrypoints = [
-                    client: ['me.clutchy.thread.platform.fabric.ThreadFabricClient']
-            ]
-            if (metadata.entrypoints != expectedEntrypoints) {
-                throw new GradleException('Runtime JAR has unexpected entrypoints.')
-            }
-            def expectedDependencies = [
-                    fabricloader: ">=${project.loader_version}",
-                    minecraft   : "=${project.minecraft_version}",
-                    java        : '>=25',
-                    'fabric-api': ">=${project.fabric_api_version}"
-            ]
-            if (metadata.depends != expectedDependencies) {
-                throw new GradleException('Runtime JAR dependency metadata is incorrect.')
-            }
-        }
-    }
-}
-
-tasks.register('releaseBundle') {
-    group = 'build'
-    description = 'Creates the validated runtime JAR and its SHA-256 checksum.'
-    dependsOn tasks.named('verifyReleaseArtifact')
-    inputs.file(runtimeJar)
-    outputs.files(
-            releaseDirectory.map { it.file(releaseJarName) },
-            releaseDirectory.map { it.file("${releaseJarName}.sha256") })
-
-    doLast {
-        def outputDirectory = releaseDirectory.get().asFile
-        outputDirectory.deleteDir()
-        outputDirectory.mkdirs()
-        def sourceJar = runtimeJar.get().asFile
-        def outputJar = new File(outputDirectory, releaseJarName)
-        java.nio.file.Files.copy(
-                sourceJar.toPath(),
-                outputJar.toPath(),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        def digest = java.security.MessageDigest.getInstance('SHA-256')
-                .digest(java.nio.file.Files.readAllBytes(outputJar.toPath()))
-        def checksum = digest.collect { String.format('%02x', it) }.join()
-        new File(outputDirectory, "${releaseJarName}.sha256")
-                .setText("${checksum}  ${releaseJarName}\n", 'UTF-8')
-    }
-}
-
-tasks.register(
-        'runProductionClientGameTest',
-        net.fabricmc.loom.task.prod.ClientProductionRunTask) {
-    group = 'verification'
-    description = 'Runs the client game test against the packaged production mod JAR.'
-    dependsOn tasks.named('build'), gametestJar
-    mods.from(gametestJar.flatMap { it.archiveFile })
-    jvmArgs.add('-Dfabric.client.gametest')
-    runDir = layout.buildDirectory.dir('run/productionClientGameTest').get().asFile
-}
-
-def disabledMcpRunDirectory = layout.buildDirectory.dir('run/mcpDisabledClientGameTest')
-def disabledMcpConfig = disabledMcpRunDirectory.map { it.file('config/thread.json') }
-
-tasks.register('prepareMcpDisabledClientGameTest') {
-    outputs.file(disabledMcpConfig)
-    doLast {
-        def configFile = disabledMcpConfig.get().asFile
-        configFile.parentFile.mkdirs()
-        configFile.setText(
-                '{\n  "schemaVersion": 1,\n  "mcpEnabled": false\n}\n',
-                'UTF-8')
-    }
-}
-
-tasks.register(
-        'runMcpDisabledProductionClientGameTest',
-        net.fabricmc.loom.task.prod.ClientProductionRunTask) {
-    group = 'verification'
-    description = 'Proves the packaged client starts cleanly with MCP disabled.'
-    dependsOn tasks.named('build'), gametestJar, tasks.named('prepareMcpDisabledClientGameTest')
-    mods.from(gametestJar.flatMap { it.archiveFile })
-    jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectMcpDisabled=true')
-    runDir = disabledMcpRunDirectory.get().asFile
-}
+apply from: 'gradle/quality.gradle'
+apply from: 'gradle/release.gradle'
+apply from: 'gradle/packaged-tests.gradle'

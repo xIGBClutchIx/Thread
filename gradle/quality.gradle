@@ -1,0 +1,61 @@
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    // Keep structural doclint without requiring boilerplate tags on trivial accessors and records.
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat(project.google_java_format_version)
+        removeUnusedImports()
+        forbidWildcardImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format 'repositoryFiles', {
+        target '*.gradle', 'gradle/**/*.gradle', '*.properties', '*.md', '*.json', '*.yml',
+                '*.yaml', '.github/**/*.yml', '.github/**/*.yaml', 'config/**/*.xml',
+                'docs/**/*.md', 'src/**/*.json'
+        targetExclude '.gradle/**', 'build/**', 'run/**'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+checkstyle {
+    toolVersion = project.checkstyle_version
+    configFile = file('config/checkstyle/checkstyle.xml')
+    maxWarnings = 0
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('spotlessCheck')
+    dependsOn tasks.named('javadoc')
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('spotlessCheck')
+}

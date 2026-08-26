@@ -73,11 +73,29 @@ Thread creates `config/thread.json` on first launch:
 ```
 
 Every field except `schemaVersion` may be omitted to keep its safe default. Tool selectors accept
-exact IDs and namespace wildcards. Disabled tools are absent from discovery. Listener hosts are
+exact IDs and namespace wildcards. Disabled tools are absent from discovery. Integration IDs in
+`disabledIntegrations` are skipped before their implementation is loaded. Listener hosts are
 restricted to `127.0.0.1`, `localhost`, or `::1`, and configurable limits remain below fixed hard
 ceilings. Invalid existing files are preserved for correction while that launch uses safe defaults.
+Configuration is loaded when Minecraft starts; restart the game after changing this file.
 
 Set `mcpEnabled` to `false` to initialize Thread without opening the HTTP listener.
+
+## Troubleshooting
+
+- **The MCP client cannot connect:** Confirm Minecraft is still running, Thread logged its listener
+  address, and the client URL matches `mcpBindHost` and `mcpPort` in the instance's
+  `config/thread.json`.
+- **The listener could not start:** Another process may own the port. Choose an unused loopback
+  port, update the MCP client URL, and restart Minecraft.
+- **Tools disappear:** Check `enabledTools`. Disabled tools are intentionally omitted from
+  discovery, while all gameplay tools are unavailable outside an integrated single-player world.
+- **The configuration is rejected:** Thread preserves the invalid file and starts with safe
+  defaults. Correct the field named in the Minecraft log, then restart the game.
+- **Minecraft reports incompatible mods:** Use the exact Minecraft, Fabric Loader, Fabric API, and
+  Java versions listed under Install; do not install both an older and newer Fabric API together.
+- **No listener is expected:** `mcpEnabled: false` keeps the tools initialized inside Thread but
+  intentionally does not open an HTTP endpoint.
 
 ## Thread Integrations
 

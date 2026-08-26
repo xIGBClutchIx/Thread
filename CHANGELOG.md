@@ -22,6 +22,10 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
   than code bundled into the base Thread artifact.
 - Consolidated contributor documentation around the current V1 system and narrowed unused internal
   API surface without changing tool behavior.
+- Hardened 0.1.0 packaging with reproducible archives, strict release version/tag validation,
+  public integration-contract checks, development-content rejection, and restart coverage.
+- Kept unexpected serialization failures out of public tool-error details while retaining concise,
+  structured client errors.
 
 ### Removed
 

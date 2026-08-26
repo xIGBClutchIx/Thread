@@ -38,7 +38,9 @@ jobs:
               run: ./gradlew --no-daemon clean spotlessCheck check build releaseBundle
 
             - name: Test packaged mod with MCP enabled
-              run: ./gradlew --no-daemon runProductionClientGameTest
+              run: >-
+                  ./gradlew --no-daemon
+                  runProductionClientGameTest runRestartProductionClientGameTest
 
             - name: Test packaged mod with MCP disabled
               run: ./gradlew --no-daemon runMcpDisabledProductionClientGameTest

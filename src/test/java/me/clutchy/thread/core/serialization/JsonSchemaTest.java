@@ -91,7 +91,8 @@ class JsonSchemaTest {
 
     assertFalse(result.successful());
     assertEquals(ToolErrorCode.INVALID_INPUT, result.error().code());
-    assertEquals("count must be positive", result.error().details().get("reason"));
+    assertEquals("Input could not be decoded.", result.error().message());
+    assertTrue(result.error().details().isEmpty());
   }
 
   @Test

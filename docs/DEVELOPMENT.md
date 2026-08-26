@@ -75,16 +75,20 @@ but is not the release proof.
 
 ```powershell
 .\gradlew.bat runProductionClientGameTest
+.\gradlew.bat runRestartProductionClientGameTest
 .\gradlew.bat runMcpDisabledProductionClientGameTest
 ```
 
 The first test launches a temporary client with the remapped runtime JAR, Fabric API, and the
 separately packaged proof integration/game-test mod. It creates a temporary single-player world,
 checks native recipe additions/replacements, activates the external proof candidate, initializes
-the real MCP endpoint, lists the catalog, and calls all thirteen tools.
+the real MCP endpoint, lists the catalog, calls all thirteen tools, then closes the world and proves
+gameplay calls return controlled errors at the menu.
 
-The second test launches the same runtime with MCP disabled and proves Thread initializes without a
-listener. Neither task may silently fall back to the source-set development classpath.
+The restart test launches that packaged client again from the same instance and proves an existing
+configuration is reloaded, including a changed MCP port. The final test uses a separate fresh
+instance with MCP disabled and proves Thread initializes without a listener. None of these tasks
+may silently fall back to the source-set development classpath.
 
 ## Full local gate
 
@@ -93,13 +97,16 @@ Before committing a V1-complete change, run the release-equivalent gate from the
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
   verifyReleaseArtifact releaseBundle runProductionClientGameTest `
-  runMcpDisabledProductionClientGameTest verifyReleaseVersion "-PreleaseTag=v0.1.0"
+  runRestartProductionClientGameTest runMcpDisabledProductionClientGameTest `
+  verifyReleaseVersion "-PreleaseTag=v0.1.0"
 git diff --check
 ```
 
-Change the release tag argument when `mod_version` changes. `verifyReleaseArtifact` rejects test
-classes, development-only metadata, and bundled third-party integration content. `releaseBundle`
-writes the validated JAR and SHA-256 file to `build/release/`.
+Change the release tag argument when `mod_version` changes. Release versions and tags must use
+`MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH`, respectively. `verifyReleaseArtifact` rejects test
+classes, development paths, unexpected top-level content, and bundled third-party integrations,
+while also checking public integration contracts and expanded Fabric metadata. `releaseBundle`
+writes the validated reproducible JAR and SHA-256 file to `build/release/`.
 
 ## Manual MCP smoke test
 

@@ -1,0 +1,78 @@
+def productionClientTaskType = project.ext.productionClientTaskType
+def gametestJar = tasks.register('gametestJar', Jar) {
+    group = 'build'
+    description = 'Packages the isolated client game-test harness.'
+    dependsOn tasks.named('gametestClasses')
+    archiveClassifier = 'gametest'
+    from sourceSets.gametest.output
+}
+
+def productionRunDirectory = layout.buildDirectory.dir('run/productionClientGameTest')
+
+tasks.register('prepareFreshProductionClientGameTest', Delete) {
+    delete productionRunDirectory
+}
+
+tasks.register(
+        'runProductionClientGameTest',
+        productionClientTaskType) {
+    group = 'verification'
+    description = 'Runs the client game test against the packaged mod.'
+    dependsOn tasks.named('build'), gametestJar, tasks.named('prepareFreshProductionClientGameTest')
+    mods.from(gametestJar.flatMap { it.archiveFile })
+    jvmArgs.add('-Dfabric.client.gametest')
+    runDir = productionRunDirectory.get().asFile
+}
+
+def restartMcpPort = 25_581
+
+tasks.register('prepareRestartProductionClientGameTest') {
+    dependsOn tasks.named('runProductionClientGameTest')
+    outputs.upToDateWhen { false }
+    doLast {
+        def configFile = productionRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText(
+                "{\n  \"schemaVersion\": 1,\n  \"mcpPort\": ${restartMcpPort}\n}\n",
+                'UTF-8')
+    }
+}
+
+tasks.register(
+        'runRestartProductionClientGameTest',
+        productionClientTaskType) {
+    group = 'verification'
+    description = 'Restarts the packaged client with an existing config.'
+    dependsOn tasks.named('build'), gametestJar,
+            tasks.named('prepareRestartProductionClientGameTest')
+    mods.from(gametestJar.flatMap { it.archiveFile })
+    jvmArgs.addAll(
+            '-Dfabric.client.gametest',
+            "-Dthread.gametest.expectedMcpPort=${restartMcpPort}")
+    runDir = productionRunDirectory.get().asFile
+}
+
+def disabledRunDirectory = layout.buildDirectory.dir('run/mcpDisabledClientGameTest')
+
+tasks.register('prepareMcpDisabledClientGameTest') {
+    outputs.upToDateWhen { false }
+    doLast {
+        disabledRunDirectory.get().asFile.deleteDir()
+        def configFile = disabledRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText(
+                '{\n  "schemaVersion": 1,\n  "mcpEnabled": false\n}\n',
+                'UTF-8')
+    }
+}
+
+tasks.register(
+        'runMcpDisabledProductionClientGameTest',
+        productionClientTaskType) {
+    group = 'verification'
+    description = 'Proves the packaged client starts with MCP disabled.'
+    dependsOn tasks.named('build'), gametestJar, tasks.named('prepareMcpDisabledClientGameTest')
+    mods.from(gametestJar.flatMap { it.archiveFile })
+    jvmArgs.addAll('-Dfabric.client.gametest', '-Dthread.gametest.expectMcpDisabled=true')
+    runDir = disabledRunDirectory.get().asFile
+}

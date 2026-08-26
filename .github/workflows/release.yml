@@ -35,7 +35,8 @@ jobs:
             - name: Run clean release gate
               run: >-
                   ./gradlew --no-daemon clean spotlessCheck check build
-                  runProductionClientGameTest runMcpDisabledProductionClientGameTest
+                  runProductionClientGameTest runRestartProductionClientGameTest
+                  runMcpDisabledProductionClientGameTest
                   verifyReleaseVersion releaseBundle -PreleaseTag="${GITHUB_REF_NAME}"
 
             - name: Upload release bundle

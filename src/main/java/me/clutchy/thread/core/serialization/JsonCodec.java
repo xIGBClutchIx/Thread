@@ -47,11 +47,7 @@ public final class JsonCodec<T> {
       return ToolResult.success(decoded);
     } catch (RuntimeException exception) {
       return ToolResult.failure(
-          new ToolError(
-              ToolErrorCode.INVALID_INPUT,
-              "Input could not be decoded.",
-              false,
-              Map.of("reason", rootMessage(exception))));
+          ToolError.of(ToolErrorCode.INVALID_INPUT, "Input could not be decoded.", false));
     }
   }
 
@@ -73,11 +69,8 @@ public final class JsonCodec<T> {
       return ToolResult.success(encoded);
     } catch (RuntimeException exception) {
       return ToolResult.failure(
-          new ToolError(
-              ToolErrorCode.INTERNAL_ERROR,
-              "Tool output could not be serialized.",
-              false,
-              Map.of("reason", rootMessage(exception))));
+          ToolError.of(
+              ToolErrorCode.INTERNAL_ERROR, "Tool output could not be serialized.", false));
     }
   }
 
@@ -94,14 +87,5 @@ public final class JsonCodec<T> {
             first.message(),
             "violationCount",
             Integer.toString(violations.size())));
-  }
-
-  private static String rootMessage(Throwable throwable) {
-    Throwable current = throwable;
-    while (current.getCause() != null) {
-      current = current.getCause();
-    }
-    String message = current.getMessage();
-    return message == null || message.isBlank() ? current.getClass().getSimpleName() : message;
   }
 }
