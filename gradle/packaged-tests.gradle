@@ -7,9 +7,10 @@ def gametestJar = tasks.register('gametestJar', Jar) {
     from sourceSets.gametest.output
 }
 
-def productionRunDirectory = layout.buildDirectory.dir('run/productionClientGameTest')
+def productionRunDirectory = rootProject.layout.buildDirectory.dir('run/productionClientGameTest')
 
 tasks.register('prepareFreshProductionClientGameTest', Delete) {
+    mustRunAfter rootProject.tasks.named('clean')
     delete productionRunDirectory
 }
 
@@ -52,9 +53,10 @@ tasks.register(
     runDir = productionRunDirectory.get().asFile
 }
 
-def disabledRunDirectory = layout.buildDirectory.dir('run/mcpDisabledClientGameTest')
+def disabledRunDirectory = rootProject.layout.buildDirectory.dir('run/mcpDisabledClientGameTest')
 
 tasks.register('prepareMcpDisabledClientGameTest') {
+    mustRunAfter rootProject.tasks.named('clean')
     outputs.upToDateWhen { false }
     doLast {
         disabledRunDirectory.get().asFile.deleteDir()

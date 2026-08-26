@@ -55,6 +55,7 @@ project toolchain.
 
 ### Engineering baseline
 
+- Gradle `:common`/`:fabric` separation with one Fabric release JAR
 - meaningful comments for non-obvious implementation decisions
 - Javadocs on public Thread contracts/extension points
 - Spotless formatting

@@ -1,13 +1,24 @@
-# Thread Development, Testing, and Release
+# Thread Development and Testing
 
 This is the contributor checklist for source quality, local validation, packaged game tests, and
 releases.
+
+## Module workflow
+
+Thread is built as `:common` plus `:fabric`. Shared core, configuration, MCP, runtime assembly, and
+loader-neutral Minecraft providers belong in `:common`. Fabric entrypoints, Loader API access,
+lifecycle events, and integration entrypoint discovery belong in `:fabric`.
+
+Root Gradle tasks aggregate both modules and remain the normal contributor interface. See
+[Build](BUILD.md) for module-specific commands and outputs.
 
 ## Source standards
 
 - Use Java 25 and the pinned Gradle/Fabric toolchain.
 - Do not add Kotlin, `package-info.java`, wildcard imports, or hidden global state.
-- Keep Minecraft/Fabric, core, and MCP dependencies inside their documented boundaries.
+- Keep Minecraft, loader, core, and MCP dependencies inside their documented module boundaries.
+- Apply the portability rule literally: code that another loader can invoke unchanged stays in
+  common; code that calls Fabric APIs stays in the Fabric adapter.
 - Prefer small immutable DTOs, explicit wiring, explicit schemas, and machine-readable errors.
 - Keep every game query bounded and every gameplay path behind the single-player guard.
 - Do not add a dependency when the JDK or Minecraft-provided runtime already supplies the narrow
@@ -39,9 +50,10 @@ change pass; narrow a noisy rule only when the code has a documented legitimate 
 
 ### Unit and architecture tests
 
-`test` covers core services, schemas, registries, configuration, integration activation/isolation,
-Fabric conversion/support code, and the real loopback MCP HTTP server without launching Minecraft.
-Fake providers should prove core behavior whenever live Minecraft is unnecessary.
+The root `test` task runs `:common:test` and `:fabric:test`. They cover core services, schemas,
+registries, configuration, integration activation/isolation, shared Minecraft conversion/support,
+Fabric discovery, and the real loopback MCP HTTP server without launching Minecraft. Fake
+providers should prove core behavior whenever live Minecraft is unnecessary.
 
 Important regression areas include:
 
@@ -55,6 +67,7 @@ Important regression areas include:
 - MCP initialize and stateless discovery, protocol validation, request/origin limits, shutdown, and
   same-port restart;
 - package/import and release-artifact boundaries.
+- common-to-Fabric module direction and the absence of Fabric imports/dependencies in common.
 
 Run focused unit coverage with:
 
@@ -79,7 +92,8 @@ but is not the release proof.
 .\gradlew.bat runMcpDisabledProductionClientGameTest
 ```
 
-The first test launches a temporary client with the remapped runtime JAR, Fabric API, and the
+The first test launches a temporary client with the merged `thread-fabric-<version>.jar`, Fabric
+API, and the
 separately packaged proof integration/game-test mod. It creates a temporary single-player world,
 checks native recipe additions/replacements, activates the external proof candidate, initializes
 the real MCP endpoint, lists the catalog, calls all thirteen tools, then closes the world and proves
@@ -104,9 +118,10 @@ git diff --check
 
 Change the release tag argument when `mod_version` changes. Release versions and tags must use
 `MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH`, respectively. `verifyReleaseArtifact` rejects test
-classes, development paths, unexpected top-level content, and bundled third-party integrations,
-while also checking public integration contracts and expanded Fabric metadata. `releaseBundle`
-writes the validated reproducible JAR and SHA-256 file to `build/release/`.
+classes, source files, and bundled third-party integrations while checking common contracts,
+shared runtime/provider classes, the Fabric entrypoint, and expanded Fabric metadata.
+`releaseBundle` writes `thread-fabric-<version>.jar` and its SHA-256 file to `build/release/`. See
+[Release](RELEASE.md) for the publishing checklist.
 
 ## Manual MCP smoke test
 
@@ -130,16 +145,8 @@ the manual smoke test verifies actual client interoperability and installation b
 
 ## Release process
 
-1. Update `mod_version` and `CHANGELOG.md`.
-2. Run the full local gate and manual smoke test.
-3. Inspect `build/release/`, verify the checksum, and confirm the Git worktree contains only the
-   intended release changes.
-4. Create a signed commit in repositories with a configured remote and verify its signature.
-5. Tag the exact commit as `vMAJOR.MINOR.PATCH`, matching `mod_version`, then push the commit and tag.
-
-The tag workflow repeats the clean gate, packaged-client tests, artifact verification, checksum
-generation, and version-match check before attaching the files to the GitHub release. Automatic
-Modrinth, CurseForge, Maven, or other publishing is not part of V1.
+The authoritative release gate, artifact layout, and publishing checklist are documented in
+[Release](RELEASE.md).
 
 ## CI
 

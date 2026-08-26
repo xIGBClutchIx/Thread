@@ -1,6 +1,7 @@
-def runtimeJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+def fabricProject = project(':fabric')
+def runtimeJar = fabricProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
 def releaseDirectory = layout.buildDirectory.dir('release')
-def releaseJarName = "thread-${project.version}.jar"
+def releaseJarName = "thread-fabric-${project.version}.jar"
 def semanticVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 
 tasks.register('validateReleaseVersion') {
@@ -40,7 +41,7 @@ tasks.register('verifyReleaseVersion') {
 tasks.register('verifyReleaseArtifact') {
     group = 'verification'
     description = 'Validates the installable runtime JAR and Fabric metadata.'
-    dependsOn tasks.named('jar'), tasks.named('validateReleaseVersion')
+    dependsOn fabricProject.tasks.named('jar'), tasks.named('validateReleaseVersion')
     inputs.file(runtimeJar)
 
     doLast {
@@ -57,7 +58,9 @@ tasks.register('verifyReleaseArtifact') {
                     'me/clutchy/thread/core/integration/ThreadIntegrationCandidateProvider.class',
                     'me/clutchy/thread/core/integration/extension/IntegrationExtensionPoint.class',
                     'me/clutchy/thread/core/integration/extension/IntegrationRecipeProvider.class',
-                    'me/clutchy/thread/platform/fabric/integration/FabricIntegrationExtensionPoints.class',
+                    'me/clutchy/thread/platform/minecraft/integration/MinecraftIntegrationExtensionPoints.class',
+                    'me/clutchy/thread/platform/minecraft/game/MinecraftGameProvider.class',
+                    'me/clutchy/thread/runtime/ThreadRuntime.class',
                     'me/clutchy/thread/platform/fabric/ThreadFabricClient.class',
                     'me/clutchy/thread/transport/mcp/McpHttpServer.class'
             ].each { entry ->

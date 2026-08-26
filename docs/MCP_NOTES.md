@@ -1,7 +1,7 @@
 # Thread MCP Transport
 
-MCP is Thread's first external transport, not its domain model. The adapter maps JSON-RPC requests
-to `ToolRegistry` and has no Minecraft or Fabric dependency.
+MCP is Thread's first external transport, not its domain model. The adapter lives in `:common`,
+maps JSON-RPC requests to `ToolRegistry`, and has no Minecraft or loader dependency.
 
 ## Selected implementation
 
@@ -73,10 +73,10 @@ or exceed hard ceilings.
 
 ## Lifecycle
 
-The Fabric client entrypoint starts MCP only after vanilla and external integration registration has
-produced the final tool registry. A bind failure is logged without taking down Minecraft. The
-Fabric client-stopping event closes the listener and its virtual-thread executor; tests verify clean
-shutdown and same-port restart.
+The shared `ThreadRuntime` starts MCP only after vanilla and external integration registration has
+produced the final tool registry. The Fabric entrypoint requests that start and logs a bind failure
+without taking down Minecraft. Its client-stopping event closes the shared runtime, listener, and
+virtual-thread executor; tests verify clean shutdown and same-port restart.
 
 ## Tests that protect compatibility
 

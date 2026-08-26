@@ -26,15 +26,15 @@ scan the wider world, use nearby storage, or mutate game state.
 ## Install
 
 1. Install Minecraft 26.2 with Java 25, Fabric Loader 0.19.3, and Fabric API 0.154.0+26.2.
-2. Download `thread-0.1.0.jar` and its matching `.sha256` file.
+2. Download `thread-fabric-0.1.0.jar` and its matching `.sha256` file.
 3. Verify the checksum and copy only the JAR into the instance's `mods` directory.
 4. Launch Minecraft and confirm the log reports both Thread initialization and the MCP listener.
 
 PowerShell checksum verification:
 
 ```powershell
-(Get-FileHash .\thread-0.1.0.jar -Algorithm SHA256).Hash.ToLower()
-Get-Content .\thread-0.1.0.jar.sha256
+(Get-FileHash .\thread-fabric-0.1.0.jar -Algorithm SHA256).Hash.ToLower()
+Get-Content .\thread-fabric-0.1.0.jar.sha256
 ```
 
 ## Connect an MCP client
@@ -119,6 +119,10 @@ multiplayer. Other gameplay tools require a supported integrated single-player s
 
 ## Development
 
+The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior and a thin `:fabric`
+adapter module. The release remains one Fabric-only JAR; there is no universal, NeoForge, or Forge
+artifact.
+
 Use the Gradle Wrapper. The normal local gate is:
 
 ```powershell
@@ -126,14 +130,18 @@ Use the Gradle Wrapper. The normal local gate is:
 .\gradlew.bat clean spotlessCheck check build
 ```
 
-Packaged-client and release checks are documented in [Development](docs/DEVELOPMENT.md).
+Module tasks and outputs are documented in [Build](docs/BUILD.md). Packaged-client coverage is in
+[Development](docs/DEVELOPMENT.md), and the artifact/publishing gate is in
+[Release](docs/RELEASE.md).
 
 Contributor references:
 
 - [V1 scope](docs/V1_SCOPE.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Build](docs/BUILD.md)
 - [Tool contracts](docs/TOOL_CONTRACTS.md)
-- [Development, testing, and release](docs/DEVELOPMENT.md)
+- [Development and testing](docs/DEVELOPMENT.md)
+- [Release](docs/RELEASE.md)
 - [Thread Integrations](docs/INTEGRATIONS.md)
 - [MCP transport notes](docs/MCP_NOTES.md)
 - [Current decisions](docs/DECISIONS.md)

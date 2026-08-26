@@ -1,0 +1,83 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+base {
+    archivesName = 'thread-fabric'
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        thread {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'thread-gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+    }
+}
+
+sourceSets {
+    test {
+        compileClasspath += sourceSets.client.output
+        runtimeClasspath += sourceSets.client.output
+    }
+    gametest {
+        compileClasspath += sourceSets.client.output
+        runtimeClasspath += sourceSets.client.output
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation project(':common')
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraftVersion', project.minecraft_version
+    inputs.property 'loaderVersion', project.loader_version
+    inputs.property 'fabricApiVersion', project.fabric_api_version
+
+    filesMatching('fabric.mod.json') {
+        expand(
+                version: project.version,
+                minecraftVersion: project.minecraft_version,
+                loaderVersion: project.loader_version,
+                fabricApiVersion: project.fabric_api_version)
+    }
+}
+
+tasks.named('jar') {
+    dependsOn ':common:classes'
+    from project(':common').sourceSets.main.output
+}
+
+tasks.named('sourcesJar') {
+    from project(':common').sourceSets.main.allSource
+}
+
+tasks.named('compileTestJava') {
+    dependsOn tasks.named('clientClasses')
+}
+
+tasks.named('compileGametestJava') {
+    dependsOn tasks.named('clientClasses')
+}
+
+// Applied scripts do not inherit Loom plugin classes on their compilation classpath.
+ext.productionClientTaskType = net.fabricmc.loom.task.prod.ClientProductionRunTask
+
+apply from: rootProject.file('gradle/packaged-tests.gradle')

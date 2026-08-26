@@ -16,14 +16,25 @@ Gameplay tools reject multiplayer before exposing state. `minecraft.get_status` 
 from every client state as the safe preflight.
 
 Thread does not implement remote access, authentication, actions, dedicated-server behavior,
-multiple loaders, or multiple Minecraft versions until those products have their own trust and
+another loader, or multiple Minecraft versions until those products have their own trust and
 compatibility designs.
 
-## Boundaries are more important than portability frameworks
+## Common and Fabric are separate modules without a portability framework
 
-Core DTOs, providers, registries, and services contain no Minecraft, Fabric, MCP, raw NBT, generic
-component map, or optional-mod type. Fabric converts live game objects into detached DTOs. MCP maps
-only the tool registry. The project leaves room for another adapter without prebuilding one.
+`:common` owns core, configuration, MCP, runtime assembly, and Minecraft-facing code that can run
+unchanged when invoked by another client loader. `:fabric` owns only Fabric entrypoint, Loader API,
+lifecycle, config-path, version-predicate, and integration-entrypoint wiring. The Fabric release JAR
+merges common classes; common is not installed or published independently.
+
+Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
+component map, or optional-mod type. Shared Minecraft adapters convert live game objects into
+detached DTOs. MCP maps only the tool registry. Common source has no Fabric imports or runtime
+dependencies.
+
+Thread does not use Architectury or a custom platform god object, and it does not wrap every
+Minecraft class. Config-directory and lifecycle abstractions are intentionally absent because the
+thin Fabric entrypoint consumes those values directly. Add another contract only when a second
+loader proves a real difference.
 
 Java type documentation belongs on public types and architecture documentation belongs under
 `docs/`; `package-info.java` is not used.
@@ -87,7 +98,7 @@ Legacy GET/SSE and non-tool MCP feature surfaces are absent.
 
 ## Quality and release proofs are part of V1
 
-Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and two
-packaged-client runs are mandatory. The normal packaged test uses the remapped runtime JAR in a real
-temporary single-player world; the second proves MCP-disabled startup. A release is not validated by
-compilation alone.
+Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and
+three packaged-client runs are mandatory. The normal packaged test uses the merged Fabric runtime
+JAR in a real temporary single-player world; the restart run proves persisted configuration reload,
+and the final run proves MCP-disabled startup. A release is not validated by compilation alone.

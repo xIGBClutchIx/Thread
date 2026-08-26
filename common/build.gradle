@@ -1,0 +1,15 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+base {
+    archivesName = 'thread-common'
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+}
+
+tasks.named('test') {
+    systemProperty 'thread.rootDir', rootProject.projectDir.absolutePath
+}

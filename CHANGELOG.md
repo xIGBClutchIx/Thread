@@ -15,6 +15,11 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Changed
 
+- Split the project into `:common` and `:fabric`, moved loader-neutral Minecraft providers and
+  runtime assembly into common, and reduced Fabric to loader/lifecycle/discovery wiring while
+  preserving the single Fabric release artifact and all V1 behavior.
+- Renamed Minecraft-facing integration extension contracts from Fabric-specific names/IDs to
+  loader-neutral `Minecraft*` contracts and `minecraft.*` extension IDs.
 - Restored the Minecraft 26.2 Fabric API minimum to the native `0.154.0+26.2` baseline.
 - Made recipe-source precedence deterministic: the first usable optional provider wins per item,
   while Minecraft's live recipe manager remains the guarded base and fallback.

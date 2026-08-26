@@ -1,149 +1,141 @@
 # Thread V1 Architecture
 
-## System shape
+## Module shape
 
 ```text
-MCP client
-    |
-    v
-transport.mcp -> core tool registry <- core services
-                                      |
-                                      v
-                               provider contracts
-                                      ^
-                                      |
-                         platform.fabric -> Minecraft
+:fabric
+    Fabric entrypoint, Loader API, lifecycle events, integration entrypoint discovery
+       |
+       v
+:common
+    runtime assembly -> Minecraft providers -> core provider contracts
+    MCP transport    -> tool registry      -> core services and DTOs
 ```
 
-Dependencies point toward core. Core has no Minecraft, Fabric, or MCP dependency. The MCP adapter
-invokes only registered core tools, and Fabric providers convert live Minecraft objects into
-detached Thread DTOs before returning them.
+The build produces one installable artifact: `thread-fabric-<version>.jar`. `:common` is an
+internal build module whose classes are merged into that Fabric JAR; it is not a separately
+installed mod and it is not a universal multi-loader JAR.
 
-## Source ownership
+Dependencies point from `:fabric` to `:common`. Common production source has no Fabric Loader or
+Fabric API imports or runtime dependencies. No NeoForge or Forge module exists yet.
+
+## Common ownership
 
 ### Core
 
-`me.clutchy.thread.core` owns stable behavior that can be tested without launching Minecraft:
+`common/src/main/java/me/clutchy/thread/core` owns behavior that can be tested without launching
+Minecraft:
 
-- immutable domain DTOs and structured errors;
+- immutable DTOs, structured errors, and explicit limits;
 - provider contracts for game, player, world, recipes, and logical-thread execution;
-- explicit JSON codecs and schemas;
-- tool and context registries;
-- integration discovery and transactional contributions;
-- direct crafting assessment and recursive planning.
+- JSON codecs and schemas;
+- tool, context, integration, and extension registries;
+- deterministic direct crafting assessment and bounded recursive planning.
 
-Core public contracts use plain Java and Thread types. Registry IDs are canonical; localized names
-are display metadata. Raw NBT, component maps, Minecraft objects, Fabric types, MCP types, and
-optional-mod types do not cross this boundary.
+Core public contracts use plain Java and Thread types. Raw NBT, component maps, Minecraft objects,
+loader types, MCP types, and optional-mod types do not cross this boundary.
 
-### Fabric platform
+### Shared Minecraft edge
 
-`me.clutchy.thread.platform.fabric` owns live game access and lifecycle wiring:
+`me.clutchy.thread.platform.minecraft` owns code that uses Minecraft classes but no loader API:
 
-- the client entrypoint and configuration wiring;
-- centralized single-player session checks;
 - client and integrated-server thread dispatch;
-- bounded game, player, world, item, block, entity, and recipe reads;
-- conversion from Minecraft state to core DTOs;
-- Fabric discovery and advanced Fabric-side enrichment hooks.
+- the single-player session guard and status mapping;
+- bounded game, player, world, item, block, entity, and live-recipe reads;
+- conversion from Minecraft objects to detached Thread DTOs;
+- safe Minecraft-facing block/entity extension points and registries.
 
-Providers read only already-loaded state. They do not generate chunks, scan arbitrary world areas,
+This code stays shared because it can run unchanged after another client loader invokes it. It does
+not wrap every Minecraft class. Providers receive the actual `Minecraft` client at assembly time
+and keep Minecraft objects at this outer edge.
+
+Providers read only already-loaded state. They never generate chunks, scan arbitrary world areas,
 open hidden containers, resolve unopened loot tables, or mutate Minecraft.
 
-The platform-specific enrichment interfaces intentionally live at this outer edge. They may accept
-Minecraft objects because they run inside a Fabric integration, but they must return detached
-Thread DTOs. They are not core contracts and cannot be consumed by core services or MCP.
+### Shared runtime
 
-### MCP transport
+`me.clutchy.thread.runtime.ThreadRuntime` performs loader-neutral assembly:
+
+1. create logical-thread dispatch, session guards, limits, mappers, and extension registries;
+2. construct the shared Minecraft providers and composite recipe provider;
+3. register the built-in vanilla integration;
+4. activate compatible enabled candidates supplied by the loader adapter;
+5. expose the final tool/integration registries;
+6. start and close MCP when requested by the loader lifecycle.
+
+`ThreadRuntimeInfo` carries the running Thread, Minecraft, and loader identity/version without
+depending on a loader API. There is no global service locator or background integration lifecycle.
+
+### MCP and configuration
 
 `me.clutchy.thread.transport.mcp` owns the loopback HTTP listener, protocol validation, discovery,
-and JSON-RPC mapping. It translates `ToolRegistry` descriptors and results without importing
-Minecraft or Fabric classes. See [MCP notes](MCP_NOTES.md) for the exact wire behavior.
+and JSON-RPC mapping. It invokes only `ToolRegistry` and imports neither Minecraft nor a loader API.
+See [MCP notes](MCP_NOTES.md).
 
-### Configuration
+`me.clutchy.thread.config` owns the persisted schema and validation. It can disable the listener,
+filter tools/integrations, choose an explicit loopback address/port, and tune limits within hard
+ceilings. The Fabric adapter supplies the config-file location.
 
-`me.clutchy.thread.config` owns the persisted schema and validation. Configuration can disable the
-listener, filter tools and integrations, choose an explicit loopback address/port, and tune limits
-within hard ceilings. It cannot enable remote binding or weaken the V1 session boundary.
+## Fabric ownership
 
-## Runtime assembly
+`fabric/src/client/java/me/clutchy/thread/platform/fabric` is intentionally small. It owns only:
 
-`ThreadFabricClient` performs explicit startup wiring:
+- `ThreadFabricClient`, the Fabric client entrypoint;
+- Fabric Loader lookups for Thread, Minecraft, loader, and installed-mod versions;
+- the Fabric config-directory path;
+- the Fabric client-stopping event that closes `ThreadRuntime`;
+- `thread:integrations` entrypoint discovery;
+- Fabric version-predicate evaluation for optional integration candidates.
 
-1. read pinned component versions and validated configuration;
-2. create the game-thread executors, centralized session guard, limits, mapper, and extension
-   registries;
-3. create native Fabric providers and the composite recipe provider;
-4. register the built-in vanilla integration;
-5. collect external candidate metadata and activate compatible enabled integrations;
-6. start MCP only after the final tool registry exists;
-7. close MCP from the Fabric client-stopping lifecycle event.
+The entrypoint supplies loader metadata, configuration, candidates, and the active mod classloader
+to `ThreadRuntime`. It does not contain tool, crafting, MCP, mapping, or live-query behavior.
 
-There is no global service locator or background integration lifecycle. Startup uses explicit
-objects, and integrations receive a short-lived transactional registration context.
+No generic client-lifecycle or config-directory interface is introduced: those values are consumed
+once by the thin entrypoint. No integrated-server lifecycle abstraction is needed because shared
+providers resolve the current integrated server for each bounded read. These can become contracts
+only when a second loader proves a real behavioral difference.
 
 ## Session and threading rules
 
-`minecraft.get_status` is always callable. Other live gameplay tools pass through the centralized
-session guard and reject menus, loading states, missing players, and multiplayer before exposing
-game state.
+`minecraft.get_status` is always callable. Other gameplay tools pass through the centralized
+shared session guard and reject menus, loading states, missing players, and multiplayer before
+exposing game state.
 
 Client-owned reads run on the Minecraft client thread. Integrated-server-owned reads, including
-live recipes and block entities, run on the integrated server thread. Dispatch has a configured
-deadline; timeout and lifecycle rejection become structured retryable tool errors. A request may
-fail safely if the world unloads while it is waiting.
+live recipes and block entities, run on the integrated-server thread. Dispatch has a configured
+deadline; timeout and lifecycle rejection become structured retryable errors. A request may fail
+safely if the world unloads while it is waiting.
 
-## Tools and serialization
+## Tools, crafting, and integrations
 
-A `GameTool` owns a stable ID, description, input/output codecs, JSON schemas, read-only capability
-metadata, and an execution function. `ToolRegistry` validates input before execution and validates
-serialized output before returning it to a transport.
+A `GameTool` owns a stable ID, description, input/output codecs, explicit JSON schemas, read-only
+capability metadata, and an execution function. `ToolRegistry` validates input before execution
+and validates serialized output before returning it to MCP.
 
-Schemas are explicit rather than generated by reflection. Gson is supplied by the pinned Minecraft
-runtime and remains inside serialization/transport code. [Tool contracts](TOOL_CONTRACTS.md)
-documents the public meanings and limits.
+`CraftingService` uses maximum-flow allocation so overlapping alternatives cannot spend the same
+inventory item twice. `CraftingPlanner` uses one inventory/surplus ledger, active-path cycle
+detection, deterministic local variant scoring, and hard depth/work/quantity limits.
 
-## Crafting services
-
-`CraftingService` compares one execution of each live recipe variant with a single detached
-36-slot main-inventory snapshot. Its maximum-flow allocation prevents overlapping ingredient
-alternatives from counting the same item twice and produces deterministic allocations.
-
-`CraftingPlanner` recursively resolves intermediate recipes using one inventory-and-crafted-surplus
-ledger. It tracks the active item path for direct, indirect, and tag-based cycle detection. Depth,
-step, explored-branch, ingredient, alternative, and quantity limits guarantee bounded work. Variant
-selection is deterministic local scoring, not exponential global optimization.
-
-The planner's state and allocation machinery are intentionally internal. Tools expose only the
-stable crafting DTOs.
-
-## Integrations
-
-Base Thread registers only the built-in `vanilla` integration. External packages advertise
-metadata through the `thread:integrations` Fabric entrypoint. Thread checks configuration, target
-mod presence, and version compatibility before `ReflectiveIntegrationLoader` resolves the named
-implementation class.
-
-Registration is transactional: tools, contexts, recipe providers, typed extensions, and capability
-metadata become visible together or not at all. A broken candidate or invocation is isolated so it
-cannot prevent vanilla startup or bypass native session/limit checks.
-
-`CompositeRecipeProvider` captures the native recipe result first. The first successful non-empty
-external recipe contribution in stable integration-ID order may replace that result for one item;
-empty or failed contributions preserve the native fallback.
-
-The supported external API and implementation-only classes are listed in
-[Thread Integrations](INTEGRATIONS.md).
+External Fabric packages advertise metadata through `thread:integrations`. Fabric discovers those
+candidates, while common `IntegrationRegistry` performs enabled, mod-presence, version, reflective
+load, and transactional contribution handling. Shared Minecraft extension points use
+`MinecraftIntegrationExtensionPoints`; they accept Minecraft inputs on the owning thread and return
+detached Thread DTOs.
 
 ## Enforced boundaries
 
-Automated architecture and release checks protect the design:
+Architecture and release tests enforce that:
 
-- core source cannot import Minecraft, Fabric, MCP, or internal JDK APIs;
-- MCP source cannot import Minecraft or Fabric;
-- the only allowed production `com.sun` API is the supported JDK HTTP server under MCP;
-- optional implementations are referenced by class-name strings after metadata checks;
-- the runtime artifact contains no test code or bundled third-party adapter/dependency;
-- packaged-client tests exercise the final JAR in a real temporary single-player world.
+- common production source imports no Fabric API;
+- core imports no Minecraft, Fabric, or MCP API;
+- MCP imports no Minecraft or loader API;
+- Fabric production code stays inside the Fabric adapter package;
+- only the supported JDK HTTP server uses `com.sun` APIs;
+- optional implementations remain deferred class-name strings;
+- the installable JAR contains common and Fabric classes but no tests or bundled third-party
+  adapter;
+- packaged-client tests exercise the final JAR through menu/world/menu, restart, and MCP-disabled
+  lifecycles.
 
-V1 remains Java-only, Fabric-only, read-only, single-player-only, bounded, and loopback-only.
+V1 remains Java-only, Fabric-only, read-only, single-player-only, bounded, and loopback-only. The
+module boundary prepares shared code for a future loader without claiming another loader exists.

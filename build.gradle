@@ -1,101 +1,43 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version "${loom_version}"
-    id 'java'
-    id 'checkstyle'
+    id 'base'
+    id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
     id 'com.diffplug.spotless' version "${spotless_version}"
 }
 
 group = project.maven_group
 version = project.mod_version
 
-base {
-    archivesName = project.archives_base_name
-}
+allprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
 
-repositories {
-    mavenCentral()
-}
-
-loom {
-    splitEnvironmentSourceSets()
-
-    mods {
-        thread {
-            sourceSet sourceSets.main
-            sourceSet sourceSets.client
-        }
+    repositories {
+        mavenCentral()
     }
 }
-
-fabricApi {
-    configureTests {
-        createSourceSet = true
-        modId = 'thread-gametest'
-        enableGameTests = false
-        enableClientGameTests = true
-    }
-}
-
-sourceSets {
-    test {
-        compileClasspath += sourceSets.client.output
-        runtimeClasspath += sourceSets.client.output
-    }
-    gametest {
-        compileClasspath += sourceSets.client.output
-        runtimeClasspath += sourceSets.client.output
-    }
-}
-
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-
-    testImplementation platform("org.junit:junit-bom:${project.junit_version}")
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-    withSourcesJar()
-}
-
-processResources {
-    inputs.property 'version', project.version
-    inputs.property 'minecraftVersion', project.minecraft_version
-    inputs.property 'loaderVersion', project.loader_version
-    inputs.property 'fabricApiVersion', project.fabric_api_version
-
-    filesMatching('fabric.mod.json') {
-        expand(
-                version: project.version,
-                minecraftVersion: project.minecraft_version,
-                loaderVersion: project.loader_version,
-                fabricApiVersion: project.fabric_api_version)
-    }
-}
-
-tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask).configureEach {
-    preserveFileTimestamps = false
-    reproducibleFileOrder = true
-}
-
-tasks.named('compileTestJava') {
-    dependsOn tasks.named('clientClasses')
-}
-
-tasks.named('compileGametestJava') {
-    dependsOn tasks.named('clientClasses')
-}
-
-// Applied scripts do not inherit Loom plugin classes on their compilation classpath.
-ext.productionClientTaskType = net.fabricmc.loom.task.prod.ClientProductionRunTask
 
 apply from: 'gradle/quality.gradle'
 apply from: 'gradle/release.gradle'
-apply from: 'gradle/packaged-tests.gradle'
+
+tasks.register('test') {
+    group = 'verification'
+    description = 'Runs unit tests in every Thread module.'
+    dependsOn ':common:test', ':fabric:test'
+}
+
+tasks.register('runClientGameTest') {
+    group = 'verification'
+    description = 'Runs the Fabric development client game test.'
+    dependsOn ':fabric:runClientGameTest'
+}
+
+[
+        'runProductionClientGameTest',
+        'runRestartProductionClientGameTest',
+        'runMcpDisabledProductionClientGameTest'
+].each { taskName ->
+    tasks.register(taskName) {
+        group = 'verification'
+        dependsOn ":fabric:${taskName}"
+    }
+}

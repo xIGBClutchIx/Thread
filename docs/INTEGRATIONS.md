@@ -23,18 +23,19 @@ The supported loader-neutral integration surface is:
 These contracts expose only Java and Thread core types. They do not expose Fabric, Minecraft, MCP,
 or target-mod types.
 
-Thread also provides advanced Fabric-edge contracts for integrations that must inspect an already
+Thread also provides shared Minecraft-edge contracts for integrations that must inspect an already
 selected Minecraft object:
 
-- `FabricIntegrationExtensionPoints`;
-- `FabricBlockEntityInspector`;
-- `FabricBlockEnricher`;
-- `FabricEntityEnricher`.
+- `MinecraftIntegrationExtensionPoints`;
+- `MinecraftBlockEntityInspector`;
+- `MinecraftBlockEnricher`;
+- `MinecraftEntityEnricher`.
 
-Those interfaces are deliberately platform-specific, live under `platform.fabric`, and are not
-portable core API. They may accept Minecraft inputs on the owning logical thread, but contributions
-must return detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and
-component maps must never be returned.
+Those interfaces deliberately live under `platform.minecraft`, outside core. They can be reused by
+any client loader because they depend on Minecraft rather than Fabric, but they are not plain-Java
+core API. They may accept Minecraft inputs on the owning logical thread; contributions must return
+detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and component
+maps must never be returned. Their stable extension IDs use the `minecraft.*` namespace.
 
 ## Internal implementation surface
 
@@ -46,12 +47,13 @@ promises:
 - `IntegrationEnvironment`, `IntegrationLoader`, `IntegrationLoadException`, and
   `ReflectiveIntegrationLoader`;
 - `IntegrationExtensionRegistry` and `CompositeRecipeProvider`;
-- `FabricIntegrationCatalog`, `FabricIntegrationEnvironment`, provider/enricher registries, client
-  lifecycle wiring, configuration, and MCP classes;
+- `FabricIntegrationCatalog`, `FabricIntegrationEnvironment`, shared Minecraft provider/enricher
+  registries, client runtime/lifecycle wiring, configuration, and MCP classes;
 - the built-in `VanillaIntegration` implementation.
 
 External packages should not construct registries, loaders, platform providers, or transports.
-Their stable entry is the Fabric candidate provider followed by the `ThreadIntegration` callback.
+For the currently implemented Fabric artifact, their entry is the Fabric candidate provider
+followed by the loader-neutral `ThreadIntegration` callback.
 
 ## Packaging and discovery
 
@@ -112,7 +114,7 @@ therefore reports only active integrations and their usable surfaces.
 
 ## Recipe behavior
 
-`FabricRecipeProvider` reads the integrated server's final live `RecipeManager` first. That native
+`MinecraftRecipeProvider` reads the integrated server's final live `RecipeManager` first. That native
 result establishes the authoritative single-player guard and query limits.
 
 `CompositeRecipeProvider` then evaluates external `IntegrationRecipeProvider` contributions in

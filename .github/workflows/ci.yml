@@ -52,6 +52,8 @@ jobs:
                   name: build-reports
                   path: |
                       build/reports/
+                      common/build/reports/
+                      fabric/build/reports/
                       build/run/**/logs/
                       build/run/**/crash-reports/
                   if-no-files-found: ignore
