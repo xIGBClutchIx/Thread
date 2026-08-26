@@ -41,6 +41,7 @@ import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
@@ -48,6 +49,7 @@ import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
@@ -67,6 +69,7 @@ class VanillaIntegrationTest {
   private static final List<String> V1_TOOL_IDS =
       List.of(
           "minecraft.can_craft",
+          "minecraft.find_item",
           "minecraft.get_capabilities",
           "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
@@ -203,6 +206,23 @@ class VanillaIntegrationTest {
     assertEquals("diamond pick", search.get("query").getAsString());
     assertEquals("minecraft:diamond_pickaxe", first(search, "items").get("itemId").getAsString());
 
+    JsonObject found =
+        invoke(
+            catalog.tools(),
+            "minecraft.find_item",
+            "{\"query\":\"minecraft:diamond\",\"radius\":16,"
+                + "\"containerLimit\":8,\"itemLimit\":16}");
+    JsonObject foundDiamond = first(found, "matches");
+    assertEquals(
+        "minecraft:diamond", foundDiamond.getAsJsonObject("item").get("itemId").getAsString());
+    assertEquals(5, foundDiamond.get("totalCount").getAsInt());
+    assertEquals(
+        List.of("PLAYER_INVENTORY", "NEARBY_CONTAINER"),
+        foundDiamond.getAsJsonArray("sources").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(source -> source.get("sourceType").getAsString())
+            .toList());
+
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
     assertTrue(capabilities.get("readOnly").getAsBoolean());
     assertEquals(V1_TOOL_IDS, strings(capabilities, "tools"));
@@ -225,6 +245,7 @@ class VanillaIntegrationTest {
     assertEquals(ToolAvailability.ALWAYS, availability.get("minecraft.get_capabilities"));
     assertEquals(
         ToolAvailability.SUPPORTED_SINGLEPLAYER, availability.get("minecraft.get_inventory"));
+    assertEquals(ToolAvailability.SUPPORTED_SINGLEPLAYER, availability.get("minecraft.find_item"));
 
     JsonObject status = invoke(catalog.tools(), "minecraft.get_status", "{}");
     assertEquals("MAIN_MENU", status.get("state").getAsString());
@@ -236,7 +257,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        15, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        16, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -264,6 +285,10 @@ class VanillaIntegrationTest {
     assertInvalid(
         catalog.tools(), "minecraft.get_crafting_plan", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.search_items", "{\"query\":\"\",\"limit\":0}");
+    assertInvalid(
+        catalog.tools(),
+        "minecraft.find_item",
+        "{\"query\":\"\",\"radius\":0,\"containerLimit\":0,\"itemLimit\":0}");
   }
 
   @Test
@@ -311,7 +336,7 @@ class VanillaIntegrationTest {
     Catalog noWorld =
         catalog(
             new MenuGameProvider(),
-            new FailingPlayerProvider(),
+            new UnavailablePlayerProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
             new UnavailableWorldProvider(ToolErrorCode.WORLD_NOT_AVAILABLE),
             new FakeRecipeProvider(),
             ignored -> true);
@@ -320,11 +345,16 @@ class VanillaIntegrationTest {
         "minecraft.get_nearby_containers",
         "{\"radius\":8,\"limit\":8}",
         ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertToolFailure(
+        noWorld.tools(),
+        "minecraft.find_item",
+        "{\"query\":\"coal\",\"radius\":8,\"containerLimit\":8,\"itemLimit\":16}",
+        ToolErrorCode.WORLD_NOT_AVAILABLE);
 
     Catalog multiplayer =
         catalog(
             new SupportedGameProvider(),
-            new FailingPlayerProvider(),
+            new UnavailablePlayerProvider(ToolErrorCode.UNSUPPORTED),
             new UnavailableWorldProvider(ToolErrorCode.UNSUPPORTED),
             new FakeRecipeProvider(),
             ignored -> true);
@@ -333,6 +363,55 @@ class VanillaIntegrationTest {
         "minecraft.inspect_container",
         "{\"position\":{\"x\":0,\"y\":64,\"z\":0}}",
         ToolErrorCode.UNSUPPORTED);
+    assertToolFailure(
+        multiplayer.tools(),
+        "minecraft.find_item",
+        "{\"query\":\"coal\",\"radius\":8,\"containerLimit\":8,\"itemLimit\":16}",
+        ToolErrorCode.UNSUPPORTED);
+  }
+
+  @Test
+  void nearbyItemMatchesNeverBecomeCraftingInventory() {
+    PlayerProvider emptyPlayer =
+        new FakePlayerProvider() {
+          @Override
+          public ToolResult<InventorySnapshot> inventory() {
+            return ToolResult.success(new InventorySnapshot(0, List.of()));
+          }
+
+          @Override
+          public ToolResult<EquipmentSnapshot> equipment() {
+            return ToolResult.success(equipmentWithMainHand(null));
+          }
+        };
+    Catalog catalog = catalog(new SupportedGameProvider(), emptyPlayer);
+
+    JsonObject found =
+        invoke(
+            catalog.tools(),
+            "minecraft.find_item",
+            "{\"query\":\"minecraft:diamond\",\"radius\":8,"
+                + "\"containerLimit\":8,\"itemLimit\":16}");
+
+    assertEquals(2, first(found, "matches").get("totalCount").getAsInt());
+    assertFalse(
+        invoke(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"minecraft:diamond_pickaxe\"}")
+            .get("craftable")
+            .getAsBoolean());
+    assertFalse(
+        invoke(
+                catalog.tools(),
+                "minecraft.get_missing_ingredients",
+                "{\"itemId\":\"minecraft:diamond_pickaxe\"}")
+            .get("craftable")
+            .getAsBoolean());
+    assertFalse(
+        invoke(
+                catalog.tools(),
+                "minecraft.get_crafting_plan",
+                "{\"itemId\":\"minecraft:diamond_pickaxe\"}")
+            .get("craftable")
+            .getAsBoolean());
   }
 
   @Test
@@ -373,7 +452,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(16, strings(capabilities, "tools").size());
+    assertEquals(17, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -431,7 +510,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(15, strings(capabilities, "tools").size());
+    assertEquals(16, strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -746,6 +825,31 @@ class VanillaIntegrationTest {
     }
 
     @Override
+    public ToolResult<NearbyContainerSnapshotResult> nearbyContainerSnapshots(
+        NearbyContainerQuery query) {
+      return ToolResult.success(
+          new NearbyContainerSnapshotResult(
+              query.radius(),
+              query.limit(),
+              false,
+              List.of(
+                  new BlockInfo(
+                      "minecraft:chest",
+                      "Chest",
+                      new BlockPosition(2, 64, 0),
+                      Map.of("type", "single"),
+                      2,
+                      true,
+                      new BlockEntityInfo(
+                          "minecraft:chest",
+                          27,
+                          List.of(
+                              new BlockEntityItemInfo(
+                                  "3", item("minecraft:diamond", "Diamond", 2, 64))),
+                          Map.of("contentsResolved", "true"))))));
+    }
+
+    @Override
     public ToolResult<BlockInfo> inspectContainer(ContainerInspectionQuery query) {
       return ToolResult.success(
           new BlockInfo(
@@ -773,6 +877,12 @@ class VanillaIntegrationTest {
 
     @Override
     public ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query) {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<NearbyContainerSnapshotResult> nearbyContainerSnapshots(
+        NearbyContainerQuery query) {
       return ToolResult.failure(error);
     }
 

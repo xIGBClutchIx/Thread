@@ -661,6 +661,96 @@ replacements, and removals; it does not use a static vanilla recipe list. A futu
 Integrations package may contribute detached recipes through the same `RecipeProvider` extension
 without changing this contract.
 
+## `minecraft.find_item`
+
+Purpose: find matching items across the player's live inventory, offhand/armor, and nearby loaded
+containers without moving items or changing crafting inputs.
+
+Input:
+
+```json
+{
+  "query": "minecraft:coal",
+  "radius": 12,
+  "containerLimit": 16,
+  "itemLimit": 16
+}
+```
+
+An input that matches the canonical registry-ID syntax is exact: `minecraft:coal` does not match
+`minecraft:coal_block`. Other input is a case-insensitive all-term match over registry ID, display
+name, and custom name, consistent with `minecraft.search_items`.
+
+Example result:
+
+```json
+{
+  "query": "minecraft:coal",
+  "radius": 12,
+  "containerLimit": 16,
+  "itemLimit": 16,
+  "containersTruncated": false,
+  "itemsTruncated": false,
+  "matches": [
+    {
+      "item": {
+        "itemId": "minecraft:coal",
+        "displayName": "Coal"
+      },
+      "totalCount": 11,
+      "sources": [
+        {
+          "sourceType": "PLAYER_INVENTORY",
+          "count": 2,
+          "inventorySlots": [7],
+          "equipmentSlots": [],
+          "containerSlots": [],
+          "containerPosition": null,
+          "containerTypeId": null,
+          "distance": null
+        },
+        {
+          "sourceType": "PLAYER_EQUIPMENT",
+          "count": 1,
+          "inventorySlots": [],
+          "equipmentSlots": ["OFF_HAND"],
+          "containerSlots": [],
+          "containerPosition": null,
+          "containerTypeId": null,
+          "distance": null
+        },
+        {
+          "sourceType": "NEARBY_CONTAINER",
+          "count": 8,
+          "inventorySlots": [],
+          "equipmentSlots": [],
+          "containerSlots": ["fuel", "input"],
+          "containerPosition": {"x": 153, "y": 67, "z": -379},
+          "containerTypeId": "minecraft:furnace",
+          "distance": 3.4
+        }
+      ]
+    }
+  ]
+}
+```
+
+Distinct item matches are ordered by canonical item ID. Within a match, player inventory comes
+first, followed by offhand/armor, then containers ordered by distance, position, and type. Slots in
+one source are sorted and duplicate stacks are summed. Main hand is not counted through equipment
+because it is already the selected hotbar stack in the 36-slot inventory snapshot.
+
+The hard container radius is 16, the hard container result limit is 64, and the hard distinct-item
+limit is 64. Configured lower limits still apply. Nearby scanning uses the same loaded-chunk-only,
+distance-ordered provider path as `minecraft.get_nearby_containers`; it never force-loads chunks.
+Unopened loot and any container whose full contents cannot be represented safely are excluded from
+item totals rather than guessed. `containersTruncated` and `itemsTruncated` tell the client when the
+requested bounds omitted additional candidates.
+
+This tool is live lookup context only. `minecraft.can_craft`,
+`minecraft.get_missing_ingredients`, and `minecraft.get_crafting_plan` continue to read only the
+player's 36-slot main inventory and never consume this result.
+
 ## `minecraft.search_items`
 
 Purpose: resolve user/model-friendly item queries into canonical registry IDs.
@@ -690,7 +780,10 @@ Example result:
 }
 ```
 
-V1 search can be simple case-insensitive matching over registry IDs and display names. No embeddings/fuzzy-search dependency is required.
+Canonical registry-ID input is matched exactly. Other input uses case-insensitive all-term matching
+over registry IDs and display names. No embeddings or fuzzy-search dependency is required. Unlike
+`minecraft.find_item`, this tool searches the live item registry and does not report owned stacks or
+locations.
 
 ## `minecraft.get_capabilities`
 
@@ -715,7 +808,7 @@ Example result:
       "id": "vanilla",
       "version": "1",
       "metadata": [
-        {"key": "thread.tool_count", "value": "15"}
+        {"key": "thread.tool_count", "value": "16"}
       ]
     }
   ]
@@ -733,7 +826,7 @@ capabilities and their classes are not resolved before presence/compatibility ch
 
 The base artifact reports only the required `vanilla` integration. Future separately installed
 Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
-changing the fifteen built-in `minecraft.*` tool contracts.
+changing the sixteen built-in `minecraft.*` tool contracts.
 
 ## Tool descriptions
 

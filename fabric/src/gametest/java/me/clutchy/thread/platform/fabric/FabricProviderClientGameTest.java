@@ -72,6 +72,10 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           .getServer()
           .runCommand("item replace block 0 101 3 container.1 with minecraft:coal");
       singleplayer.getServer().runCommand("setblock -2 101 2 minecraft:barrel");
+      singleplayer.getServer().runCommand("setblock -3 101 2 minecraft:chest");
+      singleplayer
+          .getServer()
+          .runCommand("item replace block -3 101 2 container.0 with minecraft:coal");
       singleplayer.getServer().runCommand("setblock 2 101 2 minecraft:hopper");
       for (int slot = 0; slot < 5; slot++) {
         singleplayer
@@ -91,6 +95,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer.getServer().runCommand("give @a minecraft:stick 2");
       singleplayer.getServer().runCommand("give @a minecraft:oak_log 1");
       singleplayer.getServer().runCommand("give @a minecraft:dirt 1");
+      singleplayer.getServer().runCommand("give @a minecraft:coal 2");
       singleplayer.getServer().runCommand("summon minecraft:minecart 2 100 0");
       singleplayer
           .getServer()
@@ -103,6 +108,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
                   && hasInventoryStack(client, Items.STICK, 2)
                   && hasInventoryStack(client, Items.OAK_LOG, 1)
                   && hasInventoryStack(client, Items.DIRT, 1)
+                  && hasInventoryStack(client, Items.COAL, 2)
                   && client.player != null
                   && client.player.getMainHandItem().is(Items.DIAMOND_PICKAXE));
       context.waitFor(FabricProviderClientGameTest::targetsKnownFurnace);
@@ -399,6 +405,50 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       assertEquals(
           "minecraft:furnace", mcpFurnace.get("blockId").getAsString(), "MCP inspected furnace");
 
+      JsonObject findCoalArguments = new JsonObject();
+      findCoalArguments.addProperty("query", "minecraft:coal");
+      findCoalArguments.addProperty("radius", 16);
+      findCoalArguments.addProperty("containerLimit", 8);
+      findCoalArguments.addProperty("itemLimit", 16);
+      JsonObject foundCoal =
+          mcpTool(context, mcp.endpoint(), 42, "minecraft.find_item", findCoalArguments);
+      JsonObject coal = foundCoal.getAsJsonArray("matches").get(0).getAsJsonObject();
+      assertEquals(
+          "minecraft:coal",
+          coal.getAsJsonObject("item").get("itemId").getAsString(),
+          "found item ID");
+      assertEquals(3, coal.get("totalCount").getAsInt(), "player and furnace coal total");
+      assertEquals(2, coal.getAsJsonArray("sources").size(), "coal source count");
+      assertEquals(
+          "PLAYER_INVENTORY",
+          coal.getAsJsonArray("sources").get(0).getAsJsonObject().get("sourceType").getAsString(),
+          "player source first");
+      JsonObject chestCoalSource = coal.getAsJsonArray("sources").get(1).getAsJsonObject();
+      assertEquals(
+          "NEARBY_CONTAINER",
+          chestCoalSource.get("sourceType").getAsString(),
+          "container source second");
+      assertEquals(
+          "minecraft:chest",
+          chestCoalSource.get("containerTypeId").getAsString(),
+          "container source type");
+      assertEquals(
+          -3,
+          chestCoalSource.getAsJsonObject("containerPosition").get("x").getAsInt(),
+          "container source position");
+
+      JsonObject findStoneArguments = findCoalArguments.deepCopy();
+      findStoneArguments.addProperty("query", "stone");
+      JsonObject foundStone =
+          mcpTool(context, mcp.endpoint(), 43, "minecraft.find_item", findStoneArguments);
+      JsonObject stone = foundStone.getAsJsonArray("matches").get(0).getAsJsonObject();
+      assertEquals(
+          "minecraft:stone",
+          stone.getAsJsonObject("item").get("itemId").getAsString(),
+          "text item match");
+      assertEquals(320, stone.get("totalCount").getAsInt(), "duplicate hopper stacks aggregate");
+      assertEquals(1, stone.getAsJsonArray("sources").size(), "hopper is one aggregated source");
+
       JsonObject recipeArguments = new JsonObject();
       recipeArguments.addProperty("itemId", "minecraft:diamond_pickaxe");
       JsonObject mcpRecipe =
@@ -448,7 +498,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
       JsonObject mcpCapabilities =
           mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
-      assertEquals(15, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+      assertEquals(16, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
       assertEquals(
           2, mcpCapabilities.getAsJsonArray("integrations").size(), "MCP integration count");
       assertTrue(

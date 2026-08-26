@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Unified `minecraft.find_item` search across player inventory, offhand/armor, and nearby loaded
+  containers, with exact-ID and friendly text matching, aggregate counts, structured locations,
+  deterministic ordering, and unchanged player-inventory-only crafting semantics.
 - Safe nearby loaded-container discovery and individual inspection across common vanilla storage
   and machines, with compact summaries, full bounded inventory snapshots, selected furnace/brewing
   state, and no chunk loading or crafting changes.
@@ -17,7 +20,7 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 - NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate
   release JAR, and real packaged-client lifecycle/MCP/recipe tests.
 - Deterministic direct craftability, missing-ingredient analysis, and bounded recursive crafting
-  plans across fifteen read-only tools.
+  plans within the sixteen-tool read-only catalog.
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
 - Loader-specific metadata discovery for separately distributed Thread Integrations packages:

@@ -28,6 +28,7 @@ import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
@@ -68,6 +69,14 @@ class ProviderContractsTest {
         "minecraft:barrel",
         world
             .nearbyContainers(new NearbyContainerQuery(12, 10))
+            .value()
+            .containers()
+            .getFirst()
+            .blockId());
+    assertEquals(
+        "minecraft:barrel",
+        world
+            .nearbyContainerSnapshots(new NearbyContainerQuery(12, 10))
             .value()
             .containers()
             .getFirst()
@@ -179,6 +188,25 @@ class ProviderContractsTest {
                       0,
                       List.of(),
                       false))));
+    }
+
+    @Override
+    public ToolResult<NearbyContainerSnapshotResult> nearbyContainerSnapshots(
+        NearbyContainerQuery query) {
+      return ToolResult.success(
+          new NearbyContainerSnapshotResult(
+              query.radius(),
+              query.limit(),
+              false,
+              List.of(
+                  new BlockInfo(
+                      "minecraft:barrel",
+                      "Barrel",
+                      new BlockPosition(2, 64, 0),
+                      Map.of(),
+                      1,
+                      true,
+                      new BlockEntityInfo("minecraft:barrel", 27, List.of(), Map.of())))));
     }
 
     @Override

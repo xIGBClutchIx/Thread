@@ -54,7 +54,9 @@ project toolchain.
 - live native recipe lookup, including datapack and installed-mod changes
 - deterministic inventory-to-recipe craftability and missing-ingredient assessment
 - deterministic recursive crafting plans with bounded cycle/depth handling
-- vanilla item search
+- vanilla registry item search
+- unified live item search across player inventory, offhand/armor, and nearby loaded containers,
+  with aggregate counts and structured source locations
 
 ### Engineering baseline
 
@@ -123,14 +125,16 @@ From a clean install, an MCP client can discover Thread and correctly answer eac
 10. "What intermediate crafts and raw materials do I need for a crafting table?"
 11. "What loaded containers are near me?"
 12. "What is inside that nearby furnace or chest?"
+13. "Where are my coal and diamonds across my inventory and nearby loaded containers?"
 
 For #9, Thread performs a deterministic comparison against the player's current main inventory and
 reports each recipe variant independently with required, allocated, and missing counts. For #10,
 Thread recursively plans intermediate recipes with one shared inventory ledger and reports final raw
 shortages plus structured cycle/depth/work-limit issues. Both are read-only analyses: Thread does not
 craft items, include nearby storage in crafting calculations, model workstation/fuel feasibility,
-or globally optimize every recipe combination. Questions #11 and #12 use independent bounded
-loaded-world reads and never alter those crafting inputs. The base recipe source is Minecraft's
+or globally optimize every recipe combination. Questions #11 through #13 use independent bounded
+loaded-world reads and never alter those crafting inputs. Unified item search may report nearby
+container contents, but crafting never consumes that result. The base recipe source is Minecraft's
 final live recipe manager, not a static vanilla list, so supported datapack and installed-mod recipe
 changes flow through the same tool contracts.
 

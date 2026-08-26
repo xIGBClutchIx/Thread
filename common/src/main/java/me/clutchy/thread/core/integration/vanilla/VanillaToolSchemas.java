@@ -2,10 +2,12 @@ package me.clutchy.thread.core.integration.vanilla;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.serialization.JsonSchema;
+import me.clutchy.thread.core.service.item.ItemFinder;
 
 final class VanillaToolSchemas {
   private static final String REGISTRY_ID_PATTERN = "^[a-z0-9_.-]+:[a-z0-9/._-]+$";
@@ -83,6 +85,35 @@ final class VanillaToolSchemas {
               "itemSummary",
               boundedArray(BLOCK_ENTITY_ITEM, 0, NearbyContainerSummary.MAX_SUMMARY_ITEMS)),
           property("itemSummaryTruncated", bool()));
+  private static final JsonObject FOUND_ITEM_SOURCE =
+      object(
+          property(
+              "sourceType",
+              enumString(
+                  java.util.Arrays.stream(FoundItemSourceType.values())
+                      .map(Enum::name)
+                      .toArray(String[]::new))),
+          property("count", integer(1, null)),
+          property(
+              "inventorySlots",
+              boundedArray(
+                  integer(0, InventorySnapshot.MAIN_SLOT_COUNT - 1),
+                  0,
+                  InventorySnapshot.MAIN_SLOT_COUNT)),
+          property(
+              "equipmentSlots",
+              boundedArray(
+                  enumString("MAIN_HAND", "OFF_HAND", "HEAD", "CHEST", "LEGS", "FEET"), 0, 6)),
+          property(
+              "containerSlots", boundedArray(string(1, 64, null), 0, BlockEntityInfo.MAX_ITEMS)),
+          property("containerPosition", nullable(BLOCK_POSITION)),
+          property("containerTypeId", nullable(registryId())),
+          property("distance", nullable(number(0.0, null))));
+  private static final JsonObject FOUND_ITEM =
+      object(
+          property("item", ITEM_INFO),
+          property("totalCount", integer(1, null)),
+          property("sources", array(FOUND_ITEM_SOURCE)));
   private static final JsonObject ENTITY_INFO =
       object(
           property("entityType", registryId()),
@@ -246,6 +277,23 @@ final class VanillaToolSchemas {
               property("limit", integer(1, null)),
               property("truncated", bool()),
               property("items", array(ITEM_INFO))));
+  static final JsonSchema FIND_ITEM_QUERY =
+      schema(
+          object(
+              property("query", string(1, 128, null)),
+              property("radius", number(0.0, null)),
+              property("containerLimit", integer(1, null)),
+              property("itemLimit", integer(1, null))));
+  static final JsonSchema FIND_ITEM_RESULT =
+      schema(
+          object(
+              property("query", string(1, 128, null)),
+              property("radius", number(0.0, null)),
+              property("containerLimit", integer(1, null)),
+              property("itemLimit", integer(1, ItemFinder.MAX_ITEM_RESULTS)),
+              property("containersTruncated", bool()),
+              property("itemsTruncated", bool()),
+              property("matches", boundedArray(FOUND_ITEM, 0, ItemFinder.MAX_ITEM_RESULTS))));
   static final JsonSchema CAPABILITIES =
       schema(
           object(

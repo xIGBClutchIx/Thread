@@ -33,6 +33,7 @@ public final class LoaderParityAssertions {
   private static final Set<String> EXPECTED_TOOLS =
       Set.of(
           "minecraft.can_craft",
+          "minecraft.find_item",
           "minecraft.get_capabilities",
           "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
@@ -156,6 +157,12 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "menu container inspection rejection");
+    assertToolError(
+        mcpToolResult(endpoint, 8, "minecraft.find_item", findArguments("coal")),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu live item search rejection");
   }
 
   /** Verifies the common single-player catalog, native recipes, crafting, and MCP behavior. */
@@ -197,6 +204,10 @@ public final class LoaderParityAssertions {
             .map(JsonElement::getAsJsonObject)
             .anyMatch(item -> item.get("itemId").getAsString().equals("minecraft:diamond_pickaxe")),
         "live item registry search");
+    JsonObject absentLiveItem =
+        invoke(tools, "minecraft.find_item", findInput("thread:missing_item"));
+    assertTrue(
+        absentLiveItem.getAsJsonArray("matches").isEmpty(), "live item search no-match result");
 
     JsonObject recipe =
         invoke(tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:command_block\"}");
@@ -264,6 +275,11 @@ public final class LoaderParityAssertions {
         "The requested position is not a supported container.",
         false,
         "MCP non-container rejection");
+    assertTrue(
+        mcpTool(endpoint, 26, "minecraft.find_item", findArguments("thread:missing_item"))
+            .getAsJsonArray("matches")
+            .isEmpty(),
+        "MCP live item search no-match result");
   }
 
   /** Verifies clean world detachment while the loader-owned client remains running. */
@@ -295,6 +311,13 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "return-to-menu container rejection");
+    assertToolError(
+        mcpToolResult(
+            runtime.mcpServer().endpoint(), 33, "minecraft.find_item", findArguments("coal")),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu live item search rejection");
     assertTrue(runtime.mcpRunning(), "MCP listener survives world close");
   }
 
@@ -324,6 +347,14 @@ public final class LoaderParityAssertions {
     McpResponse response = mcpRequest(endpoint, id, "tools/call", name, arguments);
     assertEquals(200, response.status(), name + " MCP status");
     return response.body().getAsJsonObject("result");
+  }
+
+  private static String findInput(String query) {
+    return "{\"query\":\"" + query + "\",\"radius\":16,\"containerLimit\":8,\"itemLimit\":16}";
+  }
+
+  private static JsonObject findArguments(String query) {
+    return JsonParser.parseString(findInput(query)).getAsJsonObject();
   }
 
   /** Counts ingredient requirements containing one canonical item ID. */

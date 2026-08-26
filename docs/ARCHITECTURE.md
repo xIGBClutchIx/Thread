@@ -131,7 +131,7 @@ behavior.
 
 Packaged parity coverage requires each loader to prove:
 
-- the exact same fifteen-tool catalog and active vanilla integration;
+- the exact same sixteen-tool catalog and active vanilla integration;
 - correct loader identity plus menu, single-player, and return-to-menu status;
 - MCP-enabled, restarted-config, and MCP-disabled startup;
 - standard MCP initialization, discovery, tool listing, calls, and controlled menu rejection;
@@ -171,6 +171,12 @@ summaries. Individual inspection reuses `BlockInfo`, `BlockEntityInfo`, and the 
 `MinecraftBlockEntityInspectorRegistry`, so contributed inspectors can enrich future custom
 machines without a second registry. These snapshots are not inputs to `CraftingService` or
 `CraftingPlanner`.
+
+`ItemFinder` composes small transport-independent `ItemSource` snapshots. V1 supplies player and
+nearby-container sources; the nearby source uses one full bounded container scan on the integrated
+server thread. Main hand is not counted as equipment because it aliases the selected hotbar slot.
+Matched item IDs and source locations are ordered deterministically. This composition boundary can
+support a future external storage integration without making storage an input to crafting today.
 
 External packages advertise metadata through the loader-specific catalog (`thread:integrations`
 on Fabric and a Java service provider on NeoForge or Forge). Common `IntegrationRegistry` performs enabled,

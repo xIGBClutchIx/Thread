@@ -70,12 +70,14 @@ installed-mod changes. Thread has no static vanilla recipe catalog.
 and returns at most 64 distance-ordered summaries. Each summary includes at most four occupied
 slots. `minecraft.inspect_container` accepts one position within the same range and reuses the
 existing safe block/block-entity DTOs and inspector registry for full visible contents and selected
-machine state.
+machine state. `minecraft.find_item` reuses one full bounded scan to aggregate matching player and
+container stacks with structured source locations; it does not inspect containers one by one.
 
 Unopened loot containers remain unresolved because reading their slots would mutate world state.
 The tools run on the integrated-server thread, never force-load chunks, and remain independent of
 crafting: `CraftingService` and `CraftingPlanner` continue to read only the player's 36-slot main
-inventory.
+inventory. The transport-independent `ItemSource` boundary exists for live search composition, not
+as a storage-aware crafting or third-party storage contract.
 
 ## Crafting intelligence remains deterministic and bounded
 

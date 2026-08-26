@@ -210,6 +210,10 @@ class ArchitectureBoundaryTest {
       assertFalse(contents.contains("WorldProvider"), source::toString);
       assertFalse(contents.contains("NearbyContainer"), source::toString);
       assertFalse(contents.contains("ContainerInspection"), source::toString);
+      assertFalse(contents.contains("ItemFinder"), source::toString);
+      assertFalse(contents.contains("ItemSource"), source::toString);
+      assertFalse(contents.contains("FoundItem"), source::toString);
+      assertFalse(contents.contains("find_item"), source::toString);
     }
   }
 

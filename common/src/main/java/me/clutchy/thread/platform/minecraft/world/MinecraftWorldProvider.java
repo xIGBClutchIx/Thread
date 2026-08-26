@@ -16,6 +16,7 @@ import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
@@ -93,6 +94,22 @@ public final class MinecraftWorldProvider implements WorldProvider {
 
   @Override
   public ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query) {
+    ToolResult<NearbyContainerSnapshotResult> result = nearbyContainerSnapshots(query);
+    if (!result.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(result.error()));
+    }
+    NearbyContainerSnapshotResult snapshots = Objects.requireNonNull(result.value());
+    return ToolResult.success(
+        new NearbyContainerResult(
+            snapshots.radius(),
+            snapshots.limit(),
+            snapshots.truncated(),
+            snapshots.containers().stream().map(MinecraftWorldProvider::summary).toList()));
+  }
+
+  @Override
+  public ToolResult<NearbyContainerSnapshotResult> nearbyContainerSnapshots(
+      NearbyContainerQuery query) {
     Objects.requireNonNull(query, "query");
     Optional<ToolError> invalidQuery = validateContainerQuery(query, limits);
     if (invalidQuery.isPresent()) {
@@ -105,9 +122,10 @@ public final class MinecraftWorldProvider implements WorldProvider {
     WorldContext context = Objects.requireNonNull(captured.value());
     return inspectOnServer(
         context,
-        "world.nearby_containers.inspect",
+        "world.nearby_container_snapshots.inspect",
         access ->
-            ToolResult.success(findNearbyContainers(query, context.playerPosition(), access)));
+            ToolResult.success(
+                findNearbyContainerSnapshots(query, context.playerPosition(), access)));
   }
 
   @Override
@@ -177,22 +195,30 @@ public final class MinecraftWorldProvider implements WorldProvider {
 
   static NearbyContainerResult findNearbyContainers(
       NearbyContainerQuery query, Position playerPosition, LoadedContainerAccess access) {
+    NearbyContainerSnapshotResult snapshots =
+        findNearbyContainerSnapshots(query, playerPosition, access);
+    return new NearbyContainerResult(
+        snapshots.radius(),
+        snapshots.limit(),
+        snapshots.truncated(),
+        snapshots.containers().stream().map(MinecraftWorldProvider::summary).toList());
+  }
+
+  static NearbyContainerSnapshotResult findNearbyContainerSnapshots(
+      NearbyContainerQuery query, Position playerPosition, LoadedContainerAccess access) {
     List<NearbyPosition> positions = nearbyPositions(playerPosition, query.radius());
-    List<NearbyContainerSummary> containers = new ArrayList<>(query.limit() + 1);
+    List<BlockInfo> containers = new ArrayList<>(query.limit() + 1);
     for (NearbyPosition candidate : positions) {
       if (!access.loaded(candidate.position())) {
         continue;
       }
-      access
-          .inspect(candidate.position(), candidate.distance())
-          .map(MinecraftWorldProvider::summary)
-          .ifPresent(containers::add);
+      access.inspect(candidate.position(), candidate.distance()).ifPresent(containers::add);
       if (containers.size() > query.limit()) {
         break;
       }
     }
     boolean truncated = containers.size() > query.limit();
-    return new NearbyContainerResult(
+    return new NearbyContainerSnapshotResult(
         query.radius(),
         query.limit(),
         truncated,

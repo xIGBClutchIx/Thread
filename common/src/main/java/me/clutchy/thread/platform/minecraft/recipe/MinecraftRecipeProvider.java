@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,6 +18,7 @@ import me.clutchy.thread.core.model.recipe.RecipeInfo;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.RecipeProvider;
+import me.clutchy.thread.core.service.item.ItemTextMatcher;
 import me.clutchy.thread.core.tool.ToolResult;
 import me.clutchy.thread.platform.minecraft.game.MinecraftProviderLimits;
 import me.clutchy.thread.platform.minecraft.game.MinecraftProviderSupport;
@@ -198,7 +198,6 @@ public final class MinecraftRecipeProvider implements RecipeProvider {
 
   static ItemSearchResult searchRegistry(String query, int limit) {
     String normalizedQuery = query.strip();
-    String[] terms = normalizedQuery.toLowerCase(Locale.ROOT).split("\\s+");
     List<ItemInfo> matches = new ArrayList<>();
     var definitions =
         BuiltInRegistries.ITEM.entrySet().stream()
@@ -207,7 +206,7 @@ public final class MinecraftRecipeProvider implements RecipeProvider {
     for (var entry : definitions) {
       String canonicalId = entry.getKey().identifier().toString();
       String displayName = Component.translatable(entry.getValue().getDescriptionId()).getString();
-      if (matches(terms, canonicalId, displayName)) {
+      if (ItemTextMatcher.matches(normalizedQuery, canonicalId, displayName, null)) {
         matches.add(new ItemInfo(canonicalId, displayName));
         if (matches.size() > limit) {
           break;
@@ -279,18 +278,6 @@ public final class MinecraftRecipeProvider implements RecipeProvider {
         .filter(stack -> !stack.isEmpty())
         .filter(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).equals(targetId))
         .findFirst();
-  }
-
-  private static boolean matches(String[] terms, String itemId, String displayName) {
-    String haystack =
-        (itemId + " " + itemId.replace('_', ' ').replace(':', ' ') + " " + displayName)
-            .toLowerCase(Locale.ROOT);
-    for (String term : terms) {
-      if (!haystack.contains(term)) {
-        return false;
-      }
-    }
-    return true;
   }
 
   private static <T> ToolResult<T> failure(ToolErrorCode code, String message, boolean retryable) {

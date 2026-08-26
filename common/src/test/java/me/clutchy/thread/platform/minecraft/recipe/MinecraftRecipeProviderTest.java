@@ -3,6 +3,7 @@ package me.clutchy.thread.platform.minecraft.recipe;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import me.clutchy.thread.core.model.item.ItemSearchResult;
 import me.clutchy.thread.platform.minecraft.testing.MinecraftTestBootstrap;
 import org.junit.jupiter.api.BeforeAll;
@@ -31,5 +32,13 @@ class MinecraftRecipeProviderTest {
     assertEquals(2, first.items().size());
     assertTrue(first.truncated());
     assertEquals(first, second);
+  }
+
+  @Test
+  void exactRegistryIdSearchDoesNotIncludeLongerIds() {
+    ItemSearchResult result = MinecraftRecipeProvider.searchRegistry("minecraft:diamond", 10);
+
+    assertEquals(
+        List.of("minecraft:diamond"), result.items().stream().map(item -> item.itemId()).toList());
   }
 }

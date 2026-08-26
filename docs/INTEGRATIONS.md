@@ -38,10 +38,11 @@ detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT
 maps must never be returned. Their stable extension IDs use the `minecraft.*` namespace.
 
 The same block-entity inspector registry serves targeted-block details,
-`minecraft.get_nearby_containers`, and `minecraft.inspect_container`. A contributed inspector that
-recognizes a custom machine can therefore make it discoverable and inspectable through the existing
-bounded provider path. It must still avoid chunk loading, world mutation, unresolved loot access,
-and unbounded payloads. Base Thread contains no third-party machine logic.
+`minecraft.get_nearby_containers`, `minecraft.inspect_container`, and the container side of
+`minecraft.find_item`. A contributed inspector that recognizes a custom machine can therefore make
+it discoverable, inspectable, and searchable through the existing bounded provider path. It must
+still avoid chunk loading, world mutation, unresolved loot access, and unbounded payloads. Base
+Thread contains no third-party machine logic.
 
 ## Internal implementation surface
 
@@ -55,6 +56,8 @@ promises:
 - `IntegrationExtensionRegistry` and `CompositeRecipeProvider`;
 - loader integration catalogs/environments, shared Minecraft provider/enricher
   registries, client runtime/lifecycle wiring, configuration, and MCP classes;
+- `ItemFinder` and `ItemSource`, which are transport-independent internal composition types but not
+  yet a registered external storage contribution point;
 - the built-in `VanillaIntegration` implementation.
 
 External packages should not construct registries, loaders, platform providers, or transports.

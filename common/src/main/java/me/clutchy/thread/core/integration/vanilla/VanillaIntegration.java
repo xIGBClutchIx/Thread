@@ -18,6 +18,8 @@ import me.clutchy.thread.core.model.game.GameInfo;
 import me.clutchy.thread.core.model.game.SessionStatus;
 import me.clutchy.thread.core.model.item.ItemSearchQuery;
 import me.clutchy.thread.core.model.item.ItemSearchResult;
+import me.clutchy.thread.core.model.item.find.FindItemQuery;
+import me.clutchy.thread.core.model.item.find.FindItemResult;
 import me.clutchy.thread.core.model.player.EquipmentSnapshot;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
@@ -36,6 +38,7 @@ import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.serialization.JsonCodec;
 import me.clutchy.thread.core.service.CraftingPlanner;
 import me.clutchy.thread.core.service.CraftingService;
+import me.clutchy.thread.core.service.item.ItemFinder;
 import me.clutchy.thread.core.tool.EmptyInput;
 import me.clutchy.thread.core.tool.GameTool;
 import me.clutchy.thread.core.tool.ToolCapabilities;
@@ -55,6 +58,7 @@ public final class VanillaIntegration implements ThreadIntegration {
   private final RecipeProvider recipes;
   private final CraftingService crafting;
   private final CraftingPlanner craftingPlanner;
+  private final ItemFinder itemFinder;
   private final Predicate<ToolId> enabledTools;
   private final Supplier<CapabilitiesSnapshot> capabilities;
 
@@ -72,6 +76,7 @@ public final class VanillaIntegration implements ThreadIntegration {
     this.recipes = Objects.requireNonNull(recipes, "recipes");
     crafting = new CraftingService(player, recipes);
     craftingPlanner = new CraftingPlanner(player, recipes, crafting);
+    itemFinder = ItemFinder.vanilla(player, world);
     this.enabledTools = Objects.requireNonNull(enabledTools, "enabledTools");
     this.capabilities = Objects.requireNonNull(capabilities, "capabilities");
   }
@@ -106,6 +111,7 @@ public final class VanillaIntegration implements ThreadIntegration {
     register(context, canCraft());
     register(context, getMissingIngredients());
     register(context, getCraftingPlan());
+    register(context, findItem());
     register(context, searchItems());
     register(context, getCapabilities());
   }
@@ -280,6 +286,20 @@ public final class VanillaIntegration implements ThreadIntegration {
         JsonCodec.of(ItemSearchResult.class, VanillaToolSchemas.ITEM_SEARCH_RESULT),
         ToolCapabilities.alwaysAvailable(),
         input -> recipes.searchItems(input.query(), input.limit()));
+  }
+
+  private GameTool<FindItemQuery, FindItemResult> findItem() {
+    return tool(
+        "minecraft.find_item",
+        "Finds matching live items across the player's main inventory, offhand and armor, plus "
+            + "bounded nearby loaded containers. Results aggregate counts by item and source with "
+            + "deterministic slots, container positions, and distances; unopened loot is skipped "
+            + "and crafting tools still use only the player's main inventory. Use this to locate "
+            + "items without moving them or changing crafting calculations.",
+        JsonCodec.of(FindItemQuery.class, VanillaToolSchemas.FIND_ITEM_QUERY),
+        JsonCodec.of(FindItemResult.class, VanillaToolSchemas.FIND_ITEM_RESULT),
+        ToolCapabilities.supportedSingleplayer(),
+        itemFinder::find);
   }
 
   private GameTool<EmptyInput, CapabilitiesSnapshot> getCapabilities() {

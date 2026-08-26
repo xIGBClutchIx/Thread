@@ -4,6 +4,7 @@ import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -25,6 +26,12 @@ public interface WorldProvider {
    * the local player.
    */
   ToolResult<NearbyContainerResult> nearbyContainers(NearbyContainerQuery query);
+
+  /**
+   * Returns full safe snapshots from the same bounded loaded-container scan for internal read-only
+   * consumers such as unified item search.
+   */
+  ToolResult<NearbyContainerSnapshotResult> nearbyContainerSnapshots(NearbyContainerQuery query);
 
   /** Returns full safe inspection data for one nearby loaded container position. */
   ToolResult<BlockInfo> inspectContainer(ContainerInspectionQuery query);

@@ -19,6 +19,7 @@ import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
+import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.Position;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -94,6 +95,49 @@ class MinecraftWorldProviderTest {
     assertEquals(1, result.containers().size());
     assertTrue(result.truncated());
     assertTrue(access.inspections() > 1);
+  }
+
+  @Test
+  void fullSnapshotsPreserveBoundedContainerItemsAndDistanceOrder() {
+    Position origin = new Position(0.5, 64.5, 0.5);
+    FakeContainerAccess access = new FakeContainerAccess();
+    ItemStackInfo coal = item("minecraft:coal", "Coal", 5, 64);
+    access.add(
+        new BlockPosition(4, 64, 0),
+        container("minecraft:barrel", 27, List.of(new BlockEntityItemInfo("4", coal))));
+    access.add(
+        new BlockPosition(1, 64, 0),
+        container("minecraft:chest", 27, List.of(new BlockEntityItemInfo("2", coal))));
+
+    NearbyContainerSnapshotResult result =
+        MinecraftWorldProvider.findNearbyContainerSnapshots(
+            new NearbyContainerQuery(8, 8), origin, access);
+
+    assertEquals(
+        List.of("minecraft:chest", "minecraft:barrel"),
+        result.containers().stream().map(BlockInfo::blockId).toList());
+    assertEquals("2", result.containers().getFirst().blockEntity().items().getFirst().slot());
+    assertEquals(5, result.containers().getFirst().blockEntity().items().getFirst().item().count());
+  }
+
+  @Test
+  void fullSnapshotsSkipUnloadedAndOutOfRadiusContainers() {
+    Position origin = new Position(0.5, 64.5, 0.5);
+    FakeContainerAccess access = new FakeContainerAccess();
+    BlockPosition loaded = new BlockPosition(1, 64, 0);
+    BlockPosition unloaded = new BlockPosition(2, 64, 0);
+    BlockPosition outOfRange = new BlockPosition(9, 64, 0);
+    access.add(loaded, container("minecraft:chest", 27, List.of()));
+    access.add(unloaded, container("minecraft:barrel", 27, List.of()));
+    access.add(outOfRange, container("minecraft:hopper", 5, List.of()));
+    access.unload(unloaded);
+
+    NearbyContainerSnapshotResult result =
+        MinecraftWorldProvider.findNearbyContainerSnapshots(
+            new NearbyContainerQuery(8, 8), origin, access);
+
+    assertEquals(
+        List.of("minecraft:chest"), result.containers().stream().map(BlockInfo::blockId).toList());
   }
 
   @Test
