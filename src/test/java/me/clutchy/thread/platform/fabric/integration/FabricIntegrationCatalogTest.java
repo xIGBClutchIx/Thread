@@ -11,11 +11,6 @@ import org.junit.jupiter.api.Test;
 
 class FabricIntegrationCatalogTest {
   @Test
-  void baseArtifactDoesNotBundleOptionalIntegrationCandidates() {
-    assertEquals(0, FabricIntegrationCatalog.bundledCandidates().size());
-  }
-
-  @Test
   void collectsExternalCandidateMetadataAndIsolatesBrokenProviders() {
     IntegrationCandidate candidate =
         new IntegrationCandidate(

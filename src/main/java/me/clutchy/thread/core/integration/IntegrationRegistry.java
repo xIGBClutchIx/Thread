@@ -12,6 +12,9 @@ import java.util.function.Predicate;
 import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.error.DuplicateRegistrationException;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
+import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
+import me.clutchy.thread.core.model.capability.IntegrationCapability;
+import me.clutchy.thread.core.model.capability.IntegrationMetadataEntry;
 import me.clutchy.thread.core.tool.ToolRegistry;
 
 /**
@@ -89,6 +92,25 @@ public final class IntegrationRegistry {
     return List.copyOf(integrations.values());
   }
 
+  /** Returns the current tool and integration catalog as a detached capability snapshot. */
+  public synchronized CapabilitiesSnapshot capabilities(String threadVersion) {
+    List<String> toolIds = tools.descriptors().stream().map(tool -> tool.id().toString()).toList();
+    List<IntegrationCapability> activeIntegrations =
+        integrations.values().stream()
+            .map(
+                info ->
+                    new IntegrationCapability(
+                        info.id().toString(),
+                        info.version(),
+                        info.metadata().entrySet().stream()
+                            .map(
+                                entry ->
+                                    new IntegrationMetadataEntry(entry.getKey(), entry.getValue()))
+                            .toList()))
+            .toList();
+    return new CapabilitiesSnapshot(threadVersion, true, toolIds, activeIntegrations);
+  }
+
   private IntegrationActivation activateCandidate(
       IntegrationCandidate candidate,
       boolean duplicateCandidate,
@@ -157,7 +179,7 @@ public final class IntegrationRegistry {
       throw new DuplicateRegistrationException("integration", id.toString());
     }
 
-    IntegrationContext context = new IntegrationContext(id, tools, contexts, extensions, this);
+    IntegrationContext context = new IntegrationContext(id, tools, contexts, extensions);
     integration.register(context);
     context.prepareCommit();
     IntegrationInfo info =

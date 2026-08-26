@@ -1,7 +1,6 @@
 package me.clutchy.thread.core.tool;
 
 import java.util.Objects;
-import java.util.Optional;
 import me.clutchy.thread.core.error.ToolError;
 
 /**
@@ -33,15 +32,5 @@ public record ToolResult<T>(T value, ToolError error) {
   /** Returns whether this result contains a successful value. */
   public boolean successful() {
     return error == null;
-  }
-
-  /** Returns the successful value when present. */
-  public Optional<T> optionalValue() {
-    return Optional.ofNullable(value);
-  }
-
-  /** Returns the error when present. */
-  public Optional<ToolError> optionalError() {
-    return Optional.ofNullable(error);
   }
 }

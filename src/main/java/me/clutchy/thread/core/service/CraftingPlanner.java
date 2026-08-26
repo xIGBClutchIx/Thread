@@ -26,9 +26,9 @@ import me.clutchy.thread.core.tool.ToolResult;
 
 /** Builds bounded, deterministic recursive crafting plans from detached provider snapshots. */
 public final class CraftingPlanner {
-  public static final int DEFAULT_MAX_DEPTH = 32;
-  public static final int DEFAULT_MAX_STEPS = 512;
-  public static final int DEFAULT_MAX_BRANCHES = 4096;
+  static final int DEFAULT_MAX_DEPTH = 32;
+  static final int DEFAULT_MAX_STEPS = 512;
+  static final int DEFAULT_MAX_BRANCHES = 4096;
   private static final int MAX_REQUIRED_UNITS = 1_000_000;
   private static final int MAX_INGREDIENT_GROUPS = 512;
   private static final int MAX_ALTERNATIVES_PER_INGREDIENT = 512;
@@ -52,8 +52,8 @@ public final class CraftingPlanner {
     this(players, recipes, crafting, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STEPS, DEFAULT_MAX_BRANCHES);
   }
 
-  /** Creates a planner with explicit internal safety limits, primarily for bounded deployments. */
-  public CraftingPlanner(
+  /** Creates a planner with explicit safety limits for focused boundary tests. */
+  CraftingPlanner(
       PlayerProvider players,
       RecipeProvider recipes,
       CraftingService crafting,

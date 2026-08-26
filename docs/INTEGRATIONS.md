@@ -1,72 +1,61 @@
 # Thread Integrations
 
-Thread's base artifact contains native Minecraft/Fabric support and public integration hooks. It
-does not contain adapters for third-party gameplay mods, recipe viewers, quest systems, storage
-networks, or automation mods.
+Thread Integrations are separately distributed optional Fabric mods that contribute read-only
+capabilities to base Thread. The base JAR contains native Minecraft/Fabric support and the extension
+contracts, but no third-party gameplay-mod or recipe-viewer adapter.
 
-## Distribution model
+## Supported external API
 
-The intended direction is:
+The supported loader-neutral integration surface is:
 
-```text
-Thread
-  -> native Minecraft/Fabric support
-  -> public integration hooks
+| Contract | Purpose |
+| --- | --- |
+| `ThreadIntegrationCandidateProvider` | Metadata-only `thread:integrations` entrypoint |
+| `IntegrationCandidate` | Stable ID, target mod, version requirement, and deferred implementation class name |
+| `IntegrationId` | Stable ordering/configuration/capability identity |
+| `ThreadIntegration` | Identity plus one transactional registration callback |
+| `IntegrationContext` | Contributes tools, contexts, recipes, typed extensions, and capability metadata |
+| `GameTool` / `ContextProvider` | Read-only core tool and bounded context contracts |
+| `IntegrationRecipeProvider` | Optional detached recipe contribution |
+| `IntegrationExtensionPoint` | Typed extension key |
+| `CoreIntegrationExtensionPoints` | Core-owned extension keys such as recipe providers |
 
-Thread Integrations
-  -> separate optional mods/packages
-  -> JEI
-  -> FTB Quests
-  -> Create
-  -> AE2
-  -> other third-party integrations
-```
+These contracts expose only Java and Thread core types. They do not expose Fabric, Minecraft, MCP,
+or target-mod types.
 
-**Thread Integrations** is the umbrella concept for future separately distributed adapters. No
-`thread-jei` or other integration package is created by the current cleanup slice, and installing a
-third-party mod beside base Thread does not activate support automatically.
+Thread also provides advanced Fabric-edge contracts for integrations that must inspect an already
+selected Minecraft object:
 
-This separation keeps the base artifact dependency-light, prevents recipe-viewer or gameplay-mod
-APIs from entering Thread core, and lets players install only the adapters their modpack needs.
+- `FabricIntegrationExtensionPoints`;
+- `FabricBlockEntityInspector`;
+- `FabricBlockEnricher`;
+- `FabricEntityEnricher`.
 
-## Native recipe base
+Those interfaces are deliberately platform-specific, live under `platform.fabric`, and are not
+portable core API. They may accept Minecraft inputs on the owning logical thread, but contributions
+must return detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and
+component maps must never be returned.
 
-`FabricRecipeProvider` reads the integrated server's final live `RecipeManager` on its owning
-logical thread. The result includes vanilla definitions plus active datapack and Fabric-mod recipe
-additions, replacements, and removals after reload. Thread does not ship or consult a static vanilla
-recipe catalog.
+## Internal implementation surface
 
-The base read always happens first so the centralized single-player guard and recipe limits remain
-authoritative. `CompositeRecipeProvider` can then consider contributed
-`IntegrationRecipeProvider` values in stable integration-ID order. The first successful provider
-with at least one recipe wins for that item. Empty results, controlled failures, runtime exceptions,
-and linkage failures preserve the captured native result unchanged.
+The following types may be public for cross-package wiring or tests but are not external API
+promises:
 
-Base Thread registers no optional recipe provider, so its recipe lookup, craftability,
-missing-ingredient analysis, and recursive planner all consume the live native result.
+- `IntegrationRegistry`, `IntegrationInfo`, `IntegrationActivation`, and
+  `IntegrationActivationStatus`;
+- `IntegrationEnvironment`, `IntegrationLoader`, `IntegrationLoadException`, and
+  `ReflectiveIntegrationLoader`;
+- `IntegrationExtensionRegistry` and `CompositeRecipeProvider`;
+- `FabricIntegrationCatalog`, `FabricIntegrationEnvironment`, provider/enricher registries, client
+  lifecycle wiring, configuration, and MCP classes;
+- the built-in `VanillaIntegration` implementation.
 
-## Public integration framework
+External packages should not construct registries, loaders, platform providers, or transports.
+Their stable entry is the Fabric candidate provider followed by the `ThreadIntegration` callback.
 
-The generic framework remains part of Thread:
+## Packaging and discovery
 
-- `ThreadIntegration` defines a stable integration identity and one transactional registration
-  callback.
-- `IntegrationCandidate` and `IntegrationRegistry.discover` defer implementation class loading
-  until configuration, target-mod presence, and version compatibility checks pass.
-- `IntegrationContext` can contribute read-only tools, bounded contexts, recipe providers, typed
-  extensions, and bounded capability metadata.
-- `IntegrationExtensionRegistry` keeps contribution ordering deterministic and isolates optional
-  recipe/enrichment failures from native behavior.
-- `disabledIntegrations` rejects an exact integration ID before its implementation class is loaded.
-
-Successful registration commits all contributions together. A duplicate, callback failure,
-construction failure, or linkage failure leaves no partial registration and does not prevent a
-healthy later candidate from activating. Active integrations and their contribution metadata are
-derived from the live registry and exposed by `minecraft.get_capabilities`.
-
-The base Fabric catalog's bundled-candidate list is intentionally empty. Separately distributed
-packages connect through the `thread:integrations` Fabric entrypoint. Its entrypoint class implements
-`ThreadIntegrationCandidateProvider` and returns only `IntegrationCandidate` metadata:
+An external JAR declares a metadata-only entrypoint:
 
 ```json
 {
@@ -91,19 +80,58 @@ public final class ExampleCandidateProvider implements ThreadIntegrationCandidat
 }
 ```
 
-The candidate provider is loaded before target-mod compatibility is known, so it must depend only
-on Thread contracts and must not import or initialize target-mod APIs. Thread isolates a broken
-provider, collects healthy candidate metadata, applies `disabledIntegrations`, mod presence, and
-version checks, then reflectively constructs the named no-argument `ThreadIntegration`
-implementation. The actual implementation may depend on the target mod because it is not resolved
-until those checks pass.
+The candidate provider loads before target compatibility is known. It must import only Thread
+contracts and have no target-mod side effects. Thread isolates a broken provider and continues
+collecting candidates from other external JARs.
 
-## Third-party boundary
+For each candidate, Thread checks in this order:
 
-Integration packages must convert optional-mod and Minecraft objects into detached Thread
-DTOs before crossing core/provider contracts. They must retain Thread's read-only, single-player,
-threading, bounded-query, and no-forced-chunk-loading rules. Core services, tool contracts, and MCP
-transport must remain unaware of the third-party API that supplied a contribution.
+1. the stable integration ID is enabled;
+2. the target mod is loaded;
+3. the target version satisfies the candidate requirement;
+4. `ReflectiveIntegrationLoader` resolves and constructs the named no-argument implementation;
+5. the implementation registers its contributions transactionally.
 
-JEI, FTB Quests, Create, AE2, EMI, REI, Mekanism, and other third-party systems are not currently
-supported by the base Thread artifact.
+The reflective loader is intentional. A class-name string is the narrow mechanism that prevents an
+absent optional API from being verified or linked before presence/version checks. Do not replace it
+with a class literal, eager `ServiceLoader`, or catalog import.
+
+## Transactional registration
+
+`ThreadIntegration.register` receives one short-lived `IntegrationContext`. Contributions become
+visible only after the callback and all duplicate/contract validation succeed. Callback,
+construction, linkage, duplicate, or metadata failures leave no partial registration and do not
+stop later candidates.
+
+Integrations must not retain the context, start generic background workers, or assume start/stop/
+reload callbacks. Add lifecycle only when a concrete external integration proves and tests that
+need.
+
+Capability metadata is bounded and derived from committed contributions. `minecraft.get_capabilities`
+therefore reports only active integrations and their usable surfaces.
+
+## Recipe behavior
+
+`FabricRecipeProvider` reads the integrated server's final live `RecipeManager` first. That native
+result establishes the authoritative single-player guard and query limits.
+
+`CompositeRecipeProvider` then evaluates external `IntegrationRecipeProvider` contributions in
+stable integration-ID order. The first successful non-empty result may replace the native result
+for that item. Empty results, controlled failures, runtime exceptions, and linkage errors preserve
+the already-captured native fallback. Core crafting services and MCP never know which source won.
+
+## Integration requirements
+
+Every external Thread Integration must:
+
+- remain read-only and single-player-only;
+- use the owning Minecraft logical thread;
+- keep scans, results, metadata, and payloads bounded;
+- avoid force-loading chunks or resolving hidden/unopened state;
+- convert target-mod and Minecraft objects to Thread DTOs at the platform edge;
+- isolate optional dependency failures and preserve native fallback behavior;
+- test absence, disabled configuration, incompatible versions, class/linkage failures,
+  transactional rollback, and unchanged vanilla behavior.
+
+JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, and similar systems are not supported by the base
+artifact. Each requires its own separately versioned and tested integration JAR.

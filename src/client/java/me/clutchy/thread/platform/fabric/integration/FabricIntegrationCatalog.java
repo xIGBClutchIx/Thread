@@ -22,12 +22,11 @@ public final class FabricIntegrationCatalog {
 
   private static final System.Logger LOGGER =
       System.getLogger(FabricIntegrationCatalog.class.getName());
-  private static final List<IntegrationCandidate> BUNDLED_CANDIDATES = List.of();
 
   private FabricIntegrationCatalog() {}
 
   /**
-   * Returns bundled and external candidates; registry discovery applies stable ID ordering.
+   * Returns external candidates; registry discovery applies stable ID ordering.
    *
    * @param loader active Fabric Loader instance
    * @return detached candidate metadata
@@ -44,14 +43,10 @@ public final class FabricIntegrationCatalog {
     return candidatesFromProviders(providers);
   }
 
-  static List<IntegrationCandidate> bundledCandidates() {
-    return BUNDLED_CANDIDATES;
-  }
-
   static List<IntegrationCandidate> candidatesFromProviders(
       List<? extends Supplier<ThreadIntegrationCandidateProvider>> providers) {
     Objects.requireNonNull(providers, "providers");
-    List<IntegrationCandidate> candidates = new ArrayList<>(BUNDLED_CANDIDATES);
+    List<IntegrationCandidate> candidates = new ArrayList<>();
     for (Supplier<ThreadIntegrationCandidateProvider> providerSupplier : providers) {
       try {
         ThreadIntegrationCandidateProvider provider =

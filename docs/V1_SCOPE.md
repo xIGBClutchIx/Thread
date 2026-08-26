@@ -20,8 +20,8 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
 
-These versions were selected and pinned during Slice 0. V1 does not attempt multi-version
-compatibility. Minecraft 26.2 requires Java 25, which is also the project toolchain.
+V1 does not attempt multi-version compatibility. Minecraft 26.2 requires Java 25, which is also the
+project toolchain.
 
 ## In scope
 

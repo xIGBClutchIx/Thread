@@ -1,19 +1,17 @@
 package me.clutchy.thread.core.integration.vanilla;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.ThreadIntegration;
 import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
-import me.clutchy.thread.core.model.capability.IntegrationCapability;
-import me.clutchy.thread.core.model.capability.IntegrationMetadataEntry;
 import me.clutchy.thread.core.model.crafting.CraftingPlan;
 import me.clutchy.thread.core.model.crafting.CraftingResult;
 import me.clutchy.thread.core.model.game.GameInfo;
@@ -38,7 +36,6 @@ import me.clutchy.thread.core.service.CraftingService;
 import me.clutchy.thread.core.tool.EmptyInput;
 import me.clutchy.thread.core.tool.GameTool;
 import me.clutchy.thread.core.tool.ToolCapabilities;
-import me.clutchy.thread.core.tool.ToolDescriptor;
 import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolResult;
 
@@ -56,12 +53,7 @@ public final class VanillaIntegration implements ThreadIntegration {
   private final CraftingService crafting;
   private final CraftingPlanner craftingPlanner;
   private final Predicate<ToolId> enabledTools;
-
-  /** Creates the vanilla catalog over explicit loader-neutral providers. */
-  public VanillaIntegration(
-      GameProvider game, PlayerProvider player, WorldProvider world, RecipeProvider recipes) {
-    this(game, player, world, recipes, ignored -> true);
-  }
+  private final Supplier<CapabilitiesSnapshot> capabilities;
 
   /** Creates a vanilla catalog filtered before tools enter discovery or invocation registries. */
   public VanillaIntegration(
@@ -69,7 +61,8 @@ public final class VanillaIntegration implements ThreadIntegration {
       PlayerProvider player,
       WorldProvider world,
       RecipeProvider recipes,
-      Predicate<ToolId> enabledTools) {
+      Predicate<ToolId> enabledTools,
+      Supplier<CapabilitiesSnapshot> capabilities) {
     this.game = Objects.requireNonNull(game, "game");
     this.player = Objects.requireNonNull(player, "player");
     this.world = Objects.requireNonNull(world, "world");
@@ -77,6 +70,7 @@ public final class VanillaIntegration implements ThreadIntegration {
     crafting = new CraftingService(player, recipes);
     craftingPlanner = new CraftingPlanner(player, recipes, crafting);
     this.enabledTools = Objects.requireNonNull(enabledTools, "enabledTools");
+    this.capabilities = Objects.requireNonNull(capabilities, "capabilities");
   }
 
   @Override
@@ -108,7 +102,7 @@ public final class VanillaIntegration implements ThreadIntegration {
     register(context, getMissingIngredients());
     register(context, getCraftingPlan());
     register(context, searchItems());
-    register(context, getCapabilities(context));
+    register(context, getCapabilities());
   }
 
   private GameTool<EmptyInput, SessionStatus> getStatus() {
@@ -257,7 +251,7 @@ public final class VanillaIntegration implements ThreadIntegration {
         input -> recipes.searchItems(input.query(), input.limit()));
   }
 
-  private GameTool<EmptyInput, CapabilitiesSnapshot> getCapabilities(IntegrationContext context) {
+  private GameTool<EmptyInput, CapabilitiesSnapshot> getCapabilities() {
     return tool(
         "minecraft.get_capabilities",
         "Returns Thread's actual registered read-only tools and active game integrations. Use this "
@@ -265,7 +259,7 @@ public final class VanillaIntegration implements ThreadIntegration {
         emptyInputCodec(),
         JsonCodec.of(CapabilitiesSnapshot.class, VanillaToolSchemas.CAPABILITIES),
         ToolCapabilities.alwaysAvailable(),
-        ignored -> ToolResult.success(capabilities(context)));
+        ignored -> ToolResult.success(capabilities.get()));
   }
 
   private ToolResult<BlockInfo> targetBlock() {
@@ -289,26 +283,6 @@ public final class VanillaIntegration implements ThreadIntegration {
     return map(
         recipes.recipesFor(input.itemId()),
         matches -> new RecipeLookupResult(input.itemId(), matches));
-  }
-
-  private CapabilitiesSnapshot capabilities(IntegrationContext context) {
-    List<String> toolIds =
-        context.activeTools().stream().map(ToolDescriptor::id).map(Object::toString).toList();
-    List<IntegrationCapability> activeIntegrations =
-        context.activeIntegrations().stream()
-            .map(
-                info ->
-                    new IntegrationCapability(
-                        info.id().toString(),
-                        info.version(),
-                        info.metadata().entrySet().stream()
-                            .map(
-                                entry ->
-                                    new IntegrationMetadataEntry(entry.getKey(), entry.getValue()))
-                            .toList()))
-            .toList();
-    return new CapabilitiesSnapshot(
-        game.gameInfo().threadVersion(), true, toolIds, activeIntegrations);
   }
 
   private static JsonCodec<EmptyInput> emptyInputCodec() {

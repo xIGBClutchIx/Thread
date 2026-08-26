@@ -20,6 +20,8 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
   while Minecraft's live recipe manager remains the guarded base and fallback.
 - Defined **Thread Integrations** as future separately distributed optional mods/packages rather
   than code bundled into the base Thread artifact.
+- Consolidated contributor documentation around the current V1 system and narrowed unused internal
+  API surface without changing tool behavior.
 
 ### Removed
 

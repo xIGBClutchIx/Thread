@@ -428,7 +428,13 @@ class VanillaIntegrationTest {
     IntegrationRegistry integrations =
         new IntegrationRegistry(tools, new ContextRegistry(), new IntegrationExtensionRegistry());
     integrations.register(
-        new VanillaIntegration(game, player, new FakeWorldProvider(), recipes, enabledTools));
+        new VanillaIntegration(
+            game,
+            player,
+            new FakeWorldProvider(),
+            recipes,
+            enabledTools,
+            () -> integrations.capabilities(game.gameInfo().threadVersion())));
     return new Catalog(tools, integrations);
   }
 

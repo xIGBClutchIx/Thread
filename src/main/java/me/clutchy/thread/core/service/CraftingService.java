@@ -73,7 +73,7 @@ public final class CraftingService {
   }
 
   /** Returns recipe definitions in Thread's stable variant order. */
-  public List<RecipeInfo> orderedRecipes(List<RecipeInfo> recipeDefinitions) {
+  List<RecipeInfo> orderedRecipes(List<RecipeInfo> recipeDefinitions) {
     Objects.requireNonNull(recipeDefinitions, "recipeDefinitions");
     return recipeDefinitions.stream()
         .map(recipe -> Objects.requireNonNull(recipe, "recipeDefinitions entry"))
@@ -87,7 +87,7 @@ public final class CraftingService {
    * <p>The recursive planner uses this method so direct assessments and planned steps share the
    * same alternative-aware maximum-flow allocation.
    */
-  public RecipeCraftability assessRecipe(
+  RecipeCraftability assessRecipe(
       int variant, RecipeInfo recipe, int executions, Map<String, Integer> availableItems) {
     Objects.requireNonNull(recipe, "recipe");
     Objects.requireNonNull(availableItems, "availableItems");

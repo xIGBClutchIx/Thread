@@ -1,170 +1,98 @@
-# Thread MCP Notes
+# Thread MCP Transport
 
-## V1 role of MCP
+MCP is Thread's first external transport, not its domain model. The adapter maps JSON-RPC requests
+to `ToolRegistry` and has no Minecraft or Fabric dependency.
 
-MCP is Thread's first external transport. It is not the core domain model.
+## Selected implementation
 
-Thread core owns:
+Thread implements its narrow tools-only Streamable HTTP surface with the JDK `jdk.httpserver`
+module and Minecraft-provided Gson. It has no MCP SDK or additional HTTP runtime dependency.
 
-- tools
-- schemas/models
-- providers
-- capabilities
-- execution
-- errors
+The default endpoint is `http://127.0.0.1:25580/mcp`. Every message is an independent HTTP POST;
+Thread creates no protocol session, never emits or requires `Mcp-Session-Id`, and exposes no GET/SSE
+stream endpoint.
 
-The MCP adapter owns:
+The same endpoint supports two interoperable openings:
 
-- protocol/server lifecycle
-- MCP tool discovery mapping
-- MCP call mapping
-- protocol-specific schema/result/error translation
-- HTTP transport details
+### Initialization flow
 
-## Protocol target
+1. `initialize` with `params.protocolVersion`, `params.capabilities`, and `params.clientInfo`;
+2. Thread returns the negotiated version, server identity, tools capability, and instructions;
+3. `notifications/initialized` returns HTTP 202;
+4. later `tools/list` and `tools/call` requests include `MCP-Protocol-Version`.
 
-The Slice 0 investigation was refreshed immediately before Slice 4 on 2026-08-24.
+This is the standard Streamable HTTP flow used by Codex. `initialize` does not require the protocol
+header because it negotiates that value. Thread accepts `2026-07-28` and the initialization-era
+`2025-11-25` value used by compatible clients.
 
-As of 2026-08-24:
+### Stateless discovery flow
 
-- the current MCP specification is `2026-07-28`;
-- that revision moves the core toward stateless request/response semantics;
-- Streamable HTTP is the relevant HTTP transport direction;
-- legacy HTTP+SSE is deprecated;
-- Roots, Sampling, and Logging are deprecated in the core and are unnecessary for Thread V1;
-- Thread V1 only needs the tools surface.
+Clients that implement MCP `2026-07-28` stateless discovery can call `server/discover`, then
+`tools/list` and `tools/call`, with `MCP-Protocol-Version: 2026-07-28` on each request.
 
-## Java SDK compatibility caveat
+Discovery returns the tools capability, instructions, supported versions, a 60-second TTL, public
+cache scope, and server identity under `result._meta.io.modelcontextprotocol/serverInfo`.
+`tools/list` returns the same server metadata and cache hints.
 
-As of 2026-08-24, the official MCP Java SDK active 2.0.x line has released 2.0.1 but still reports
-support for the `2025-11-25` MCP specification, not `2026-07-28`.
+Thread does not require custom `Mcp-Method`, `Mcp-Name`, or per-request `_meta` mirrors. Those older
+Thread-specific validation experiments are not part of the transport contract.
 
-Therefore Slice 0 must make an explicit decision rather than assuming the Java SDK is current.
+## Tool mapping
 
-Acceptable V1 strategies include:
+- `tools/list` is generated from stable `ToolRegistry` descriptors.
+- Each descriptor includes its input/output schemas and read-only, non-destructive, idempotent,
+  closed-world annotations.
+- `tools/call` accepts a registered name and an object-valued `arguments` field.
+- Input is validated by the core codec before execution; serialized output is checked against the
+  declared output schema.
+- Successes and tool failures include both JSON text content and `structuredContent`.
+- Tool failures stay structured Thread errors; malformed JSON-RPC, protocol, and unknown-tool
+  requests use JSON-RPC errors.
 
-### A. Use the official Java SDK behind an adapter
+MCP never contains crafting, session, or Minecraft query logic. It invokes only the registry.
 
-Use it if interoperability with target MCP clients is confirmed for the V1 subset.
+## HTTP and security rules
 
-Pros:
+- Bind addresses must be explicit IPv4/IPv6 loopback values.
+- Only `POST /mcp` is accepted.
+- Browser `Origin`, when present, must be HTTP(S) loopback with no credentials, path, query, or
+  fragment.
+- `Content-Type` must be `application/json`.
+- `Accept` must include both `application/json` and `text/event-stream`, as required by Streamable
+  HTTP negotiation, even though Thread returns JSON for its request/response-only surface.
+- Request bodies are capped at the configured size: 1 MiB by default and 8 MiB hard maximum.
+- Concurrent requests are bounded: 8 by default and 32 hard maximum. Excess work receives HTTP 503.
+- Provider dispatch uses the configured game-thread deadline and returns structured timeout or
+  lifecycle errors.
+- Logs contain only response status, duration, and unexpected exception class. They never include
+  request bodies, tool arguments, inventories, world results, or exception messages.
+- Responses set `X-Content-Type-Options: nosniff`.
 
-- less protocol code
-- official implementation
-- existing Streamable HTTP support
-- schema/validation helpers
+Configuration may disable MCP or choose another loopback port, but it cannot enable remote binding
+or exceed hard ceilings.
 
-Cons:
+## Lifecycle
 
-- spec revision lag
-- protocol-specific types must be carefully contained
+The Fabric client entrypoint starts MCP only after vanilla and external integration registration has
+produced the final tool registry. A bind failure is logged without taking down Minecraft. The
+Fabric client-stopping event closes the listener and its virtual-thread executor; tests verify clean
+shutdown and same-port restart.
 
-### B. Implement the minimal current MCP tools subset in `transport/mcp`
+## Tests that protect compatibility
 
-Only consider this if the official SDK cannot interoperate cleanly with the target clients.
+The real local HTTP tests cover:
 
-Pros:
+- `initialize` -> `notifications/initialized` -> `tools/list`;
+- stateless `server/discover` -> `tools/list` -> `tools/call`;
+- protocol negotiation and required post-initialization headers;
+- request envelope, JSON, content negotiation, origin, size, and concurrency failures;
+- tool schemas, annotations, structured success/error mapping, disconnects, and shutdown.
 
-- current protocol behavior can be targeted directly
-- no wait for SDK release
+The packaged client game test repeats initialization and calls all thirteen tools against the
+actual remapped mod JAR in a temporary single-player world.
 
-Cons:
+## Deliberately absent MCP features
 
-- more protocol/security/testing responsibility
-- greater risk of subtle incompatibility
-
-### C. External sidecar bridge
-
-Not preferred for V1 unless JVM transport constraints make embedded MCP unreasonable.
-
-A sidecar could translate MCP <-> a private Thread local API, but it adds packaging and lifecycle complexity for players.
-
-## Selected V1 approach
-
-The released official Java SDK is not selected for the V1 runtime. Thread's tools-only surface is
-small enough to implement with the JDK HTTP server and Gson already supplied by Minecraft.
-
-The initial Slice 4 implementation exposed only the stateless `2026-07-28` flow. Live Codex
-verification showed that Codex opens Streamable HTTP servers with `initialize` and therefore loaded
-zero tools when Thread rejected that method. Thread now implements both supported openings on the
-same endpoint: Codex's `initialize`/`notifications/initialized` sequence and stateless
-`server/discover`. Both converge on the same `tools/list` and `tools/call` handlers.
-
-Re-evaluate the SDK before changing the adapter. A stable release with verified `2026-07-28`
-interoperability may replace the narrow wire implementation without changing core APIs.
-
-## Slice 4 implementation
-
-- `McpHttpServer` uses the JDK `jdk.httpserver` module; Thread adds no MCP or HTTP runtime library.
-- The endpoint is `http://127.0.0.1:25580/mcp` by default and only accepts loopback listener
-  options.
-- Each message is an independent HTTP POST. `initialize` returns protocol version, server identity,
-  tools capability, and instructions; `notifications/initialized` returns HTTP 202.
-- Initialization does not create server-side session state. `Mcp-Session-Id` is ignored and never
-  minted or echoed. Legacy GET/SSE endpoints and server-to-client feature surfaces are absent.
-- Ordinary initialized requests require the standard `MCP-Protocol-Version` header. They do not
-  require custom `Mcp-Method`, `Mcp-Name`, or per-request protocol `_meta` mirrors.
-- `server/discover` advertises only the tools capability and includes Thread name/version metadata.
-- `tools/list` is derived directly from deterministic `ToolRegistry` descriptors, including input
-  schema, output schema, and read-only annotations.
-- `tools/call` invokes only `ToolRegistry.invoke`; transport code imports no Fabric or Minecraft
-  types.
-- Successful and tool-error results include text content plus structured JSON. Unknown tools and
-  malformed protocol requests use JSON-RPC errors.
-- The Fabric client entrypoint starts the listener after tool registration and closes it from
-  `ClientLifecycleEvents.CLIENT_STOPPING`.
-- Unit tests cover a real initialize-to-tool-list sequence, HTTP/protocol validation, structured
-  mapping, disconnects, shutdown, and same-port restart. The Fabric client game test performs the
-  initialization sequence and all required release scenarios through the real HTTP listener.
-
-## Slice 5 hardening
-
-- `config/thread.json` persists listener enablement, explicit loopback host, port, registered tool
-  selectors, provider result limits, request size, game-thread deadline, and request concurrency.
-- Disabled tools are filtered before registration, so `tools/list`, invocation, and
-  `minecraft.get_capabilities` all share the same catalog.
-- Configuration cannot opt into a non-loopback listener or exceed Thread's hard safety ceilings.
-- A semaphore bounds concurrently handled requests. Excess work receives a controlled HTTP 503;
-  accepted work runs on lightweight virtual threads without an unbounded platform-thread pool.
-- Client and integrated-server dispatch use the configured deadline. Timed-out futures are
-  cancelled and returned as retryable `TIMEOUT` tool errors; lifecycle-time task rejection is a
-  retryable `NOT_AVAILABLE` result.
-- Transport diagnostics record only status, duration, and unexpected exception class. Request
-  bodies, tool arguments, exception messages, inventories, and world results are not logged.
-
-## Transport and security
-
-- bind only to `127.0.0.1`/loopback in V1
-- validate browser `Origin` values against loopback hosts
-- accept negotiated `2026-07-28` or initialization-era `2025-11-25` protocol headers
-- do not depend on nonstandard mirrored method/name or per-request protocol metadata
-- cap request bodies at the configured value (1 MiB by default, with a fixed 8 MiB hard ceiling)
-- bound concurrent requests (8 by default, with a fixed ceiling of 32)
-- do not log complete inventories/world results at normal log levels
-- validate input schemas before reaching providers
-- enforce Thread's own query limits even if protocol/client validation exists
-
-## MCP surface for V1
-
-Expose tools only.
-
-Do not add V1 complexity for:
-
-- MCP Apps
-- prompts
-- sampling
-- roots
-- tasks
-- elicitation
-- remote OAuth flows
-- public discovery
-
-Those can be reconsidered when there is a concrete product use case.
-
-## References checked for this plan
-
-- MCP 2026-07-28 release: https://blog.modelcontextprotocol.io/posts/2026-07-28/
-- MCP roadmap update, 2026-08-22: https://blog.modelcontextprotocol.io/posts/mcp-roadmap/
-- Official Java SDK: https://github.com/modelcontextprotocol/java-sdk
-- Java SDK changelog: https://github.com/modelcontextprotocol/java-sdk/blob/main/CHANGELOG.md
-- Java SDK 2.0.x/OpenAI discovery incompatibility: https://github.com/modelcontextprotocol/java-sdk/issues/1072
+V1 exposes tools only. It does not implement MCP Apps, prompts, roots, sampling, tasks, elicitation,
+logging, OAuth, remote discovery, server-to-client requests, protocol sessions, or legacy HTTP+SSE.
+Add one only for a concrete product requirement and keep it behind the transport boundary.

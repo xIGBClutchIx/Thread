@@ -29,7 +29,6 @@ public final class IntegrationContext {
   private final ToolRegistry activeTools;
   private final ContextRegistry activeContexts;
   private final IntegrationExtensionRegistry activeExtensions;
-  private final IntegrationRegistry activeIntegrations;
   private final ToolRegistry stagedToolValidation = new ToolRegistry();
   private final ContextRegistry stagedContextValidation = new ContextRegistry();
   private final List<GameTool<?, ?>> stagedTools = new ArrayList<>();
@@ -43,18 +42,11 @@ public final class IntegrationContext {
       IntegrationId integrationId,
       ToolRegistry activeTools,
       ContextRegistry activeContexts,
-      IntegrationExtensionRegistry activeExtensions,
-      IntegrationRegistry activeIntegrations) {
+      IntegrationExtensionRegistry activeExtensions) {
     this.integrationId = Objects.requireNonNull(integrationId, "integrationId");
     this.activeTools = Objects.requireNonNull(activeTools, "activeTools");
     this.activeContexts = Objects.requireNonNull(activeContexts, "activeContexts");
     this.activeExtensions = Objects.requireNonNull(activeExtensions, "activeExtensions");
-    this.activeIntegrations = Objects.requireNonNull(activeIntegrations, "activeIntegrations");
-  }
-
-  /** Returns the stable ID of the integration currently contributing. */
-  public IntegrationId integrationId() {
-    return integrationId;
   }
 
   /** Stages one transport-independent read-only tool. */
@@ -105,21 +97,6 @@ public final class IntegrationContext {
     if (metadata.putIfAbsent(validatedKey, validatedValue) != null) {
       throw new DuplicateRegistrationException("integration metadata", validatedKey);
     }
-  }
-
-  /** Returns active tool descriptors; the view is resolved each time it is called. */
-  public List<ToolDescriptor> activeTools() {
-    return activeTools.descriptors();
-  }
-
-  /** Returns active context descriptors; the view is resolved each time it is called. */
-  public List<ContextDescriptor> activeContexts() {
-    return activeContexts.descriptors();
-  }
-
-  /** Returns active integration metadata in stable ID order. */
-  public List<IntegrationInfo> activeIntegrations() {
-    return activeIntegrations.integrations();
   }
 
   void prepareCommit() {

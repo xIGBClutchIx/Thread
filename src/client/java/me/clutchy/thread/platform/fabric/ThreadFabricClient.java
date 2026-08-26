@@ -2,20 +2,21 @@ package me.clutchy.thread.platform.fabric;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import me.clutchy.thread.config.ThreadConfig;
 import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.context.ContextRegistry;
-import me.clutchy.thread.core.integration.IntegrationActivation;
 import me.clutchy.thread.core.integration.IntegrationRegistry;
 import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
 import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
+import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
+import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
+import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.platform.fabric.game.FabricGameProvider;
 import me.clutchy.thread.platform.fabric.game.FabricProviderLimits;
@@ -46,7 +47,6 @@ public final class ThreadFabricClient implements ClientModInitializer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-  private FabricProviderBundle providers;
   private ToolRegistry tools;
   private IntegrationRegistry integrations;
   private McpHttpServer mcpServer;
@@ -80,37 +80,39 @@ public final class ThreadFabricClient implements ClientModInitializer {
                 client, clientThread, sessionGuard, limits, mapper, gameThreadTimeout),
             extensionRegistry);
 
-    providers =
-        new FabricProviderBundle(
-            new FabricGameProvider(client, clientThread, versions.gameInfo()),
-            new FabricPlayerProvider(
-                client,
-                clientThread,
-                sessionGuard,
-                mapper,
-                blockEntityInspectors,
-                blockEnrichers,
-                gameThreadTimeout),
-            new FabricWorldProvider(
-                client, clientThread, sessionGuard, limits, mapper, entityEnrichers),
-            recipeProvider);
+    GameProvider gameProvider = new FabricGameProvider(client, clientThread, versions.gameInfo());
+    PlayerProvider playerProvider =
+        new FabricPlayerProvider(
+            client,
+            clientThread,
+            sessionGuard,
+            mapper,
+            blockEntityInspectors,
+            blockEnrichers,
+            gameThreadTimeout);
+    WorldProvider worldProvider =
+        new FabricWorldProvider(
+            client, clientThread, sessionGuard, limits, mapper, entityEnrichers);
 
     ToolRegistry toolRegistry = new ToolRegistry();
     IntegrationRegistry integrationRegistry =
         new IntegrationRegistry(toolRegistry, new ContextRegistry(), extensionRegistry);
     integrationRegistry.register(
         new VanillaIntegration(
-            providers.game(),
-            providers.player(),
-            providers.world(),
-            providers.recipe(),
-            config::toolEnabled));
-    List<IntegrationActivation> optionalIntegrations =
-        integrationRegistry.discover(
-            FabricIntegrationCatalog.candidates(loader),
-            new FabricIntegrationEnvironment(loader),
-            config::integrationEnabled,
-            new ReflectiveIntegrationLoader(ThreadFabricClient.class.getClassLoader()));
+            gameProvider,
+            playerProvider,
+            worldProvider,
+            recipeProvider,
+            config::toolEnabled,
+            () -> integrationRegistry.capabilities(versions.threadVersion())));
+    int optionalIntegrationCount =
+        integrationRegistry
+            .discover(
+                FabricIntegrationCatalog.candidates(loader),
+                new FabricIntegrationEnvironment(loader),
+                config::integrationEnabled,
+                new ReflectiveIntegrationLoader(ThreadFabricClient.class.getClassLoader()))
+            .size();
     tools = toolRegistry;
     integrations = integrationRegistry;
 
@@ -128,7 +130,7 @@ public final class ThreadFabricClient implements ClientModInitializer {
     LOGGER.debug(
         "Thread integrations initialized ({} active, {} optional candidates)",
         integrations.integrations().size(),
-        optionalIntegrations.size());
+        optionalIntegrationCount);
   }
 
   private void startMcpServer(ThreadConfig config, String threadVersion) {
@@ -177,10 +179,6 @@ public final class ThreadFabricClient implements ClientModInitializer {
           exception.getClass().getSimpleName());
       return ThreadConfig.defaults();
     }
-  }
-
-  FabricProviderBundle providers() {
-    return Objects.requireNonNull(providers, "providers have not been initialized");
   }
 
   ToolRegistry tools() {

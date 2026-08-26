@@ -13,14 +13,9 @@ public record McpServerOptions(
     int maxConcurrentRequests,
     String serverName,
     String serverVersion) {
-  /** Default local port. */
-  public static final int DEFAULT_PORT = 25_580;
+  static final int DEFAULT_MAX_REQUEST_BYTES = 1_048_576;
 
-  /** Default HTTP request-body safety bound. */
-  public static final int DEFAULT_MAX_REQUEST_BYTES = 1_048_576;
-
-  /** Default number of simultaneously handled MCP requests. */
-  public static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 8;
+  static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 8;
 
   public McpServerOptions {
     Objects.requireNonNull(bindAddress, "bindAddress");
@@ -44,19 +39,8 @@ public record McpServerOptions(
     }
   }
 
-  /** Returns the V1 loopback listener defaults for the supplied Thread version. */
-  public static McpServerOptions loopbackDefaults(String serverVersion) {
-    return new McpServerOptions(
-        ipv4Loopback(),
-        DEFAULT_PORT,
-        DEFAULT_MAX_REQUEST_BYTES,
-        DEFAULT_MAX_CONCURRENT_REQUESTS,
-        "Thread",
-        serverVersion);
-  }
-
-  /** Returns loopback options using an ephemeral port, primarily for isolated tests. */
-  public static McpServerOptions ephemeral(String serverVersion) {
+  /** Returns loopback options using an ephemeral port for isolated transport tests. */
+  static McpServerOptions ephemeral(String serverVersion) {
     return new McpServerOptions(
         ipv4Loopback(),
         0,
