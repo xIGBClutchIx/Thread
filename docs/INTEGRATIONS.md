@@ -86,16 +86,16 @@ The candidate provider loads before target compatibility is known. It must impor
 contracts and have no target-mod side effects. Thread isolates a broken provider and continues
 collecting candidates from other external JARs.
 
-An external NeoForge JAR lists the same provider in the standard Java service file
+An external NeoForge or Forge JAR lists the same provider in the standard Java service file
 `META-INF/services/me.clutchy.thread.core.integration.ThreadIntegrationCandidateProvider`:
 
 ```text
 example.thread.integration.ExampleCandidateProvider
 ```
 
-The provider class uses the same Java API shown above. NeoForge candidate requirements use Maven
-version-range syntax such as `[1.0,2.0)`; Fabric candidates use Fabric Loader predicate syntax such
-as `>=1 <2`. Implementations remain class-name strings on both loaders.
+The provider class uses the same Java API shown above. NeoForge and Forge candidate requirements use
+Maven version-range syntax such as `[1.0,2.0)`; Fabric candidates use Fabric Loader predicate syntax
+such as `>=1 <2`. Implementations remain class-name strings on all loaders.
 
 For each candidate, Thread checks in this order:
 
@@ -107,7 +107,7 @@ For each candidate, Thread checks in this order:
 
 The reflective loader is intentional. A class-name string is the narrow mechanism that prevents an
 absent optional API from being verified or linked before presence/version checks. Java
-`ServiceLoader` is used only to collect NeoForge candidate-provider metadata; it never constructs
+`ServiceLoader` is used only to collect NeoForge/Forge candidate-provider metadata; it never constructs
 the deferred integration implementation. Do not replace the implementation class name with a class
 literal or eager implementation import.
 

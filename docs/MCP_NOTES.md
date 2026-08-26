@@ -76,7 +76,7 @@ or exceed hard ceilings.
 The shared `ThreadRuntime` starts MCP only after vanilla and external integration registration has
 produced the final tool registry. Each loader entrypoint requests that start and logs a bind
 failure without taking down Minecraft. Loader shutdown events close the shared runtime and
-listener; tests verify clean shutdown and same-port restart on both loaders.
+listener; tests verify clean shutdown and same-port restart on all three loaders.
 
 ## Tests that protect compatibility
 
@@ -91,7 +91,7 @@ The real local HTTP tests cover:
 Packaged client tests repeat initialization against each actual loader-specific JAR. A shared
 loader-neutral parity fixture verifies the exact catalog, exercises all thirteen tool paths across
 the menu/world/menu lifecycle, and repeats representative status, player, recipe, and crafting
-calls through MCP on both Fabric and NeoForge.
+calls through MCP on Fabric, NeoForge, and Forge.
 
 ## Deliberately absent MCP features
 

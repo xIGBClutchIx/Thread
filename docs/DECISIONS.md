@@ -11,28 +11,28 @@ not the core API.
 
 ## V1 is deliberately narrow
 
-V1 is Java 25, Fabric/NeoForge client, Minecraft 26.2, single-player, read-only, bounded, and loopback-only.
+V1 is Java 25, Fabric/NeoForge/Forge client, Minecraft 26.2, single-player, read-only, bounded, and loopback-only.
 Gameplay tools reject multiplayer before exposing state. `minecraft.get_status` remains available
 from every client state as the safe preflight.
 
 Thread does not implement remote access, authentication, actions, dedicated-server behavior,
-Forge, a universal artifact, or multiple Minecraft versions until those products have their own trust and
+a universal artifact, or multiple Minecraft versions until those products have their own trust and
 compatibility designs.
 
 ## Common and loader adapters are separate modules without a portability framework
 
 `:common` owns core, configuration, MCP, runtime assembly, and Minecraft-facing code that can run
-unchanged across client loaders. `:fabric` and `:neoforge` own only their entrypoint, Loader API,
+unchanged across client loaders. `:fabric`, `:neoforge`, and `:forge` own only their entrypoint, Loader API,
 lifecycle, config-path, version-predicate, and integration-discovery wiring. Each release JAR merges
 common classes; common is not installed or published independently.
 
-Both entrypoints resolve those loader-specific values and call `ThreadRuntime.start`. Configuration
+All three entrypoints resolve those loader-specific values and call `ThreadRuntime.start`. Configuration
 fallback, reflective integration activation, MCP bind handling, startup diagnostics, and resource
 close behavior are one shared lifecycle rather than parallel loader implementations.
 
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
 component map, or optional-mod type. Shared Minecraft adapters convert live game objects into
-detached DTOs. MCP maps only the tool registry. Common source has no Fabric imports or runtime
+detached DTOs. MCP maps only the tool registry. Common source has no loader imports or runtime
 dependencies.
 
 Thread does not use Architectury or a custom platform god object, and it does not wrap every
@@ -46,7 +46,7 @@ Java type documentation belongs on public types and architecture documentation b
 ## Versions and dependencies are pinned
 
 The V1 baseline is Minecraft 26.2, Java 25, Fabric Loader 0.19.3, Fabric API 0.154.0+26.2, NeoForge
-26.2.0.62, Loom 1.17.19, ModDevGradle 2.0.144, Gradle 9.5.1, Spotless 8.10.0,
+26.2.0.62, Forge 65.1.2, Loom 1.17.19, ModDevGradle 2.0.144, ForgeGradle 7.0.35, Gradle 9.5.1, Spotless 8.10.0,
 google-java-format 1.36.0, Checkstyle 14.0.0, and JUnit 6.1.2.
 
 Minecraft supplies Gson 2.14.0. Thread uses it behind explicit Thread-owned JSON schemas rather
@@ -73,11 +73,11 @@ globally optimize all combinations, or craft items.
 
 ## Optional integrations load metadata first
 
-Third-party adapters ship as separate Thread Integrations JARs. Their Fabric entrypoint or NeoForge
+Third-party adapters ship as separate Thread Integrations JARs. Their Fabric entrypoint or NeoForge/Forge
 Java service returns only `IntegrationCandidate` metadata. Thread applies enabled, mod-presence, and version checks before
 `ReflectiveIntegrationLoader` resolves the implementation class name.
 
-Reflection is retained specifically to prevent absent optional APIs from linking early. NeoForge
+Reflection is retained specifically to prevent absent optional APIs from linking early. NeoForge and Forge
 uses `ServiceLoader` only for metadata providers; eager implementation imports and class literals
 would break that guarantee.
 
@@ -106,6 +106,6 @@ Legacy GET/SSE and non-tool MCP feature surfaces are absent.
 Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and
 three packaged-client runs per loader are mandatory. Each normal test uses the final runtime JAR in
 a real temporary single-player world; restart proves persisted configuration reload, and disabled
-startup proves tools initialize without MCP. Both loader proof mods compile one shared parity
+startup proves tools initialize without MCP. All three loader proof mods compile one shared parity
 fixture for the exact catalog, config, lifecycle, MCP, recipes/crafting, and integration contract;
 only their launch mechanics remain separate. A release is not validated by compilation alone.

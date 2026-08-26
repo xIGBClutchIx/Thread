@@ -13,9 +13,10 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 ## V1 target
 
 - Minecraft Java Edition
-- Fabric and NeoForge client loaders
+- Fabric, NeoForge, and Forge client loaders
 - Java implementation
-- Minecraft 26.2 with either Fabric Loader 0.19.3 plus Fabric API 0.154.0+26.2, or NeoForge 26.2.0.62
+- Minecraft 26.2 with Fabric Loader 0.19.3 plus Fabric API 0.154.0+26.2, NeoForge
+  26.2.0.62, or Forge 65.1.2
 - Local MCP access only by default
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
@@ -55,7 +56,7 @@ project toolchain.
 
 ### Engineering baseline
 
-- Gradle `:common`/`:fabric`/`:neoforge` separation with one JAR per supported loader
+- Gradle `:common`/`:fabric`/`:neoforge`/`:forge` separation with one JAR per supported loader
 - meaningful comments for non-obvious implementation decisions
 - Javadocs on public Thread contracts/extension points
 - Spotless formatting
@@ -77,7 +78,6 @@ project toolchain.
 
 ## Explicitly out of scope
 
-- Forge
 - Quilt
 - multiple Minecraft versions
 - custom in-game AI/chat screen

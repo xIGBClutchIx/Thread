@@ -48,6 +48,12 @@ jobs:
                   verifyNeoForgeRestartProductionClientGameTest
                   verifyNeoForgeMcpDisabledProductionClientGameTest
 
+            - name: Test packaged Forge artifact
+              run: >-
+                  xvfb-run -a ./gradlew --no-daemon
+                  verifyForgeRestartProductionClientGameTest
+                  verifyForgeMcpDisabledProductionClientGameTest
+
             - name: Upload release bundle
               uses: actions/upload-artifact@v4
               with:

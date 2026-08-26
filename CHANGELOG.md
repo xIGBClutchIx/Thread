@@ -6,6 +6,8 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Forge 65.1.2 support with a thin loader adapter, Java-service integration discovery, a separate
+  release JAR, and the same real packaged-client lifecycle/MCP/recipe proofs as the other loaders.
 - NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate
   release JAR, and real packaged-client lifecycle/MCP/recipe tests.
 - Deterministic direct craftability, missing-ingredient analysis, and bounded recursive crafting
@@ -13,14 +15,14 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
 - Loader-specific metadata discovery for separately distributed Thread Integrations packages:
-  `thread:integrations` on Fabric and standard Java services on NeoForge.
+  `thread:integrations` on Fabric and standard Java services on NeoForge and Forge.
 
 ### Changed
 
 - Consolidated loader-neutral config, startup, MCP, logging, and shutdown behavior in the shared
-  runtime, with one packaged parity contract exercised by both Fabric and NeoForge.
-- Split the project into `:common`, `:fabric`, and `:neoforge`, moved loader-neutral Minecraft
-  providers and runtime assembly into common, and kept both loader adapters limited to
+  runtime, with one packaged parity contract exercised by Fabric, NeoForge, and Forge.
+- Split the project into `:common`, `:fabric`, `:neoforge`, and `:forge`, moved loader-neutral Minecraft
+  providers and runtime assembly into common, and kept all loader adapters limited to
   loader/lifecycle/discovery wiring.
 - Renamed Minecraft-facing integration extension contracts from Fabric-specific names/IDs to
   loader-neutral `Minecraft*` contracts and `minecraft.*` extension IDs.

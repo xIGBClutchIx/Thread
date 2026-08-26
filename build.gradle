@@ -2,6 +2,7 @@ plugins {
     id 'base'
     id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
     id 'net.neoforged.moddev' version "${moddev_version}" apply false
+    id 'net.minecraftforge.gradle' version "${forgegradle_version}" apply false
     id 'com.diffplug.spotless' version "${spotless_version}"
 }
 
@@ -23,7 +24,7 @@ apply from: 'gradle/release.gradle'
 tasks.register('test') {
     group = 'verification'
     description = 'Runs unit tests in every Thread module.'
-    dependsOn ':common:test', ':fabric:test', ':neoforge:test'
+    dependsOn ':common:test', ':fabric:test', ':neoforge:test', ':forge:test'
 }
 
 tasks.register('runClientGameTest') {
@@ -38,6 +39,12 @@ tasks.register('runNeoForgeClient') {
     dependsOn ':neoforge:runClient'
 }
 
+tasks.register('runForgeClient') {
+    group = 'verification'
+    description = 'Runs the Forge development client.'
+    dependsOn ':forge:runClient'
+}
+
 [
         'runProductionClientGameTest',
         'runRestartProductionClientGameTest',
@@ -46,6 +53,17 @@ tasks.register('runNeoForgeClient') {
     tasks.register(taskName) {
         group = 'verification'
         dependsOn ":fabric:${taskName}"
+    }
+}
+
+[
+        'verifyForgeProductionClientGameTest',
+        'verifyForgeRestartProductionClientGameTest',
+        'verifyForgeMcpDisabledProductionClientGameTest'
+].each { taskName ->
+    tasks.register(taskName) {
+        group = 'verification'
+        dependsOn ":forge:${taskName}"
     }
 }
 

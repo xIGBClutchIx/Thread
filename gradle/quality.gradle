@@ -1,6 +1,7 @@
 spotless {
     java {
-        target 'common/src/**/*.java', 'fabric/src/**/*.java', 'neoforge/src/**/*.java'
+        target 'common/src/**/*.java', 'fabric/src/**/*.java', 'neoforge/src/**/*.java',
+                'forge/src/**/*.java'
         googleJavaFormat(project.google_java_format_version)
         removeUnusedImports()
         forbidWildcardImports()
@@ -11,9 +12,10 @@ spotless {
     format 'repositoryFiles', {
         target '*.gradle', 'gradle/**/*.gradle', '*.properties', '*.md', '*.json', '*.yml',
                 '*.yaml', '.github/**/*.yml', '.github/**/*.yaml', 'common/**/*.gradle',
-                'fabric/**/*.gradle', 'neoforge/**/*.gradle', 'config/**/*.xml', 'docs/**/*.md',
+                'fabric/**/*.gradle', 'neoforge/**/*.gradle', 'forge/**/*.gradle',
+                'config/**/*.xml', 'docs/**/*.md',
                 'common/src/**/*.json', 'fabric/src/**/*.json', 'neoforge/src/**/*.json',
-                'neoforge/src/**/*.toml'
+                'forge/src/**/*.json', 'neoforge/src/**/*.toml', 'forge/src/**/*.toml'
         targetExclude '.gradle/**', '**/build/**', 'run/**'
         trimTrailingWhitespace()
         endWithNewline()

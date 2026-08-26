@@ -4,7 +4,7 @@ Thread is a read-only Minecraft context server for AI clients. It exposes struct
 running single-player world through MCP without embedding an AI model or automating gameplay.
 
 Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fabric API
-0.154.0+26.2, or NeoForge 26.2.0.62. V1 is single-player-only and bound to loopback.
+0.154.0+26.2, NeoForge 26.2.0.62, or Forge 65.1.2. V1 is single-player-only and bound to loopback.
 
 ## What it exposes
 
@@ -25,10 +25,10 @@ scan the wider world, use nearby storage, or mutate game state.
 
 ## Install
 
-1. Install Minecraft 26.2 with Java 25 using either Fabric Loader 0.19.3 and Fabric API
-   0.154.0+26.2, or NeoForge 26.2.0.62.
-2. Put the matching `thread-fabric-0.1.0.jar` or `thread-neoforge-0.1.0.jar` in your instance's
-   `mods` folder. Do not install both.
+1. Install Minecraft 26.2 with Java 25 using Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2,
+   NeoForge 26.2.0.62, or Forge 65.1.2.
+2. Put the matching `thread-fabric-0.1.0.jar`, `thread-neoforge-0.1.0.jar`, or
+   `thread-forge-0.1.0.jar` in your instance's `mods` folder. Install only one Thread JAR.
 3. Launch Minecraft. Thread starts its MCP server automatically.
 
 ## Connect an MCP client
@@ -87,7 +87,7 @@ Set `mcpEnabled` to `false` to initialize Thread without opening the HTTP listen
 - **The configuration is rejected:** Thread preserves the invalid file and starts with safe
   defaults. Correct the field named in the Minecraft log, then restart the game.
 - **Minecraft reports incompatible mods:** Use the exact Minecraft, Java, and selected-loader
-  versions listed under Install. Fabric requires Fabric API; NeoForge does not. Install only the
+  versions listed under Install. Fabric requires Fabric API; NeoForge and Forge do not. Install only the
   Thread JAR for that loader.
 - **No listener is expected:** `mcpEnabled: false` keeps the tools initialized inside Thread but
   intentionally does not open an HTTP endpoint.
@@ -95,7 +95,7 @@ Set `mcpEnabled` to `false` to initialize Thread without opening the HTTP listen
 ## Thread Integrations
 
 The base artifact includes no third-party gameplay-mod or recipe-viewer adapter. Separate optional
-mods can use the metadata-only `thread:integrations` Fabric entrypoint or NeoForge Java service
+mods can use the metadata-only `thread:integrations` Fabric entrypoint or NeoForge/Forge Java service
 provider and Thread's public, transactional contribution contracts. Target-mod types remain
 outside Thread core and MCP.
 
@@ -115,8 +115,8 @@ multiplayer. Other gameplay tools require a supported integrated single-player s
 
 ## Development
 
-The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior plus thin `:fabric`
-and `:neoforge` adapters. Releases are separate loader JARs; there is no universal or Forge
+The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior plus thin `:fabric`,
+`:neoforge`, and `:forge` adapters. Releases are separate loader JARs; there is no universal
 artifact.
 
 Use the Gradle Wrapper. The normal local gate is:

@@ -1,14 +1,15 @@
 # Thread Build
 
-Thread uses a Gradle multi-project build with three modules:
+Thread uses a Gradle multi-project build with four modules:
 
 | Module | Purpose | Distributed |
 | --- | --- | --- |
 | `:common` | Core, configuration, MCP, shared runtime, and loader-neutral Minecraft providers | No |
 | `:fabric` | Fabric entrypoint, Loader API access, events, metadata, and integration discovery | Yes |
 | `:neoforge` | NeoForge entrypoint, Loader API access, events, metadata, and integration discovery | Yes |
+| `:forge` | Forge entrypoint, Loader API access, events, metadata, and integration discovery | Yes |
 
-Both loader modules depend on `:common`. Each JAR task merges common output into one installable
+All three loader modules depend on `:common`. Each JAR task merges common output into one installable
 client mod; the build does not create a universal multi-loader JAR.
 
 ## Common commands
@@ -27,13 +28,14 @@ Focused module commands are also available:
 .\gradlew.bat :common:test
 .\gradlew.bat :fabric:test
 .\gradlew.bat :neoforge:test
-.\gradlew.bat :common:compileJava :fabric:compileClientJava :neoforge:compileJava
+.\gradlew.bat :forge:test
+.\gradlew.bat :common:compileJava :fabric:compileClientJava :neoforge:compileJava :forge:compileJava
 ```
 
 The architecture suite runs in `:common:test` and inspects every source tree. It rejects loader
 imports in common, Minecraft/loader imports in core or MCP, cross-loader imports, and production
 Java outside each loader adapter package. Shared packaged assertions live under
-`common/src/gametest/java`; both loader test source sets compile them into their separate proof JARs,
+`common/src/gametest/java`; all loader test source sets compile them into their separate proof JARs,
 and the boundary suite verifies those fixtures contain no loader API imports.
 
 ## Outputs
@@ -46,6 +48,8 @@ build/release/thread-fabric-<version>.jar
 build/release/thread-fabric-<version>.jar.sha256
 build/release/thread-neoforge-<version>.jar
 build/release/thread-neoforge-<version>.jar.sha256
+build/release/thread-forge-<version>.jar
+build/release/thread-forge-<version>.jar.sha256
 ```
 
 `common/build/libs/thread-common-<version>.jar` is an internal build artifact. Do not install or
@@ -76,6 +80,17 @@ NeoForge has parallel packaged proofs:
 These stage `thread-neoforge-<version>.jar` plus a separately packaged external proof mod in a fresh
 `mods` directory while explicitly loading no Thread development source set.
 
-The Fabric and NeoForge launch tasks remain separate, but both execute the same loader-neutral
+Forge has the same packaged proof set:
+
+```powershell
+.\gradlew.bat verifyForgeProductionClientGameTest
+.\gradlew.bat verifyForgeRestartProductionClientGameTest
+.\gradlew.bat verifyForgeMcpDisabledProductionClientGameTest
+```
+
+These stage `thread-forge-<version>.jar` plus its external proof mod. The production JAR embeds
+common once; common is kept off Forge's runtime classpath so ModLauncher sees one Thread module.
+
+The Fabric, NeoForge, and Forge launch tasks remain separate, but all execute the same loader-neutral
 parity assertions for catalog, configuration, lifecycle state, MCP, tools, recipes, crafting, and
 integration behavior.

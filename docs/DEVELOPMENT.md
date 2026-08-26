@@ -5,17 +5,17 @@ releases.
 
 ## Module workflow
 
-Thread is built as `:common` plus thin `:fabric` and `:neoforge` adapters. Shared core,
+Thread is built as `:common` plus thin `:fabric`, `:neoforge`, and `:forge` adapters. Shared core,
 configuration, MCP, runtime assembly, and loader-neutral Minecraft providers belong in `:common`.
 Loader API access, lifecycle events, metadata, and integration discovery stay in their adapter.
-Both entrypoints call the same `ThreadRuntime.start` path after resolving those loader values.
+All three entrypoints call the same `ThreadRuntime.start` path after resolving those loader values.
 
 Root Gradle tasks aggregate all modules and remain the normal contributor interface. See
 [Build](BUILD.md) for module-specific commands and outputs.
 
 ## Source standards
 
-- Use Java 25 and the pinned Fabric and NeoForge toolchains.
+- Use Java 25 and the pinned Fabric, NeoForge, and Forge toolchains.
 - Do not add Kotlin, `package-info.java`, wildcard imports, or hidden global state.
 - Keep Minecraft, loader, core, and MCP dependencies inside their documented module boundaries.
 - Apply the portability rule literally: code that another loader can invoke unchanged stays in
@@ -31,7 +31,7 @@ should explain non-obvious lifecycle, logical-side, protocol, compatibility, or 
 do not narrate syntax or retain commented-out code.
 
 Third-party adapters belong in separate Thread Integrations artifacts. Their metadata-only Fabric
-entrypoint or NeoForge service provider must not link target-mod APIs. See
+entrypoint or NeoForge/Forge service provider must not link target-mod APIs. See
 [Thread Integrations](INTEGRATIONS.md).
 
 ## Formatting and static checks
@@ -52,7 +52,7 @@ change pass; narrow a noisy rule only when the code has a documented legitimate 
 
 ### Unit and architecture tests
 
-The root `test` task runs `:common:test`, `:fabric:test`, and `:neoforge:test`. They cover core
+The root `test` task runs `:common:test`, `:fabric:test`, `:neoforge:test`, and `:forge:test`. They cover core
 services, schemas, registries, configuration, integration activation/isolation, shared Minecraft
 conversion/support, loader-specific discovery/version handling, and the real loopback MCP HTTP
 server without launching Minecraft. Fake providers should prove core behavior whenever live
@@ -70,7 +70,7 @@ Important regression areas include:
 - MCP initialize and stateless discovery, protocol validation, request/origin limits, shutdown, and
   same-port restart;
 - package/import and release-artifact boundaries.
-- loader-to-common module direction, cross-loader isolation, and the absence of Fabric/NeoForge
+- loader-to-common module direction, cross-loader isolation, and the absence of Fabric/NeoForge/Forge
   imports in common or the shared packaged parity fixture.
 
 Run focused unit coverage with:
@@ -97,17 +97,20 @@ but is not the release proof.
 .\gradlew.bat verifyNeoForgeProductionClientGameTest
 .\gradlew.bat verifyNeoForgeRestartProductionClientGameTest
 .\gradlew.bat verifyNeoForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat verifyForgeProductionClientGameTest
+.\gradlew.bat verifyForgeRestartProductionClientGameTest
+.\gradlew.bat verifyForgeMcpDisabledProductionClientGameTest
 ```
 
 Each normal test launches a temporary client with the final loader-specific Thread JAR and a
-separately packaged proof integration/game-test mod. Both compile the same loader-neutral parity
+separately packaged proof integration/game-test mod. All three compile the same loader-neutral parity
 fixture from `common/src/gametest/java`. It verifies the exact thirteen-tool catalog, config,
 loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
 recipes and crafting, external integration activation, and controlled gameplay rejection at the
 menu.
 
 Launch control remains loader-specific because the APIs are genuinely different: Fabric uses the
-Fabric client game-test context, while NeoForge uses a bounded event-driven state machine. Fabric
+Fabric client game-test context, while NeoForge and Forge use bounded event-driven state machines. Fabric
 also retains richer deterministic payload assertions for inventory, equipment, target blocks, and
 entities; those are provider regression coverage, not a different loader contract.
 
@@ -126,6 +129,8 @@ Before committing a V1-complete change, run the release-equivalent gate from the
   runRestartProductionClientGameTest runMcpDisabledProductionClientGameTest `
   verifyNeoForgeRestartProductionClientGameTest `
   verifyNeoForgeMcpDisabledProductionClientGameTest `
+  verifyForgeRestartProductionClientGameTest `
+  verifyForgeMcpDisabledProductionClientGameTest `
   verifyReleaseVersion "-PreleaseTag=v0.1.0"
 git diff --check
 ```
@@ -134,7 +139,7 @@ Change the release tag argument when `mod_version` changes. Release versions and
 `MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH`, respectively. `verifyReleaseArtifact` rejects test
 classes, source files, and bundled third-party integrations while checking common contracts,
 shared runtime/provider classes, exactly one loader entrypoint, and loader metadata.
-`releaseBundle` writes both loader JARs and their SHA-256 files to `build/release/`. See
+`releaseBundle` writes all three loader JARs and their SHA-256 files to `build/release/`. See
 [Release](RELEASE.md) for the publishing checklist.
 
 ## Manual MCP smoke test

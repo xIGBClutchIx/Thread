@@ -3,25 +3,22 @@
 ## Module shape
 
 ```text
-:fabric
-    Fabric entrypoint, Loader API, lifecycle events, integration entrypoint discovery
-       |
-       v
+:fabric   -- Fabric entrypoint, lifecycle, and integration discovery --\
+:neoforge -- NeoForge entrypoint, lifecycle, and integration discovery ---> :common
+:forge    -- Forge entrypoint, lifecycle, and integration discovery -----/
+
 :common
     runtime assembly -> Minecraft providers -> core provider contracts
     MCP transport    -> tool registry      -> core services and DTOs
-       ^
-       |
-:neoforge
-    NeoForge entrypoint, Loader API, lifecycle events, Java-service candidate discovery
 ```
 
-The build produces two installable artifacts: `thread-fabric-<version>.jar` and
-`thread-neoforge-<version>.jar`. `:common` is an internal build module whose classes are merged into
-each loader JAR; it is not installed separately and there is no universal multi-loader JAR.
+The build produces three installable artifacts: `thread-fabric-<version>.jar`,
+`thread-neoforge-<version>.jar`, and `thread-forge-<version>.jar`. `:common` is an internal build
+module whose classes are merged into each loader JAR; it is not installed separately and there is
+no universal multi-loader JAR.
 
-Dependencies point from each loader adapter to `:common`. Common production source has no Fabric
-or NeoForge imports or runtime dependencies. The loader modules do not depend on one another.
+Dependencies point from each loader adapter to `:common`. Common production source has no Fabric,
+NeoForge, or Forge imports or runtime dependencies. The loader modules do not depend on one another.
 
 ## Common ownership
 
@@ -112,6 +109,17 @@ NeoForge does not maintain a second integrated-server lifecycle state. The share
 Minecraft's current integrated server for each bounded read, which is the same source used on
 Fabric and avoids loader-specific state drifting from the game.
 
+## Forge ownership
+
+`forge/src/main/java/me/clutchy/thread/platform/forge` is the equivalent thin Forge boundary. It
+owns the `@Mod` client bootstrap, `ModList` and Maven-version-range queries, `FMLPaths` config path,
+Forge client setup and shutdown events, and Java `ServiceLoader` candidate-provider discovery.
+Common output is compile-only for the adapter and embedded once in the final JAR so ModLauncher does
+not see common as a second module.
+
+Forge uses the same shared runtime and Minecraft providers as the other loaders. ForgeGradle launch
+metadata and packaged-test wiring stay local to `:forge`; no Forge API leaks into common.
+
 ## Loader behavior contract
 
 Every supported loader must hand its metadata, config path, integration candidates, environment,
@@ -130,9 +138,9 @@ Packaged parity coverage requires each loader to prove:
 - clean process exit so the listener can bind again on restart.
 
 The assertions are shared, but launch mechanics remain local: Fabric uses its client game-test API,
-while NeoForge drives its client lifecycle through NeoForge events and screens. Version parsing,
-candidate enumeration, config-path lookup, and shutdown event registration also remain local
-because those are genuine loader APIs rather than portable behavior.
+while NeoForge and Forge drive their client lifecycles through their own events and screens. Version
+parsing, candidate enumeration, config-path lookup, and shutdown event registration also remain
+local because those are genuine loader APIs rather than portable behavior.
 
 ## Session and threading rules
 
@@ -156,7 +164,7 @@ inventory item twice. `CraftingPlanner` uses one inventory/surplus ledger, activ
 detection, deterministic local variant scoring, and hard depth/work/quantity limits.
 
 External packages advertise metadata through the loader-specific catalog (`thread:integrations`
-on Fabric and a Java service provider on NeoForge). Common `IntegrationRegistry` performs enabled,
+on Fabric and a Java service provider on NeoForge or Forge). Common `IntegrationRegistry` performs enabled,
 mod-presence, version, reflective load, and transactional contribution handling. Shared Minecraft extension points use
 `MinecraftIntegrationExtensionPoints`; they accept Minecraft inputs on the owning thread and return
 detached Thread DTOs.
@@ -165,19 +173,20 @@ detached Thread DTOs.
 
 Architecture and release tests enforce that:
 
-- common production source imports no Fabric or NeoForge API;
+- common production source imports no Fabric, NeoForge, or Forge API;
 - core imports no Minecraft, loader, or MCP API;
 - MCP imports no Minecraft or loader API;
 - Fabric production code stays inside the Fabric adapter package;
 - NeoForge production code stays inside the NeoForge adapter package;
+- Forge production code stays inside the Forge adapter package;
 - only the supported JDK HTTP server uses `com.sun` APIs;
 - optional implementations remain deferred class-name strings;
 - each installable JAR contains common plus exactly one loader adapter, with no tests or bundled
   third-party adapter;
-- neither loader module imports or depends on the other loader implementation;
+- no loader module imports or depends on another loader implementation;
 - shared packaged parity fixtures import neither loader API;
 - each loader's packaged-client tests exercise its final JAR through menu/world/menu, restart, and
   MCP-disabled lifecycles.
 
-V1 remains Java-only, Fabric-and-NeoForge, read-only, single-player-only, bounded, and
-loopback-only. Forge and a universal artifact remain out of scope.
+V1 remains Java-only, Fabric/NeoForge/Forge, read-only, single-player-only, bounded, and
+loopback-only. A universal artifact remains out of scope.

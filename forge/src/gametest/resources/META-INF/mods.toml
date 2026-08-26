@@ -1,0 +1,16 @@
+modLoader="javafml"
+loaderVersion="[65,)"
+license="All Rights Reserved"
+clientSideOnly=true
+
+[[mods]]
+modId="thread_forge_gametest"
+version="1.0.0"
+displayName="Thread Forge Packaged Tests"
+
+[[dependencies.thread_forge_gametest]]
+modId="thread"
+mandatory=true
+versionRange="[0.1.0,)"
+ordering="AFTER"
+side="CLIENT"
