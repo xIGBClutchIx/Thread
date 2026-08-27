@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Read-only vanilla advancement awareness through `minecraft.get_advancements` and
+  `minecraft.get_advancement`, with live integrated-server progress, visible/known client gating,
+  criteria and timestamps, deterministic filters/search, and bounded results.
 - Opt-in `PLAYER_AND_NEARBY` scope for all three crafting analysis tools, with the existing
   player-only behavior retained by default, one consistent bounded source snapshot, structured
   container allocations, and explicit incomplete-discovery status.
@@ -23,7 +26,7 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 - NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate
   release JAR, and real packaged-client lifecycle/MCP/recipe tests.
 - Deterministic direct craftability, missing-ingredient analysis, and bounded recursive crafting
-  plans within the sixteen-tool read-only catalog.
+  plans within the read-only catalog.
 - Optional mod integration discovery with absent-mod-safe class loading, transactional
   contributions, typed recipe/block/entity extension points, and active integration metadata.
 - Loader-specific metadata discovery for separately distributed Thread Integrations packages:

@@ -2,6 +2,8 @@ package me.clutchy.thread.core.integration.vanilla;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import me.clutchy.thread.core.model.advancement.AdvancementInfo;
+import me.clutchy.thread.core.model.advancement.AdvancementListQuery;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
@@ -183,6 +185,51 @@ final class VanillaToolSchemas {
           property("nearbyContainersTruncated", bool()),
           property("unresolvedContainersSkipped", integer(0, null)),
           property("contentLimitedContainersSkipped", integer(0, null)));
+  private static final JsonObject ADVANCEMENT_CRITERION =
+      object(
+          property("name", string(1, 256, null)),
+          property("completed", bool()),
+          property("obtainedAt", nullable(string(1, 64, null))));
+  private static final JsonObject ADVANCEMENT_SUMMARY =
+      object(
+          property("advancementId", registryId()),
+          property("title", nullable(string(1, 512, null))),
+          property("description", nullable(string(1, 2_048, null))),
+          property("completed", bool()),
+          property("completionPercentage", number(0.0, 100.0)),
+          property("completedCriteria", integer(0, null)),
+          property("totalCriteria", integer(0, null)),
+          property("completedRequirements", integer(0, null)),
+          property("totalRequirements", integer(0, null)),
+          property("parentAdvancementId", nullable(registryId())),
+          property("tabAdvancementId", nullable(registryId())),
+          property("tabTitle", nullable(string(1, 512, null))),
+          property("displayType", nullableEnumString("TASK", "GOAL", "CHALLENGE")),
+          property("hidden", nullable(bool())),
+          property("firstProgressAt", nullable(string(1, 64, null))),
+          property("completedAt", nullable(string(1, 64, null))));
+  private static final JsonObject ADVANCEMENT_DETAILS =
+      object(
+          property("advancementId", registryId()),
+          property("title", nullable(string(1, 512, null))),
+          property("description", nullable(string(1, 2_048, null))),
+          property("completed", bool()),
+          property("completionPercentage", number(0.0, 100.0)),
+          property("completedCriteria", integer(0, null)),
+          property("totalCriteria", integer(0, null)),
+          property("completedRequirements", integer(0, null)),
+          property("totalRequirements", integer(0, null)),
+          property("criteriaTruncated", bool()),
+          property("parentAdvancementId", nullable(registryId())),
+          property("tabAdvancementId", nullable(registryId())),
+          property("tabTitle", nullable(string(1, 512, null))),
+          property("displayType", nullableEnumString("TASK", "GOAL", "CHALLENGE")),
+          property("hidden", nullable(bool())),
+          property("firstProgressAt", nullable(string(1, 64, null))),
+          property("completedAt", nullable(string(1, 64, null))),
+          property(
+              "criteria",
+              boundedArray(ADVANCEMENT_CRITERION, 0, AdvancementInfo.MAX_RETURNED_CRITERIA)));
   private static final JsonObject INTEGRATION_METADATA_ENTRY =
       object(
           property("key", string(1, 128, INTEGRATION_METADATA_KEY_PATTERN)),
@@ -236,6 +283,29 @@ final class VanillaToolSchemas {
                   "slots", boundedArray(INVENTORY_SLOT, 0, InventorySnapshot.MAIN_SLOT_COUNT))));
   static final JsonSchema EQUIPMENT =
       schema(object(property("slots", boundedArray(EQUIPMENT_SLOT, 6, 6))));
+  static final JsonSchema ADVANCEMENT_LIST_QUERY =
+      schema(
+          object(
+              optionalProperty("filter", advancementFilter()),
+              optionalProperty("search", string(1, AdvancementListQuery.MAX_SEARCH_LENGTH, null)),
+              optionalProperty("limit", advancementLimit())));
+  static final JsonSchema ADVANCEMENT_LIST_RESULT =
+      schema(
+          object(
+              property("filter", enumString("ALL", "COMPLETED", "INCOMPLETE")),
+              property("search", nullable(string(1, AdvancementListQuery.MAX_SEARCH_LENGTH, null))),
+              property("limit", integer(1, AdvancementListQuery.MAX_LIMIT)),
+              property("knownCount", integer(0, null)),
+              property("scannedCount", integer(0, null)),
+              property("matchedCount", integer(0, null)),
+              property("sourceTruncated", bool()),
+              property("truncated", bool()),
+              property(
+                  "advancements",
+                  boundedArray(ADVANCEMENT_SUMMARY, 0, AdvancementListQuery.MAX_LIMIT))));
+  static final JsonSchema ADVANCEMENT_LOOKUP_QUERY =
+      schema(object(property("advancementId", registryId())));
+  static final JsonSchema ADVANCEMENT_INFO = schema(ADVANCEMENT_DETAILS);
   static final JsonSchema TARGET_BLOCK = schema(BLOCK_INFO);
   static final JsonSchema NEARBY_CONTAINER_QUERY =
       schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
@@ -442,6 +512,26 @@ final class VanillaToolSchemas {
         "PLAYER_ONLY uses the 36-slot main inventory and is the default. "
             + "PLAYER_AND_NEARBY explicitly adds eligible nearby loaded containers within "
             + "Thread's configured bounds; results report incomplete or truncated discovery.");
+    return schema;
+  }
+
+  private static JsonObject advancementFilter() {
+    JsonObject schema = enumString("ALL", "COMPLETED", "INCOMPLETE");
+    schema.addProperty("default", "ALL");
+    schema.addProperty(
+        "description",
+        "ALL returns every advancement currently known to the player. COMPLETED and INCOMPLETE "
+            + "filter by live integrated-server progress.");
+    return schema;
+  }
+
+  private static JsonObject advancementLimit() {
+    JsonObject schema = integer(1, AdvancementListQuery.MAX_LIMIT);
+    schema.addProperty("default", AdvancementListQuery.DEFAULT_LIMIT);
+    schema.addProperty(
+        "description",
+        "Maximum returned advancements. Results include truncation metadata when this bound or "
+            + "the provider scan ceiling omits entries.");
     return schema;
   }
 

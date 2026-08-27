@@ -17,12 +17,14 @@ import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
+import me.clutchy.thread.core.provider.AdvancementProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.tool.ToolRegistry;
+import me.clutchy.thread.platform.minecraft.advancement.MinecraftAdvancementProvider;
 import me.clutchy.thread.platform.minecraft.game.MinecraftGameProvider;
 import me.clutchy.thread.platform.minecraft.game.MinecraftProviderLimits;
 import me.clutchy.thread.platform.minecraft.game.MinecraftSessionGuard;
@@ -162,6 +164,8 @@ public final class ThreadRuntime implements AutoCloseable {
             extensionRegistry);
 
     GameProvider gameProvider = new MinecraftGameProvider(client, clientThread, info.gameInfo());
+    AdvancementProvider advancementProvider =
+        new MinecraftAdvancementProvider(client, clientThread, sessionGuard, gameThreadTimeout);
     PlayerProvider playerProvider =
         new MinecraftPlayerProvider(
             client,
@@ -189,6 +193,7 @@ public final class ThreadRuntime implements AutoCloseable {
     integrationRegistry.register(
         new VanillaIntegration(
             gameProvider,
+            advancementProvider,
             playerProvider,
             worldProvider,
             recipeProvider,

@@ -11,6 +11,10 @@ import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.ThreadIntegration;
+import me.clutchy.thread.core.model.advancement.AdvancementInfo;
+import me.clutchy.thread.core.model.advancement.AdvancementListQuery;
+import me.clutchy.thread.core.model.advancement.AdvancementListResult;
+import me.clutchy.thread.core.model.advancement.AdvancementLookupQuery;
 import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
 import me.clutchy.thread.core.model.crafting.CraftingPlan;
 import me.clutchy.thread.core.model.crafting.CraftingQuery;
@@ -32,11 +36,13 @@ import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
+import me.clutchy.thread.core.provider.AdvancementProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.serialization.JsonCodec;
+import me.clutchy.thread.core.service.AdvancementService;
 import me.clutchy.thread.core.service.CraftingPlanner;
 import me.clutchy.thread.core.service.CraftingService;
 import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
@@ -56,6 +62,7 @@ public final class VanillaIntegration implements ThreadIntegration {
 
   private final GameProvider game;
   private final PlayerProvider player;
+  private final AdvancementService advancements;
   private final WorldProvider world;
   private final RecipeProvider recipes;
   private final CraftingService crafting;
@@ -67,6 +74,7 @@ public final class VanillaIntegration implements ThreadIntegration {
   /** Creates a vanilla catalog filtered before tools enter discovery or invocation registries. */
   public VanillaIntegration(
       GameProvider game,
+      AdvancementProvider advancements,
       PlayerProvider player,
       WorldProvider world,
       RecipeProvider recipes,
@@ -74,6 +82,8 @@ public final class VanillaIntegration implements ThreadIntegration {
       Predicate<ToolId> enabledTools,
       Supplier<CapabilitiesSnapshot> capabilities) {
     this.game = Objects.requireNonNull(game, "game");
+    this.advancements =
+        new AdvancementService(Objects.requireNonNull(advancements, "advancements"));
     this.player = Objects.requireNonNull(player, "player");
     this.world = Objects.requireNonNull(world, "world");
     this.recipes = Objects.requireNonNull(recipes, "recipes");
@@ -106,6 +116,8 @@ public final class VanillaIntegration implements ThreadIntegration {
     register(context, getStatus());
     register(context, getGameInfo());
     register(context, getPlayer());
+    register(context, getAdvancements());
+    register(context, getAdvancement());
     register(context, getInventory());
     register(context, getEquipment());
     register(context, getTargetBlock());
@@ -166,6 +178,33 @@ public final class VanillaIntegration implements ThreadIntegration {
         JsonCodec.of(InventorySnapshot.class, VanillaToolSchemas.INVENTORY),
         ToolCapabilities.supportedSingleplayer(),
         ignored -> player.inventory());
+  }
+
+  private GameTool<AdvancementListQuery, AdvancementListResult> getAdvancements() {
+    return tool(
+        "minecraft.get_advancements",
+        "Returns a bounded deterministic list of vanilla advancements currently visible or known "
+            + "to the local player, with live completion summaries. Filter by ALL, COMPLETED, or "
+            + "INCOMPLETE and optionally search canonical IDs or display text. Results report both "
+            + "query truncation and an incomplete provider snapshot. Use this for progression "
+            + "overviews without changing advancement state.",
+        JsonCodec.of(AdvancementListQuery.class, VanillaToolSchemas.ADVANCEMENT_LIST_QUERY),
+        JsonCodec.of(AdvancementListResult.class, VanillaToolSchemas.ADVANCEMENT_LIST_RESULT),
+        ToolCapabilities.supportedSingleplayer(),
+        advancements::list);
+  }
+
+  private GameTool<AdvancementLookupQuery, AdvancementInfo> getAdvancement() {
+    return tool(
+        "minecraft.get_advancement",
+        "Returns detailed live vanilla progress for one exact advancement ID already known to the "
+            + "local player, including criteria state and timestamps, parent/tab context, display "
+            + "type, hidden status, and completion. Unknown or undisclosed advancements return "
+            + "NOT_FOUND. Use this for exact progress details; no progress or rewards are changed.",
+        JsonCodec.of(AdvancementLookupQuery.class, VanillaToolSchemas.ADVANCEMENT_LOOKUP_QUERY),
+        JsonCodec.of(AdvancementInfo.class, VanillaToolSchemas.ADVANCEMENT_INFO),
+        ToolCapabilities.supportedSingleplayer(),
+        advancements::get);
   }
 
   private GameTool<EmptyInput, EquipmentSnapshot> getEquipment() {

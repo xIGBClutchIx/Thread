@@ -31,7 +31,16 @@ class ArchitectureBoundaryTest {
   private static final Path CORE_MODEL_ROOT =
       COMMON_SOURCE_ROOT.resolve("me/clutchy/thread/core/model");
   private static final Set<String> MODEL_DOMAINS =
-      Set.of("capability", "crafting", "game", "item", "player", "recipe", "validation", "world");
+      Set.of(
+          "advancement",
+          "capability",
+          "crafting",
+          "game",
+          "item",
+          "player",
+          "recipe",
+          "validation",
+          "world");
 
   @Test
   void coreDoesNotImportPlatformOrTransportTypes() throws IOException {

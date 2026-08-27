@@ -64,6 +64,12 @@ only already-loaded state and never force-load chunks.
 Recipes come from the integrated server's final live `RecipeManager`, including active datapack and
 installed-mod changes. Thread has no static vanilla recipe catalog.
 
+Vanilla advancement identity is gated by the client advancement tree, so Thread never broadens a
+query to entries Minecraft has not exposed as visible/known to the player. Progress is then read
+from the matching integrated-server player and returned as detached criteria, requirement counts,
+hierarchy, display metadata, and timestamps. The provider is advancement-specific: Thread does not
+define a generic progression or quest framework, and base Thread does not claim FTB Quests support.
+
 ## Nearby containers are bounded context and explicit crafting input
 
 `minecraft.get_nearby_containers` scans only already-loaded chunks within a hard 16-block ceiling

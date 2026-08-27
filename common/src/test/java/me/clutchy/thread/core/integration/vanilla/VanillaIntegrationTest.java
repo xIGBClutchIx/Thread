@@ -22,6 +22,10 @@ import me.clutchy.thread.core.integration.IntegrationRegistry;
 import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.testing.ProofIntegration;
+import me.clutchy.thread.core.model.advancement.AdvancementCriterionInfo;
+import me.clutchy.thread.core.model.advancement.AdvancementDisplayType;
+import me.clutchy.thread.core.model.advancement.AdvancementInfo;
+import me.clutchy.thread.core.model.advancement.AdvancementSnapshot;
 import me.clutchy.thread.core.model.game.GameInfo;
 import me.clutchy.thread.core.model.game.SessionState;
 import me.clutchy.thread.core.model.game.SessionStatus;
@@ -54,6 +58,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.provider.AdvancementProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
@@ -70,6 +75,8 @@ class VanillaIntegrationTest {
       List.of(
           "minecraft.can_craft",
           "minecraft.find_item",
+          "minecraft.get_advancement",
+          "minecraft.get_advancements",
           "minecraft.get_capabilities",
           "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
@@ -114,6 +121,21 @@ class VanillaIntegrationTest {
     JsonObject player = invoke(catalog.tools(), "minecraft.get_player", "{}");
     assertEquals("minecraft:overworld", player.get("dimension").getAsString());
     assertEquals(18, player.get("health").getAsDouble());
+
+    JsonObject advancements = invoke(catalog.tools(), "minecraft.get_advancements", "{}");
+    assertEquals("ALL", advancements.get("filter").getAsString());
+    assertEquals(2, advancements.get("knownCount").getAsInt());
+    assertEquals(
+        "minecraft:story/mine_stone",
+        first(advancements, "advancements").get("advancementId").getAsString());
+    JsonObject advancement =
+        invoke(
+            catalog.tools(),
+            "minecraft.get_advancement",
+            "{\"advancementId\":\"minecraft:story/mine_stone\"}");
+    assertEquals(50, advancement.get("completionPercentage").getAsDouble());
+    assertEquals(1, advancement.get("completedCriteria").getAsInt());
+    assertEquals("minecraft:story/root", advancement.get("parentAdvancementId").getAsString());
 
     JsonObject inventory = invoke(catalog.tools(), "minecraft.get_inventory", "{}");
     assertEquals(
@@ -263,6 +285,30 @@ class VanillaIntegrationTest {
   }
 
   @Test
+  void advancementSchemasDocumentDefaultsAndValidateFiltersAndIds() {
+    Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
+    ToolDescriptor list =
+        catalog.tools().descriptors().stream()
+            .filter(tool -> tool.id().toString().equals("minecraft.get_advancements"))
+            .findFirst()
+            .orElseThrow();
+    JsonObject properties = list.inputSchema().document().getAsJsonObject("properties");
+
+    assertEquals("ALL", properties.getAsJsonObject("filter").get("default").getAsString());
+    assertEquals(64, properties.getAsJsonObject("limit").get("default").getAsInt());
+    assertInvalid(catalog.tools(), "minecraft.get_advancements", "{\"filter\":\"UNKNOWN\"}");
+    assertInvalid(catalog.tools(), "minecraft.get_advancements", "{\"limit\":129}");
+    assertInvalid(
+        catalog.tools(), "minecraft.get_advancement", "{\"advancementId\":\"not-an-id\"}");
+  }
+
+  @Test
+  void advancementToolsPropagateMenuAndMultiplayerRejection() {
+    assertAdvancementFailure(ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertAdvancementFailure(ToolErrorCode.UNSUPPORTED);
+  }
+
+  @Test
   void advertisesAccurateAvailabilityAndKeepsMenuSafeToolsCallable() {
     Catalog catalog = catalog(new MenuGameProvider(), new FailingPlayerProvider());
 
@@ -289,7 +335,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        16, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        18, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -535,7 +581,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(17, strings(capabilities, "tools").size());
+    assertEquals(19, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -593,7 +639,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(16, strings(capabilities, "tools").size());
+    assertEquals(18, strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -651,6 +697,7 @@ class VanillaIntegrationTest {
     integrations.register(
         new VanillaIntegration(
             game,
+            new FakeAdvancementProvider(),
             player,
             world,
             recipes,
@@ -667,6 +714,25 @@ class VanillaIntegrationTest {
         () -> toolId + " failed: " + (result.error() == null ? "unknown" : result.error()));
     assertTrue(result.value().isJsonObject(), () -> toolId + " did not return an object");
     return result.value().getAsJsonObject();
+  }
+
+  private static void assertAdvancementFailure(ToolErrorCode code) {
+    ToolRegistry tools = new ToolRegistry();
+    IntegrationRegistry integrations =
+        new IntegrationRegistry(tools, new ContextRegistry(), new IntegrationExtensionRegistry());
+    integrations.register(
+        new VanillaIntegration(
+            new SupportedGameProvider(),
+            new UnavailableAdvancementProvider(code),
+            new FakePlayerProvider(),
+            new FakeWorldProvider(),
+            new FakeRecipeProvider(),
+            new NearbyContainerQuery(16, 64),
+            ignored -> true,
+            () -> integrations.capabilities("0.1.0")));
+    assertToolFailure(tools, "minecraft.get_advancements", "{}", code);
+    assertToolFailure(
+        tools, "minecraft.get_advancement", "{\"advancementId\":\"minecraft:story/root\"}", code);
   }
 
   private static void assertInvalid(ToolRegistry tools, String toolId, String input) {
@@ -803,6 +869,95 @@ class VanillaIntegrationTest {
                   3.4,
                   false,
                   null)));
+    }
+  }
+
+  private static final class FakeAdvancementProvider implements AdvancementProvider {
+    private final List<AdvancementInfo> advancements =
+        List.of(
+            advancement(
+                "minecraft:story/root",
+                "Minecraft",
+                false,
+                0,
+                null,
+                List.of(new AdvancementCriterionInfo("crafting_table", false, null))),
+            advancement(
+                "minecraft:story/mine_stone",
+                "Stone Age",
+                false,
+                50,
+                "minecraft:story/root",
+                List.of(
+                    new AdvancementCriterionInfo("mine_stone", true, "2026-08-26T12:00:00Z"),
+                    new AdvancementCriterionInfo("obtain_cobblestone", false, null))));
+
+    @Override
+    public ToolResult<AdvancementSnapshot> knownAdvancements() {
+      return ToolResult.success(new AdvancementSnapshot(2, 64, false, advancements));
+    }
+
+    @Override
+    public ToolResult<AdvancementInfo> advancement(String advancementId) {
+      return advancements.stream()
+          .filter(value -> value.advancementId().equals(advancementId))
+          .findFirst()
+          .map(ToolResult::success)
+          .orElseGet(
+              () ->
+                  ToolResult.failure(
+                      ToolError.of(
+                          ToolErrorCode.NOT_FOUND,
+                          "The requested advancement is not known to the player.",
+                          false)));
+    }
+
+    private static AdvancementInfo advancement(
+        String id,
+        String title,
+        boolean completed,
+        double percentage,
+        String parent,
+        List<AdvancementCriterionInfo> criteria) {
+      int completedCriteria =
+          (int) criteria.stream().filter(AdvancementCriterionInfo::completed).count();
+      return new AdvancementInfo(
+          id,
+          title,
+          "Test advancement",
+          completed,
+          percentage,
+          completedCriteria,
+          criteria.size(),
+          completedCriteria,
+          criteria.size(),
+          false,
+          parent,
+          "minecraft:story/root",
+          "Minecraft",
+          AdvancementDisplayType.TASK,
+          false,
+          completedCriteria == 0 ? null : "2026-08-26T12:00:00Z",
+          completed ? "2026-08-26T12:00:00Z" : null,
+          criteria);
+    }
+  }
+
+  private static final class UnavailableAdvancementProvider implements AdvancementProvider {
+    private final ToolError error;
+
+    private UnavailableAdvancementProvider(ToolErrorCode code) {
+      error = ToolError.of(code, "Unavailable for test.", true);
+    }
+
+    @Override
+    public ToolResult<AdvancementSnapshot> knownAdvancements() {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<AdvancementInfo> advancement(String advancementId) {
+      return ToolResult.failure(error);
     }
   }
 

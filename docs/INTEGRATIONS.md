@@ -59,6 +59,9 @@ promises:
 - `ItemFinder`, `CraftingItemSourceProvider`, and `ItemSource`, which are transport-independent
   internal composition types but not registered public extension points; the explicit composition
   keeps future storage-source wiring possible without changing crafting algorithms;
+- `AdvancementProvider`, `AdvancementService`, and the vanilla advancement DTOs, which currently
+  model Minecraft's own visible/known advancement progress and are not a generic progression
+  extension point;
 - the built-in `VanillaIntegration` implementation.
 
 External packages should not construct registries, loaders, platform providers, or transports.
@@ -160,3 +163,7 @@ Every external Thread Integration must:
 
 JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, and similar systems are not supported by the base
 artifact. Each requires its own separately versioned and tested integration JAR.
+
+In particular, the built-in advancement tools cover vanilla advancements only. A future FTB
+Quests integration should add its own namespaced tools unless concrete implementation experience
+first proves that part of the detached vanilla model is genuinely stable and reusable.

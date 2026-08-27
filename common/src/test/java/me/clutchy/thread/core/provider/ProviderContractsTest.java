@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import me.clutchy.thread.core.model.advancement.AdvancementCriterionInfo;
+import me.clutchy.thread.core.model.advancement.AdvancementDisplayType;
+import me.clutchy.thread.core.model.advancement.AdvancementInfo;
+import me.clutchy.thread.core.model.advancement.AdvancementSnapshot;
 import me.clutchy.thread.core.model.game.GameInfo;
 import me.clutchy.thread.core.model.game.SessionState;
 import me.clutchy.thread.core.model.game.SessionStatus;
@@ -41,12 +45,16 @@ class ProviderContractsTest {
   void plainJavaFakesCanDriveEveryProviderContract() {
     ItemStackInfo pickaxe = item("minecraft:iron_pickaxe", "Iron Pickaxe", 1, 1);
     GameProvider game = new FakeGameProvider();
+    AdvancementProvider advancements = new FakeAdvancementProvider();
     PlayerProvider player = new FakePlayerProvider(pickaxe);
     WorldProvider world = new FakeWorldProvider();
     RecipeProvider recipes = new FakeRecipeProvider();
 
     assertTrue(game.sessionStatus().supported());
     assertEquals("26.2", game.gameInfo().minecraftVersion());
+    assertEquals(
+        "minecraft:story/root",
+        advancements.knownAdvancements().value().advancements().getFirst().advancementId());
     assertEquals("minecraft:overworld", player.status().value().dimension());
     assertEquals(pickaxe, player.inventory().value().slots().getFirst().stack());
     assertEquals(
@@ -104,6 +112,39 @@ class ProviderContractsTest {
     @Override
     public GameInfo gameInfo() {
       return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+    }
+  }
+
+  private static final class FakeAdvancementProvider implements AdvancementProvider {
+    private static final AdvancementInfo ROOT =
+        new AdvancementInfo(
+            "minecraft:story/root",
+            "Minecraft",
+            "The heart and story of the game",
+            false,
+            0,
+            0,
+            1,
+            0,
+            1,
+            false,
+            null,
+            "minecraft:story/root",
+            "Minecraft",
+            AdvancementDisplayType.TASK,
+            false,
+            null,
+            null,
+            List.of(new AdvancementCriterionInfo("crafting_table", false, null)));
+
+    @Override
+    public ToolResult<AdvancementSnapshot> knownAdvancements() {
+      return ToolResult.success(new AdvancementSnapshot(1, 64, false, List.of(ROOT)));
+    }
+
+    @Override
+    public ToolResult<AdvancementInfo> advancement(String advancementId) {
+      return ToolResult.success(ROOT);
     }
   }
 

@@ -46,6 +46,8 @@ project toolchain.
 - player status
 - player inventory
 - equipped items
+- live vanilla advancements known to the player, including criterion progress, completion state,
+  hierarchy, display metadata, and available timestamps
 - current dimension and position
 - block currently targeted by the player
 - nearby loaded entities within a bounded radius
@@ -128,6 +130,7 @@ From a clean install, an MCP client can discover Thread and correctly answer eac
 11. "What loaded containers are near me?"
 12. "What is inside that nearby furnace or chest?"
 13. "Where are my coal and diamonds across my inventory and nearby loaded containers?"
+14. "Which vanilla advancements have I completed, and what criteria remain for one of them?"
 
 For #9, Thread performs a deterministic comparison and reports each recipe variant independently
 with required, allocated, missing, and live-source counts. For #10, Thread recursively plans

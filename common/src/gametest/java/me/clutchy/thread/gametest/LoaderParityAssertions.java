@@ -34,6 +34,8 @@ public final class LoaderParityAssertions {
       Set.of(
           "minecraft.can_craft",
           "minecraft.find_item",
+          "minecraft.get_advancement",
+          "minecraft.get_advancements",
           "minecraft.get_capabilities",
           "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
@@ -172,6 +174,20 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "menu expanded crafting rejection");
+    assertToolError(
+        mcpToolResult(endpoint, 10, "minecraft.get_advancements", new JsonObject()),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu advancement-list rejection");
+    JsonObject advancementArguments = new JsonObject();
+    advancementArguments.addProperty("advancementId", "minecraft:story/root");
+    assertToolError(
+        mcpToolResult(endpoint, 11, "minecraft.get_advancement", advancementArguments),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu advancement-detail rejection");
   }
 
   /** Verifies the common single-player catalog, native recipes, crafting, and MCP behavior. */
@@ -217,6 +233,54 @@ public final class LoaderParityAssertions {
         invoke(tools, "minecraft.find_item", findInput("thread:missing_item"));
     assertTrue(
         absentLiveItem.getAsJsonArray("matches").isEmpty(), "live item search no-match result");
+
+    JsonObject advancements = invoke(tools, "minecraft.get_advancements", "{\"limit\":8}");
+    verifyAdvancementList(advancements, "ALL");
+    JsonObject completedAdvancements =
+        invoke(tools, "minecraft.get_advancements", "{\"filter\":\"COMPLETED\",\"limit\":8}");
+    verifyAdvancementList(completedAdvancements, "COMPLETED");
+    assertTrue(
+        completedAdvancements.getAsJsonArray("advancements").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .allMatch(value -> value.get("completed").getAsBoolean()),
+        "completed advancement filter");
+    JsonObject incompleteAdvancements =
+        invoke(tools, "minecraft.get_advancements", "{\"filter\":\"INCOMPLETE\",\"limit\":8}");
+    verifyAdvancementList(incompleteAdvancements, "INCOMPLETE");
+    assertTrue(
+        incompleteAdvancements.getAsJsonArray("advancements").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .noneMatch(value -> value.get("completed").getAsBoolean()),
+        "incomplete advancement filter");
+    if (!advancements.getAsJsonArray("advancements").isEmpty()) {
+      String advancementId =
+          advancements
+              .getAsJsonArray("advancements")
+              .get(0)
+              .getAsJsonObject()
+              .get("advancementId")
+              .getAsString();
+      JsonObject exactSearch =
+          invoke(
+              tools,
+              "minecraft.get_advancements",
+              "{\"search\":\"" + advancementId + "\",\"limit\":8}");
+      verifyAdvancementList(exactSearch, "ALL");
+      assertEquals(1, exactSearch.getAsJsonArray("advancements").size(), "exact ID search");
+      assertEquals(
+          advancementId,
+          exactSearch
+              .getAsJsonArray("advancements")
+              .get(0)
+              .getAsJsonObject()
+              .get("advancementId")
+              .getAsString(),
+          "exact advancement match");
+      verifyAdvancementDetail(
+          invoke(
+              tools, "minecraft.get_advancement", "{\"advancementId\":\"" + advancementId + "\"}"),
+          advancementId);
+    }
 
     JsonObject recipe =
         invoke(tools, "minecraft.get_recipe", "{\"itemId\":\"minecraft:command_block\"}");
@@ -324,6 +388,22 @@ public final class LoaderParityAssertions {
             .getAsJsonArray("matches")
             .isEmpty(),
         "MCP live item search no-match result");
+    JsonObject mcpAdvancements =
+        mcpTool(endpoint, 28, "minecraft.get_advancements", new JsonObject());
+    verifyAdvancementList(mcpAdvancements, "ALL");
+    if (!mcpAdvancements.getAsJsonArray("advancements").isEmpty()) {
+      String advancementId =
+          mcpAdvancements
+              .getAsJsonArray("advancements")
+              .get(0)
+              .getAsJsonObject()
+              .get("advancementId")
+              .getAsString();
+      JsonObject advancementArguments = new JsonObject();
+      advancementArguments.addProperty("advancementId", advancementId);
+      verifyAdvancementDetail(
+          mcpTool(endpoint, 29, "minecraft.get_advancement", advancementArguments), advancementId);
+    }
   }
 
   /** Verifies clean world detachment while the loader-owned client remains running. */
@@ -371,7 +451,96 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "return-to-menu expanded crafting rejection");
+    assertToolError(
+        mcpToolResult(
+            runtime.mcpServer().endpoint(), 35, "minecraft.get_advancements", new JsonObject()),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu advancement-list rejection");
+    JsonObject advancementArguments = new JsonObject();
+    advancementArguments.addProperty("advancementId", "minecraft:story/root");
+    assertToolError(
+        mcpToolResult(
+            runtime.mcpServer().endpoint(), 36, "minecraft.get_advancement", advancementArguments),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu advancement-detail rejection");
     assertTrue(runtime.mcpRunning(), "MCP listener survives world close");
+  }
+
+  private static void verifyAdvancementList(JsonObject result, String expectedFilter) {
+    assertEquals(expectedFilter, result.get("filter").getAsString(), "advancement filter");
+    int knownCount = result.get("knownCount").getAsInt();
+    int scannedCount = result.get("scannedCount").getAsInt();
+    int matchedCount = result.get("matchedCount").getAsInt();
+    int limit = result.get("limit").getAsInt();
+    int returnedCount = result.getAsJsonArray("advancements").size();
+    assertTrue(scannedCount <= knownCount, "advancement provider bound");
+    assertTrue(returnedCount <= limit, "advancement result bound");
+    assertTrue(returnedCount <= matchedCount, "advancement match count");
+    assertEquals(
+        knownCount > scannedCount,
+        result.get("sourceTruncated").getAsBoolean(),
+        "advancement source truncation");
+    assertEquals(
+        knownCount > scannedCount || matchedCount > returnedCount,
+        result.get("truncated").getAsBoolean(),
+        "advancement result truncation");
+    String previousId = null;
+    for (JsonElement element : result.getAsJsonArray("advancements")) {
+      JsonObject advancement = element.getAsJsonObject();
+      String currentId = advancement.get("advancementId").getAsString();
+      if (previousId != null) {
+        assertTrue(previousId.compareTo(currentId) <= 0, "advancement ID ordering");
+      }
+      assertAdvancementProgress(advancement);
+      previousId = currentId;
+    }
+  }
+
+  private static void verifyAdvancementDetail(JsonObject result, String expectedId) {
+    assertEquals(expectedId, result.get("advancementId").getAsString(), "advancement detail ID");
+    assertAdvancementProgress(result);
+    int returnedCompleted = 0;
+    String previousName = null;
+    for (JsonElement element : result.getAsJsonArray("criteria")) {
+      JsonObject criterion = element.getAsJsonObject();
+      String currentName = criterion.get("name").getAsString();
+      if (previousName != null) {
+        assertTrue(previousName.compareTo(currentName) <= 0, "advancement criterion ordering");
+      }
+      if (criterion.get("completed").getAsBoolean()) {
+        returnedCompleted++;
+        assertTrue(!criterion.get("obtainedAt").isJsonNull(), "completed criterion timestamp");
+      } else {
+        assertTrue(criterion.get("obtainedAt").isJsonNull(), "incomplete criterion timestamp");
+      }
+      previousName = currentName;
+    }
+    assertTrue(
+        returnedCompleted <= result.get("completedCriteria").getAsInt(),
+        "returned completed criteria");
+  }
+
+  private static void assertAdvancementProgress(JsonObject advancement) {
+    double percentage = advancement.get("completionPercentage").getAsDouble();
+    assertTrue(percentage >= 0 && percentage <= 100, "advancement percentage range");
+    assertTrue(
+        advancement.get("completedCriteria").getAsInt()
+            <= advancement.get("totalCriteria").getAsInt(),
+        "advancement criterion counts");
+    assertTrue(
+        advancement.get("completedRequirements").getAsInt()
+            <= advancement.get("totalRequirements").getAsInt(),
+        "advancement requirement counts");
+    if (advancement.get("completed").getAsBoolean()) {
+      assertEquals(100.0, percentage, "completed advancement percentage");
+      assertTrue(!advancement.get("completedAt").isJsonNull(), "advancement completion timestamp");
+    } else {
+      assertTrue(advancement.get("completedAt").isJsonNull(), "incomplete completion timestamp");
+    }
   }
 
   /** Invokes a tool and returns its object result, failing on a controlled tool error. */

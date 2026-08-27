@@ -106,6 +106,120 @@ Example result:
 
 Session/world availability belongs to `minecraft.get_status`; player/world-specific details belong to their dedicated tools. `minecraft.get_game_info` should remain useful from the main menu.
 
+## `minecraft.get_advancements`
+
+Purpose: return a bounded, deterministic list of vanilla advancements Minecraft currently exposes
+as visible/known to the local player, with live integrated-server progress.
+
+Input:
+
+```json
+{
+  "filter": "INCOMPLETE",
+  "search": "stone",
+  "limit": 64
+}
+```
+
+`filter` defaults to `ALL` and accepts `ALL`, `COMPLETED`, or `INCOMPLETE`. `search` is optional.
+A valid registry ID matches exactly; other text uses case-insensitive all-term matching across the
+ID, title, description, and tab title. `limit` defaults to 64 and has a hard maximum of 128.
+
+Example result:
+
+```json
+{
+  "filter": "INCOMPLETE",
+  "search": "stone",
+  "limit": 64,
+  "knownCount": 42,
+  "scannedCount": 42,
+  "matchedCount": 1,
+  "sourceTruncated": false,
+  "truncated": false,
+  "advancements": [
+    {
+      "advancementId": "minecraft:story/mine_stone",
+      "title": "Stone Age",
+      "description": "Mine Stone with your new Pickaxe",
+      "completed": false,
+      "completionPercentage": 0.0,
+      "completedCriteria": 0,
+      "totalCriteria": 1,
+      "completedRequirements": 0,
+      "totalRequirements": 1,
+      "parentAdvancementId": "minecraft:story/root",
+      "tabAdvancementId": "minecraft:story/root",
+      "tabTitle": "Minecraft",
+      "displayType": "TASK",
+      "hidden": false,
+      "firstProgressAt": null,
+      "completedAt": null
+    }
+  ]
+}
+```
+
+Results are ordered by advancement registry ID. `knownCount` is the client-visible/known count;
+`scannedCount` is the bounded provider count. `sourceTruncated` reports provider scan truncation,
+while `truncated` also becomes true when the requested result limit omits matches. The list omits
+individual criteria; use `minecraft.get_advancement` for one detailed record.
+
+## `minecraft.get_advancement`
+
+Purpose: return detailed live progress for one exact vanilla advancement ID already visible/known
+to the local player.
+
+Input:
+
+```json
+{
+  "advancementId": "minecraft:story/mine_stone"
+}
+```
+
+Example result:
+
+```json
+{
+  "advancementId": "minecraft:story/mine_stone",
+  "title": "Stone Age",
+  "description": "Mine Stone with your new Pickaxe",
+  "completed": false,
+  "completionPercentage": 0.0,
+  "completedCriteria": 0,
+  "totalCriteria": 1,
+  "completedRequirements": 0,
+  "totalRequirements": 1,
+  "criteriaTruncated": false,
+  "parentAdvancementId": "minecraft:story/root",
+  "tabAdvancementId": "minecraft:story/root",
+  "tabTitle": "Minecraft",
+  "displayType": "TASK",
+  "hidden": false,
+  "firstProgressAt": null,
+  "completedAt": null,
+  "criteria": [
+    {
+      "name": "mine_stone",
+      "completed": false,
+      "obtainedAt": null
+    }
+  ]
+}
+```
+
+Criteria are ordered by name and bounded to 2,048 entries. `completionPercentage` is based on
+Minecraft's requirement groups rather than a naive criterion ratio. `completedAt` is the time the
+last required group became satisfied when that can be derived from criterion timestamps. Missing
+display metadata is represented as `null`. An unknown or not-yet-exposed advancement returns
+`NOT_FOUND`; Thread does not enumerate the integrated server's full registry to fabricate hidden
+progress.
+
+Both tools require a supported integrated single-player session, are read-only, and never award
+criteria, complete advancements, claim rewards, run commands, or mutate player state. These are
+vanilla advancement contracts, not a generic quest/progression API and not FTB Quests support.
+
 ## `minecraft.get_player`
 
 Purpose: return current local-player status.
@@ -899,7 +1013,7 @@ Example result:
       "id": "vanilla",
       "version": "1",
       "metadata": [
-        {"key": "thread.tool_count", "value": "16"}
+        {"key": "thread.tool_count", "value": "18"}
       ]
     }
   ]
@@ -917,7 +1031,7 @@ capabilities and their classes are not resolved before presence/compatibility ch
 
 The base artifact reports only the required `vanilla` integration. Future separately installed
 Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
-changing the sixteen built-in `minecraft.*` tool contracts.
+changing the eighteen built-in `minecraft.*` tool contracts.
 
 ## Tool descriptions
 
