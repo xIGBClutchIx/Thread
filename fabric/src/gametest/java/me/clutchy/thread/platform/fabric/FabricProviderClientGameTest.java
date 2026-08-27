@@ -633,7 +633,10 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
       JsonObject mcpCapabilities =
           mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
-      assertEquals(20, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+      assertEquals(
+          LoaderParityAssertions.expectedToolCount(),
+          mcpCapabilities.getAsJsonArray("tools").size(),
+          "MCP capability tool count");
       assertEquals(
           2, mcpCapabilities.getAsJsonArray("integrations").size(), "MCP integration count");
       assertTrue(

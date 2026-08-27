@@ -123,7 +123,7 @@ but is not the release proof.
 
 Each normal test launches a temporary client with a final dedicated or universal Thread JAR and a
 separately packaged proof integration/game-test mod. All three loaders compile the same
-loader-neutral parity fixture from `common/src/gametest/java`. It verifies the exact twenty-tool catalog, config,
+loader-neutral parity fixture from `common/src/gametest/java`. It verifies the exact twenty-one-tool catalog, config,
 loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
 recipes and crafting, external integration activation, and controlled gameplay rejection at the
 menu.
@@ -186,18 +186,20 @@ Use the release JAR, not a development run, for the final human check:
 
 1. Put the universal release JAR and its loader requirements in a clean Minecraft 26.2 instance.
 2. Launch to the menu and confirm `http://127.0.0.1:25580/mcp` is listening.
-3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm twenty
+3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm twenty-one
    read-only `minecraft.*` tools.
 4. Call `minecraft.get_status` in the menu; it must return a controlled unsupported/no-world state.
+   Call `minecraft.get_client_options` there as well and confirm the default local-only sections.
 5. Load an integrated single-player world and call status, player, world info, inventory, equipment,
    target block, target entity, nearby-entity, nearby-container, container-inspection, unified live item search, vanilla
-   advancement list/detail, recipe, crafting, registry search, and capability tools.
+   advancement list/detail, client options including a bounded keybind request, recipe, crafting,
+   registry search, and capability tools.
 6. Confirm tools return detached bounded data, recipes reflect the live world, container searches
    skip unloaded chunks, and no call mutates the game. Confirm crafting with omitted or explicit
    `PLAYER_ONLY` scope ignores nearby-only items, while explicit `PLAYER_AND_NEARBY` can use an
    eligible loaded container and reports its source plus any incomplete discovery.
-7. Join multiplayer only for rejection verification if appropriate: status remains callable while
-   gameplay tools return `UNSUPPORTED` without exposing live state.
+7. Join multiplayer only for rejection verification if appropriate: status and local client options
+   remain callable while gameplay tools return `UNSUPPORTED` without exposing live state.
 8. Exit Minecraft and confirm the listener closes cleanly.
 
 Automated HTTP, packaged-world, disabled-listener, boundary, and limit checks remain authoritative;

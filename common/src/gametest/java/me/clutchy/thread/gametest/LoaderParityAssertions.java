@@ -38,6 +38,7 @@ public final class LoaderParityAssertions {
           "minecraft.get_advancement",
           "minecraft.get_advancements",
           "minecraft.get_capabilities",
+          "minecraft.get_client_options",
           "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
           "minecraft.get_game_info",
@@ -55,6 +56,11 @@ public final class LoaderParityAssertions {
           "minecraft.search_items");
 
   private LoaderParityAssertions() {}
+
+  /** Returns the built-in tool count expected by loader-specific parity extensions. */
+  public static int expectedToolCount() {
+    return EXPECTED_TOOLS.size();
+  }
 
   /** Verifies configuration persistence shared by normal, restart, and disabled loader runs. */
   public static void verifyConfiguration(Path configPath) {
@@ -126,6 +132,8 @@ public final class LoaderParityAssertions {
         "MAIN_MENU",
         mcpTool(endpoint, 3, "minecraft.get_status", new JsonObject()).get("state").getAsString(),
         "MCP menu status");
+    verifyClientOptions(
+        mcpTool(endpoint, 39, "minecraft.get_client_options", new JsonObject()), false);
 
     McpResponse missing =
         mcpRequest(endpoint, 4, "tools/call", "minecraft.missing", new JsonObject());
@@ -211,6 +219,21 @@ public final class LoaderParityAssertions {
     JsonObject status = invoke(tools, "minecraft.get_status", "{}");
     assertEquals("SINGLEPLAYER", status.get("state").getAsString(), "single-player state");
     assertTrue(status.get("supported").getAsBoolean(), "single-player support");
+    JsonObject clientOptions = invoke(tools, "minecraft.get_client_options", "{}");
+    verifyClientOptions(clientOptions, false);
+    JsonObject keybindOptions =
+        invoke(
+            tools,
+            "minecraft.get_client_options",
+            "{\"sections\":[\"KEYBINDS\"],\"keybindLimit\":12}");
+    verifyClientOptions(keybindOptions, true);
+    assertEquals(
+        keybindOptions,
+        invoke(
+            tools,
+            "minecraft.get_client_options",
+            "{\"sections\":[\"KEYBINDS\"],\"keybindLimit\":12}"),
+        "deterministic keybind serialization");
     JsonObject player = invoke(tools, "minecraft.get_player", "{}");
     verifyPlayerStatus(player);
     JsonObject worldInfo = invoke(tools, "minecraft.get_world_info", "{}");
@@ -425,6 +448,13 @@ public final class LoaderParityAssertions {
     verifyWorldInfo(mcpTool(endpoint, 37, "minecraft.get_world_info", new JsonObject()), player);
     verifyOptionalTargetEntity(
         mcpToolResult(endpoint, 38, "minecraft.get_target_entity", new JsonObject()));
+    JsonObject keybindArguments = new JsonObject();
+    com.google.gson.JsonArray keybindSections = new com.google.gson.JsonArray();
+    keybindSections.add("KEYBINDS");
+    keybindArguments.add("sections", keybindSections);
+    keybindArguments.addProperty("keybindLimit", 12);
+    verifyClientOptions(
+        mcpTool(endpoint, 39, "minecraft.get_client_options", keybindArguments), true);
   }
 
   /** Verifies clean world detachment while the loader-owned client remains running. */
@@ -439,6 +469,10 @@ public final class LoaderParityAssertions {
             .get("state")
             .getAsString(),
         "MCP return-to-menu status");
+    verifyClientOptions(
+        mcpTool(
+            runtime.mcpServer().endpoint(), 39, "minecraft.get_client_options", new JsonObject()),
+        false);
     assertToolError(
         mcpToolResult(
             runtime.mcpServer().endpoint(), 31, "minecraft.get_inventory", new JsonObject()),
@@ -533,6 +567,83 @@ public final class LoaderParityAssertions {
       assertAdvancementProgress(advancement);
       previousId = currentId;
     }
+  }
+
+  private static void verifyClientOptions(JsonObject result, boolean keybindOnly) {
+    List<String> sections =
+        result.getAsJsonArray("sections").asList().stream().map(JsonElement::getAsString).toList();
+    if (keybindOnly) {
+      assertEquals(List.of("KEYBINDS"), sections, "keybind-only section selection");
+      for (String section :
+          List.of("general", "video", "audio", "controls", "accessibility", "chat")) {
+        assertTrue(result.get(section).isJsonNull(), "omitted client-options section " + section);
+      }
+      JsonObject keybinds = result.getAsJsonObject("keybinds");
+      int total = keybinds.get("totalCount").getAsInt();
+      int returned = keybinds.get("returnedCount").getAsInt();
+      int limit = keybinds.get("limit").getAsInt();
+      assertTrue(total >= returned, "keybind total covers returned bindings");
+      assertTrue(returned <= limit, "keybind result limit");
+      assertEquals(returned, keybinds.getAsJsonArray("bindings").size(), "keybind returned count");
+      assertEquals(
+          total > returned, keybinds.get("truncated").getAsBoolean(), "keybind truncation");
+      String previousAction = null;
+      for (JsonElement element : keybinds.getAsJsonArray("bindings")) {
+        JsonObject binding = element.getAsJsonObject();
+        String action = binding.get("actionId").getAsString();
+        if (previousAction != null) {
+          assertTrue(previousAction.compareTo(action) <= 0, "keybind action ordering");
+        }
+        assertTrue(!binding.get("displayName").getAsString().isBlank(), "keybind display name");
+        assertTrue(binding.get("categoryId").getAsString().contains(":"), "keybind category ID");
+        boolean unbound = binding.get("unbound").getAsBoolean();
+        assertEquals(
+            unbound,
+            binding.get("inputType").getAsString().equals("UNBOUND"),
+            "keybind unbound input type");
+        assertEquals(unbound, binding.get("boundInput").isJsonNull(), "keybind bound input");
+        List<String> conflicts =
+            binding.getAsJsonArray("conflicts").asList().stream()
+                .map(JsonElement::getAsString)
+                .toList();
+        assertEquals(conflicts.stream().sorted().toList(), conflicts, "keybind conflict ordering");
+        assertTrue(conflicts.size() <= 16, "keybind conflict bound");
+        previousAction = action;
+      }
+      return;
+    }
+
+    assertEquals(
+        List.of("GENERAL", "VIDEO", "AUDIO", "CONTROLS", "ACCESSIBILITY", "CHAT"),
+        sections,
+        "default client-options sections");
+    assertTrue(result.get("keybinds").isJsonNull(), "default response omits keybinds");
+    assertTrue(
+        !result.getAsJsonObject("general").get("languageCode").getAsString().isBlank(),
+        "client language");
+    JsonObject video = result.getAsJsonObject("video");
+    assertTrue(!video.get("fullscreen").getAsBoolean(), "test client remains windowed");
+    assertTrue(video.get("renderDistance").getAsInt() >= 0, "render distance");
+    assertTrue(video.get("simulationDistance").getAsInt() >= 0, "simulation distance");
+    assertTrue(video.get("fov").getAsInt() > 0, "field of view");
+    JsonObject audio = result.getAsJsonObject("audio");
+    assertEquals(0.0, audio.get("masterVolume").getAsDouble(), "muted test master volume");
+    List<String> categories =
+        audio.getAsJsonArray("categoryVolumes").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(value -> value.get("category").getAsString())
+            .toList();
+    assertEquals(categories.stream().sorted().toList(), categories, "sound category ordering");
+    assertTrue(!categories.isEmpty(), "sound category values");
+    JsonObject controls = result.getAsJsonObject("controls");
+    assertTrue(controls.get("mouseSensitivity").getAsDouble() >= 0, "mouse sensitivity");
+    assertTrue(controls.get("rawInput").isJsonPrimitive(), "raw input option");
+    assertTrue(
+        result.getAsJsonObject("accessibility").get("subtitles").isJsonPrimitive(),
+        "subtitle option");
+    assertTrue(
+        result.getAsJsonObject("chat").get("visibility").isJsonPrimitive(),
+        "chat visibility option");
   }
 
   private static void verifyAdvancementDetail(JsonObject result, String expectedId) {

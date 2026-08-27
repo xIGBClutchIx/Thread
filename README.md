@@ -8,9 +8,11 @@ Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fab
 
 ## What it exposes
 
-Twenty `minecraft.*` tools cover:
+Twenty-one `minecraft.*` tools cover:
 
 - session status and game versions;
+- local client options for general, video, audio, controls, accessibility, chat, and bounded
+  keybind context, available from menus and multiplayer without reading world state;
 - authoritative player vitals, armor/air, effects, movement and condition flags, hotbar/cooldown,
   position, game mode/hardcore, and conditional vehicle/respawn context;
 - compact live world context including biome, spawn distance, difficulty/hardcore, time, weather,
@@ -121,8 +123,10 @@ See [Thread Integrations](docs/INTEGRATIONS.md) for the supported API and packag
 - No bundled JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or similar adapter.
 - Crafting plans are deterministic and bounded, not exhaustive global optimizers.
 
-`minecraft.get_status` remains available in menus, loading states, single-player, and unsupported
-multiplayer. Other gameplay tools require a supported integrated single-player session.
+`minecraft.get_status`, `minecraft.get_game_info`, and `minecraft.get_client_options` remain
+available in menus, loading states, single-player, and unsupported multiplayer. Client options are
+local configuration only; all gameplay-state tools require a supported integrated single-player
+session.
 
 ## Development
 

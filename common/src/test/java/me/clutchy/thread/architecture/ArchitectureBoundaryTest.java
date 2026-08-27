@@ -37,6 +37,7 @@ class ArchitectureBoundaryTest {
           "crafting",
           "game",
           "item",
+          "options",
           "player",
           "recipe",
           "validation",

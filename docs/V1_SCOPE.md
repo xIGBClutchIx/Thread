@@ -43,6 +43,8 @@ project toolchain.
 
 - runtime/session status, including menu vs loaded world
 - game/version information
+- bounded local client settings grouped into general, video, audio, controls, accessibility, chat,
+  and opt-in keybind sections, without requiring a world
 - authoritative player vitals, armor/air, active effects, movement and condition flags, selected
   hotbar/cooldown state, game mode/hardcore, and conditional vehicle/respawn context
 - player inventory
@@ -99,6 +101,7 @@ project toolchain.
 - direct OpenAI API integration
 - autonomous actions
 - inventory modification
+- client setting mutation
 - crafting actions
 - movement
 - block placement/breaking
@@ -140,6 +143,8 @@ From a clean install, an MCP client can discover Thread and correctly answer eac
 15. "What biome and dimension am I in, how far am I from world spawn, and what are the current
     time, weather, light, difficulty, and hardcore state?"
 16. "What entity am I looking at, what is it carrying, and what useful vanilla state does it have?"
+17. "What are my current video, audio, accessibility, chat, control, and requested keybind
+    settings?"
 
 For #9, Thread performs a deterministic comparison and reports each recipe variant independently
 with required, allocated, missing, and live-source counts. For #10, Thread recursively plans

@@ -36,6 +36,9 @@ import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
 import me.clutchy.thread.core.model.item.ItemInfo;
 import me.clutchy.thread.core.model.item.ItemSearchResult;
 import me.clutchy.thread.core.model.item.ItemStackInfo;
+import me.clutchy.thread.core.model.options.ClientOptionsQuery;
+import me.clutchy.thread.core.model.options.ClientOptionsSection;
+import me.clutchy.thread.core.model.options.ClientOptionsSnapshot;
 import me.clutchy.thread.core.model.player.EquipmentPosition;
 import me.clutchy.thread.core.model.player.EquipmentSlotInfo;
 import me.clutchy.thread.core.model.player.EquipmentSnapshot;
@@ -63,6 +66,7 @@ import me.clutchy.thread.core.model.world.Position;
 import me.clutchy.thread.core.model.world.StatusEffectInfo;
 import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.AdvancementProvider;
+import me.clutchy.thread.core.provider.ClientOptionsProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
@@ -82,6 +86,7 @@ class VanillaIntegrationTest {
           "minecraft.get_advancement",
           "minecraft.get_advancements",
           "minecraft.get_capabilities",
+          "minecraft.get_client_options",
           "minecraft.get_crafting_plan",
           "minecraft.get_equipment",
           "minecraft.get_game_info",
@@ -357,6 +362,92 @@ class VanillaIntegrationTest {
   }
 
   @Test
+  void clientOptionsFilterSectionsBoundKeybindsAndSerializeDeterministically() {
+    Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
+
+    ToolDescriptor descriptor =
+        catalog.tools().descriptors().stream()
+            .filter(tool -> tool.id().toString().equals("minecraft.get_client_options"))
+            .findFirst()
+            .orElseThrow();
+    JsonObject schemaProperties = descriptor.inputSchema().document().getAsJsonObject("properties");
+    assertEquals(
+        List.of("GENERAL", "VIDEO", "AUDIO", "CONTROLS", "ACCESSIBILITY", "CHAT"),
+        schemaProperties.getAsJsonObject("sections").getAsJsonArray("default").asList().stream()
+            .map(JsonElement::getAsString)
+            .toList());
+    assertEquals(
+        ClientOptionsQuery.DEFAULT_KEYBIND_LIMIT,
+        schemaProperties.getAsJsonObject("keybindLimit").get("default").getAsInt());
+
+    JsonObject defaults = invoke(catalog.tools(), "minecraft.get_client_options", "{}");
+    assertEquals(
+        List.of("GENERAL", "VIDEO", "AUDIO", "CONTROLS", "ACCESSIBILITY", "CHAT"),
+        strings(defaults, "sections"));
+    assertTrue(defaults.get("keybinds").isJsonNull());
+    assertEquals(0.75, defaults.getAsJsonObject("audio").get("masterVolume").getAsDouble());
+    assertEquals(
+        List.of("music", "weather"),
+        defaults.getAsJsonObject("audio").getAsJsonArray("categoryVolumes").asList().stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(value -> value.get("category").getAsString())
+            .toList());
+    assertTrue(defaults.getAsJsonObject("controls").get("rawInput").getAsBoolean());
+    assertEquals("FULL", defaults.getAsJsonObject("chat").get("visibility").getAsString());
+
+    String filteredInput = "{\"sections\":[\"KEYBINDS\",\"VIDEO\"],\"keybindLimit\":2}";
+    JsonObject filtered = invoke(catalog.tools(), "minecraft.get_client_options", filteredInput);
+    assertEquals(List.of("VIDEO", "KEYBINDS"), strings(filtered, "sections"));
+    assertTrue(filtered.get("general").isJsonNull());
+    assertTrue(filtered.get("video").isJsonObject());
+    assertTrue(filtered.get("audio").isJsonNull());
+    JsonObject keybinds = filtered.getAsJsonObject("keybinds");
+    assertEquals(3, keybinds.get("totalCount").getAsInt());
+    assertEquals(2, keybinds.get("returnedCount").getAsInt());
+    assertEquals(2, keybinds.get("limit").getAsInt());
+    assertTrue(keybinds.get("truncated").getAsBoolean());
+    JsonObject attack = keybinds.getAsJsonArray("bindings").get(0).getAsJsonObject();
+    assertEquals("key.attack", attack.get("actionId").getAsString());
+    assertEquals("MOUSE", attack.get("inputType").getAsString());
+    assertEquals(List.of("key.use"), strings(attack, "conflicts"));
+    assertEquals(
+        filtered.toString(),
+        invoke(catalog.tools(), "minecraft.get_client_options", filteredInput).toString());
+
+    JsonObject allBindings =
+        invoke(
+                catalog.tools(),
+                "minecraft.get_client_options",
+                "{\"sections\":[\"KEYBINDS\"],\"keybindLimit\":3}")
+            .getAsJsonObject("keybinds");
+    JsonObject unbound = allBindings.getAsJsonArray("bindings").get(2).getAsJsonObject();
+    assertTrue(unbound.get("unbound").getAsBoolean());
+    assertEquals("UNBOUND", unbound.get("inputType").getAsString());
+    assertTrue(unbound.get("boundInput").isJsonNull());
+  }
+
+  @Test
+  void clientOptionsRemainAvailableInMultiplayerWithoutOpeningGameplayProviders() {
+    Catalog catalog =
+        catalog(
+            new MultiplayerGameProvider(),
+            new UnavailablePlayerProvider(ToolErrorCode.UNSUPPORTED),
+            new UnavailableWorldProvider(ToolErrorCode.UNSUPPORTED),
+            new UnavailableRecipeProvider(ToolErrorCode.UNSUPPORTED),
+            ignored -> true);
+
+    assertEquals(
+        "MULTIPLAYER",
+        invoke(catalog.tools(), "minecraft.get_status", "{}").get("state").getAsString());
+    assertEquals(
+        List.of("VIDEO"),
+        strings(
+            invoke(catalog.tools(), "minecraft.get_client_options", "{\"sections\":[\"VIDEO\"]}"),
+            "sections"));
+    assertToolFailure(catalog.tools(), "minecraft.get_inventory", "{}", ToolErrorCode.UNSUPPORTED);
+  }
+
+  @Test
   void advancementToolsPropagateMenuAndMultiplayerRejection() {
     assertAdvancementFailure(ToolErrorCode.WORLD_NOT_AVAILABLE);
     assertAdvancementFailure(ToolErrorCode.UNSUPPORTED);
@@ -373,6 +464,7 @@ class VanillaIntegrationTest {
                     tool -> tool.id().toString(), tool -> tool.capabilities().availability()));
     assertEquals(ToolAvailability.ALWAYS, availability.get("minecraft.get_status"));
     assertEquals(ToolAvailability.ALWAYS, availability.get("minecraft.get_game_info"));
+    assertEquals(ToolAvailability.ALWAYS, availability.get("minecraft.get_client_options"));
     assertEquals(ToolAvailability.ALWAYS, availability.get("minecraft.search_items"));
     assertEquals(ToolAvailability.ALWAYS, availability.get("minecraft.get_capabilities"));
     assertEquals(
@@ -389,7 +481,13 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        20, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        21, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+    assertEquals(
+        "en_us",
+        invoke(catalog.tools(), "minecraft.get_client_options", "{}")
+            .getAsJsonObject("general")
+            .get("languageCode")
+            .getAsString());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -407,6 +505,9 @@ class VanillaIntegrationTest {
     Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
 
     assertInvalid(catalog.tools(), "minecraft.get_status", "{\"extra\":true}");
+    assertInvalid(catalog.tools(), "minecraft.get_client_options", "{\"sections\":[\"UNKNOWN\"]}");
+    assertInvalid(catalog.tools(), "minecraft.get_client_options", "{\"sections\":[]}");
+    assertInvalid(catalog.tools(), "minecraft.get_client_options", "{\"keybindLimit\":129}");
     assertInvalid(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":0,\"limit\":8}");
     assertInvalid(catalog.tools(), "minecraft.get_nearby_containers", "{\"radius\":0,\"limit\":8}");
     assertInvalid(catalog.tools(), "minecraft.inspect_container", "{\"position\":null}");
@@ -654,7 +755,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(21, strings(capabilities, "tools").size());
+    assertEquals(V1_TOOL_IDS.size() + 1, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -712,7 +813,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(20, strings(capabilities, "tools").size());
+    assertEquals(V1_TOOL_IDS.size(), strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -770,6 +871,7 @@ class VanillaIntegrationTest {
     integrations.register(
         new VanillaIntegration(
             game,
+            new FakeClientOptionsProvider(),
             new FakeAdvancementProvider(),
             player,
             world,
@@ -796,6 +898,7 @@ class VanillaIntegrationTest {
     integrations.register(
         new VanillaIntegration(
             new SupportedGameProvider(),
+            new FakeClientOptionsProvider(),
             new UnavailableAdvancementProvider(code),
             new FakePlayerProvider(),
             new FakeWorldProvider(),
@@ -883,6 +986,97 @@ class VanillaIntegrationTest {
     @Override
     public GameInfo gameInfo() {
       return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+    }
+  }
+
+  private static final class FakeClientOptionsProvider implements ClientOptionsProvider {
+    @Override
+    public ToolResult<ClientOptionsSnapshot> options(ClientOptionsQuery query) {
+      List<ClientOptionsSnapshot.Keybind> allBindings =
+          List.of(
+              new ClientOptionsSnapshot.Keybind(
+                  "key.attack",
+                  "Attack/Destroy",
+                  "minecraft:gameplay",
+                  "Gameplay",
+                  ClientOptionsSnapshot.InputType.MOUSE,
+                  "key.mouse.left",
+                  "Left Button",
+                  false,
+                  true,
+                  List.of("key.use"),
+                  false),
+              new ClientOptionsSnapshot.Keybind(
+                  "key.jump",
+                  "Jump",
+                  "minecraft:movement",
+                  "Movement",
+                  ClientOptionsSnapshot.InputType.KEYBOARD,
+                  "key.keyboard.space",
+                  "Space",
+                  false,
+                  true,
+                  List.of(),
+                  false),
+              new ClientOptionsSnapshot.Keybind(
+                  "key.unbound",
+                  "Unbound Test",
+                  "minecraft:misc",
+                  "Miscellaneous",
+                  ClientOptionsSnapshot.InputType.UNBOUND,
+                  null,
+                  null,
+                  true,
+                  false,
+                  List.of(),
+                  false));
+      List<ClientOptionsSnapshot.Keybind> returned =
+          allBindings.stream().limit(query.keybindLimit()).toList();
+      return ToolResult.success(
+          new ClientOptionsSnapshot(
+              query.sections(),
+              query.includes(ClientOptionsSection.GENERAL)
+                  ? new ClientOptionsSnapshot.General("en_us", "RIGHT", false, true)
+                  : null,
+              query.includes(ClientOptionsSection.VIDEO)
+                  ? new ClientOptionsSnapshot.Video(
+                      false, "FANCY", 16, 12, true, 120, 3, 0.5, "ALL", 4, true, 70)
+                  : null,
+              query.includes(ClientOptionsSection.AUDIO)
+                  ? new ClientOptionsSnapshot.Audio(
+                      0.75,
+                      List.of(
+                          new ClientOptionsSnapshot.SoundCategoryVolume("music", 0.5),
+                          new ClientOptionsSnapshot.SoundCategoryVolume("weather", 0.25)),
+                      null,
+                      false)
+                  : null,
+              query.includes(ClientOptionsSection.CONTROLS)
+                  ? new ClientOptionsSnapshot.Controls(
+                      0.5,
+                      false,
+                      false,
+                      true,
+                      false,
+                      ClientOptionsSnapshot.ToggleMode.HOLD,
+                      ClientOptionsSnapshot.ToggleMode.TOGGLE)
+                  : null,
+              query.includes(ClientOptionsSection.ACCESSIBILITY)
+                  ? new ClientOptionsSnapshot.Accessibility(
+                      true, "OFF", true, false, true, false, true, 1.0)
+                  : null,
+              query.includes(ClientOptionsSection.CHAT)
+                  ? new ClientOptionsSnapshot.Chat(
+                      "FULL", 0.9, 1.0, 0.0, 0.5, true, true, true, false, true)
+                  : null,
+              query.includes(ClientOptionsSection.KEYBINDS)
+                  ? new ClientOptionsSnapshot.Keybinds(
+                      allBindings.size(),
+                      returned.size(),
+                      query.keybindLimit(),
+                      returned.size() < allBindings.size(),
+                      returned)
+                  : null));
     }
   }
 

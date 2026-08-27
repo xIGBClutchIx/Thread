@@ -24,7 +24,7 @@ bounded DTOs, and preserve native fallback behavior. Do not add an integration t
 ## Better player context
 
 Keep `minecraft.get_player` focused after its V1 enrichment. Add another tool only when it answers a
-distinct question better than the existing twenty tools; avoid large background snapshots or generic
+distinct question better than the existing twenty-one tools; avoid large background snapshots or generic
 world scanning. Prefer focused, conditional metadata over raw attributes, NBT, or full entity dumps.
 
 ## Future product phases

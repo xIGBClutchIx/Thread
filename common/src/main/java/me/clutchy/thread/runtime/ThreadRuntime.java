@@ -18,6 +18,7 @@ import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.provider.AdvancementProvider;
+import me.clutchy.thread.core.provider.ClientOptionsProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.PlayerProvider;
@@ -31,6 +32,7 @@ import me.clutchy.thread.platform.minecraft.game.MinecraftSessionGuard;
 import me.clutchy.thread.platform.minecraft.inspection.MinecraftBlockEnricherRegistry;
 import me.clutchy.thread.platform.minecraft.inspection.MinecraftBlockEntityInspectorRegistry;
 import me.clutchy.thread.platform.minecraft.mapping.MinecraftDtoMapper;
+import me.clutchy.thread.platform.minecraft.options.MinecraftClientOptionsProvider;
 import me.clutchy.thread.platform.minecraft.player.MinecraftPlayerProvider;
 import me.clutchy.thread.platform.minecraft.recipe.MinecraftRecipeProvider;
 import me.clutchy.thread.platform.minecraft.threading.MinecraftThreadExecutor;
@@ -164,6 +166,8 @@ public final class ThreadRuntime implements AutoCloseable {
             extensionRegistry);
 
     GameProvider gameProvider = new MinecraftGameProvider(client, clientThread, info.gameInfo());
+    ClientOptionsProvider clientOptionsProvider =
+        new MinecraftClientOptionsProvider(client, clientThread);
     AdvancementProvider advancementProvider =
         new MinecraftAdvancementProvider(client, clientThread, sessionGuard, gameThreadTimeout);
     PlayerProvider playerProvider =
@@ -193,6 +197,7 @@ public final class ThreadRuntime implements AutoCloseable {
     integrationRegistry.register(
         new VanillaIntegration(
             gameProvider,
+            clientOptionsProvider,
             advancementProvider,
             playerProvider,
             worldProvider,

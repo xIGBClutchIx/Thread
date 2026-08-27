@@ -5,6 +5,9 @@ import com.google.gson.JsonObject;
 import me.clutchy.thread.core.model.advancement.AdvancementInfo;
 import me.clutchy.thread.core.model.advancement.AdvancementListQuery;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
+import me.clutchy.thread.core.model.options.ClientOptionsQuery;
+import me.clutchy.thread.core.model.options.ClientOptionsSection;
+import me.clutchy.thread.core.model.options.ClientOptionsSnapshot;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
@@ -287,6 +290,94 @@ final class VanillaToolSchemas {
           property("id", string(1, 64, INTEGRATION_ID_PATTERN)),
           property("version", string(1, 128, null)),
           property("metadata", boundedArray(INTEGRATION_METADATA_ENTRY, 0, 32)));
+  private static final JsonObject CLIENT_OPTIONS_SECTION =
+      enumString(
+          java.util.Arrays.stream(ClientOptionsSection.values())
+              .map(Enum::name)
+              .toArray(String[]::new));
+  private static final JsonObject CLIENT_OPTIONS_GENERAL =
+      object(
+          property("languageCode", string(1, 64, null)),
+          property("mainHand", enumString("LEFT", "RIGHT")),
+          property("pauseOnLostFocus", bool()),
+          property("advancedItemTooltips", bool()));
+  private static final JsonObject CLIENT_OPTIONS_VIDEO =
+      object(
+          property("fullscreen", bool()),
+          property("graphicsMode", enumString("FAST", "FANCY", "FABULOUS", "CUSTOM")),
+          property("renderDistance", integer(0, null)),
+          property("simulationDistance", integer(0, null)),
+          property("vsync", bool()),
+          property("fpsLimit", integer(0, null)),
+          property("guiScale", integer(0, null)),
+          property("gamma", number()),
+          property("particles", enumString("ALL", "DECREASED", "MINIMAL")),
+          property("mipmapLevel", integer(0, null)),
+          property("entityShadows", bool()),
+          property("fov", integer(1, 180)));
+  private static final JsonObject SOUND_CATEGORY_VOLUME =
+      object(property("category", string(1, 32, null)), property("volume", number(0.0, 1.0)));
+  private static final JsonObject CLIENT_OPTIONS_AUDIO =
+      object(
+          property("masterVolume", number(0.0, 1.0)),
+          property("categoryVolumes", boundedArray(SOUND_CATEGORY_VOLUME, 0, 32)),
+          property("outputDevice", nullable(string(1, 256, null))),
+          property("directionalAudio", bool()));
+  private static final JsonObject CLIENT_OPTIONS_CONTROLS =
+      object(
+          property("mouseSensitivity", number(0.0, 1.0)),
+          property("invertMouseX", bool()),
+          property("invertMouseY", bool()),
+          property("rawInput", bool()),
+          property("autoJump", bool()),
+          property("crouchMode", enumString("HOLD", "TOGGLE")),
+          property("sprintMode", enumString("HOLD", "TOGGLE")));
+  private static final JsonObject CLIENT_OPTIONS_ACCESSIBILITY =
+      object(
+          property("subtitles", bool()),
+          property("narrator", enumString("OFF", "ALL", "CHAT", "SYSTEM")),
+          property("narratorHotkey", bool()),
+          property("highContrast", bool()),
+          property("highContrastBlockOutline", bool()),
+          property("forceUnicodeFont", bool()),
+          property("hideLightningFlashes", bool()),
+          property("notificationDisplayTime", number(0.0, null)));
+  private static final JsonObject CLIENT_OPTIONS_CHAT =
+      object(
+          property("visibility", enumString("FULL", "SYSTEM", "HIDDEN")),
+          property("opacity", number(0.0, 1.0)),
+          property("scale", number(0.0, 1.0)),
+          property("lineSpacing", number(0.0, 1.0)),
+          property("textBackgroundOpacity", number(0.0, 1.0)),
+          property("backgroundForChatOnly", bool()),
+          property("colors", bool()),
+          property("links", bool()),
+          property("linksPrompt", bool()),
+          property("onlyShowSecureChat", bool()));
+  private static final JsonObject CLIENT_OPTIONS_KEYBIND =
+      object(
+          property("actionId", string(1, 256, null)),
+          property("displayName", string(1, 256, null)),
+          property("categoryId", registryId()),
+          property("categoryDisplayName", string(1, 256, null)),
+          property("inputType", enumString("KEYBOARD", "MOUSE", "SCANCODE", "UNBOUND")),
+          property("boundInput", nullable(string(1, 256, null))),
+          property("boundDisplayName", nullable(string(1, 256, null))),
+          property("unbound", bool()),
+          property("defaultBinding", bool()),
+          property(
+              "conflicts",
+              boundedArray(string(1, 256, null), 0, ClientOptionsSnapshot.Keybind.MAX_CONFLICTS)),
+          property("conflictsTruncated", bool()));
+  private static final JsonObject CLIENT_OPTIONS_KEYBINDS =
+      object(
+          property("totalCount", integer(0, null)),
+          property("returnedCount", integer(0, ClientOptionsQuery.MAX_KEYBIND_LIMIT)),
+          property("limit", integer(1, ClientOptionsQuery.MAX_KEYBIND_LIMIT)),
+          property("truncated", bool()),
+          property(
+              "bindings",
+              boundedArray(CLIENT_OPTIONS_KEYBIND, 0, ClientOptionsQuery.MAX_KEYBIND_LIMIT)));
 
   static final JsonSchema EMPTY_INPUT = schema(object());
   static final JsonSchema SESSION_STATUS =
@@ -311,6 +402,24 @@ final class VanillaToolSchemas {
               property("loader", string(1, 64, null)),
               property("loaderVersion", string(1, 128, null)),
               property("threadVersion", string(1, 128, null))));
+  static final JsonSchema CLIENT_OPTIONS_QUERY =
+      schema(
+          object(
+              optionalProperty("sections", clientOptionsSections()),
+              optionalProperty("keybindLimit", clientOptionsKeybindLimit())));
+  static final JsonSchema CLIENT_OPTIONS_SNAPSHOT =
+      schema(
+          object(
+              property(
+                  "sections",
+                  boundedArray(CLIENT_OPTIONS_SECTION, 1, ClientOptionsSection.values().length)),
+              property("general", nullable(CLIENT_OPTIONS_GENERAL)),
+              property("video", nullable(CLIENT_OPTIONS_VIDEO)),
+              property("audio", nullable(CLIENT_OPTIONS_AUDIO)),
+              property("controls", nullable(CLIENT_OPTIONS_CONTROLS)),
+              property("accessibility", nullable(CLIENT_OPTIONS_ACCESSIBILITY)),
+              property("chat", nullable(CLIENT_OPTIONS_CHAT)),
+              property("keybinds", nullable(CLIENT_OPTIONS_KEYBINDS))));
   static final JsonSchema WORLD_INFO =
       schema(
           object(
@@ -626,6 +735,29 @@ final class VanillaToolSchemas {
         "description",
         "Maximum returned advancements. Results include truncation metadata when this bound or "
             + "the provider scan ceiling omits entries.");
+    return schema;
+  }
+
+  private static JsonObject clientOptionsSections() {
+    JsonObject schema =
+        boundedArray(CLIENT_OPTIONS_SECTION, 1, ClientOptionsSection.values().length);
+    JsonArray defaults = new JsonArray();
+    ClientOptionsQuery.defaultSections().forEach(section -> defaults.add(section.name()));
+    schema.add("default", defaults);
+    schema.addProperty(
+        "description",
+        "Sections to return. The bounded default excludes KEYBINDS; request KEYBINDS explicitly "
+            + "when bindings are needed.");
+    return schema;
+  }
+
+  private static JsonObject clientOptionsKeybindLimit() {
+    JsonObject schema = integer(1, ClientOptionsQuery.MAX_KEYBIND_LIMIT);
+    schema.addProperty("default", ClientOptionsQuery.DEFAULT_KEYBIND_LIMIT);
+    schema.addProperty(
+        "description",
+        "Maximum keybind records returned when KEYBINDS is selected. The response reports total, "
+            + "returned, and truncation metadata.");
     return schema;
   }
 

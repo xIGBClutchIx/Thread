@@ -30,8 +30,8 @@ NeoForge, or Forge imports or runtime dependencies. The loader modules do not de
 Minecraft:
 
 - immutable DTOs, structured errors, and explicit limits;
-- provider contracts for game, player, vanilla advancements, world, recipes, and logical-thread
-  execution;
+- provider contracts for game, local client options, player, vanilla advancements, world, recipes,
+  and logical-thread execution;
 - JSON codecs and schemas;
 - tool, context, integration, and extension registries;
 - deterministic direct crafting assessment and bounded recursive planning.
@@ -45,7 +45,7 @@ loader types, MCP types, and optional-mod types do not cross this boundary.
 
 - client and integrated-server thread dispatch;
 - the single-player session guard and status mapping;
-- bounded game, player, vanilla-advancement, world/environment, item, block, entity,
+- bounded game, local-client-option, player, vanilla-advancement, world/environment, item, block, entity,
   loaded-container, and live-recipe reads;
 - conversion from Minecraft objects to detached Thread DTOs;
 - safe Minecraft-facing block/entity extension points and registries.
@@ -133,7 +133,7 @@ behavior.
 
 Packaged parity coverage requires each loader to prove:
 
-- the exact same twenty-tool catalog and active vanilla integration;
+- the exact same twenty-one-tool catalog and active vanilla integration;
 - correct loader identity plus menu, single-player, and return-to-menu status;
 - MCP-enabled, restarted-config, and MCP-disabled startup;
 - standard MCP initialization, discovery, tool listing, calls, and controlled menu rejection;
@@ -148,9 +148,10 @@ local because those are genuine loader APIs rather than portable behavior.
 
 ## Session and threading rules
 
-`minecraft.get_status` is always callable. Other gameplay tools pass through the centralized
-shared session guard and reject menus, loading states, missing players, and multiplayer before
-exposing game state.
+`minecraft.get_status`, `minecraft.get_game_info`, and `minecraft.get_client_options` are always
+callable. Client options use only local `Minecraft.options` state and never consult a world, player,
+or server. Other gameplay tools pass through the centralized shared session guard and reject menus,
+loading states, missing players, and multiplayer before exposing game state.
 
 Client-owned reads run on the Minecraft client thread. Integrated-server-owned reads, including
 player status, live recipes, advancement progress, world/environment context, block entities, and
@@ -172,6 +173,12 @@ the target disappears.
 A `GameTool` owns a stable ID, description, input/output codecs, explicit JSON schemas, read-only
 capability metadata, and an execution function. `ToolRegistry` validates input before execution
 and validates serialized output before returning it to MCP.
+
+`minecraft.get_client_options` maps native client options into stable sectioned Thread DTOs on the
+client thread. The default response omits keybinds; callers must select `KEYBINDS`, whose page size
+and per-binding conflict list have hard limits. Section order, sound-category order, keybind order,
+and conflict order are deterministic. This client-only provider deliberately bypasses the gameplay
+session guard so menu and multiplayer calls cannot accidentally expose gameplay state.
 
 `AdvancementService` applies exact registry-ID or all-term text matching, completion filters,
 stable ID ordering, and result limits over a bounded `AdvancementProvider` snapshot. This is a

@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Read-only local client settings through `minecraft.get_client_options`, with section filtering,
+  bounded opt-in keybinds and conflicts, deterministic output, and safe availability in menus,
+  single-player, and multiplayer without gameplay-state access.
 - Actual-look entity inspection through `minecraft.get_target_entity`, reusing the nearby-entity
   contract with bounded equipment, active effects, age, tame ownership, and villager metadata.
 - Compact live world/environment context through `minecraft.get_world_info`, including dimension,

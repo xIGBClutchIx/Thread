@@ -12,8 +12,9 @@ not the core API.
 ## V1 is deliberately narrow
 
 V1 is Java 25, Fabric/NeoForge/Forge client, Minecraft 26.2, single-player, read-only, bounded, and loopback-only.
-Gameplay tools reject multiplayer before exposing state. `minecraft.get_status` remains available
-from every client state as the safe preflight.
+Gameplay tools reject multiplayer before exposing state. `minecraft.get_status`,
+`minecraft.get_game_info`, and the local-only `minecraft.get_client_options` remain available from
+every client state.
 
 Thread does not implement remote access, authentication, actions, dedicated-server behavior, or
 multiple Minecraft versions until those products have their own trust and compatibility designs.
@@ -63,6 +64,20 @@ only already-loaded state and never force-load chunks.
 
 Recipes come from the integrated server's final live `RecipeManager`, including active datapack and
 installed-mod changes. Thread has no static vanilla recipe catalog.
+
+## Client options are local, stable, and bounded
+
+`minecraft.get_client_options` reads `Minecraft.options` on the client thread and deliberately does
+not use the single-player gameplay guard. It remains available in menus and multiplayer because it
+does not touch a world, player, connection, or server. All values are copied into stable sectioned
+Thread DTOs; native `Options`, `OptionInstance`, `KeyMapping`, and component objects never cross the
+provider boundary.
+
+The default response includes general, video, audio, controls, accessibility, and chat sections but
+excludes keybinds. Keybinds are opt-in, limited to 64 by default and 128 maximum, and carry explicit
+total/returned/truncation metadata. Per-binding conflicts are capped at 16. Sections, audio
+categories, keybinds, and conflicts have deterministic ordering so repeated reads serialize
+consistently. The tool is read-only and provides no setting-mutation contract.
 
 Vanilla advancement identity is gated by the client advancement tree, so Thread never broadens a
 query to entries Minecraft has not exposed as visible/known to the player. Progress is then read

@@ -25,6 +25,8 @@ import me.clutchy.thread.core.model.item.ItemSearchQuery;
 import me.clutchy.thread.core.model.item.ItemSearchResult;
 import me.clutchy.thread.core.model.item.find.FindItemQuery;
 import me.clutchy.thread.core.model.item.find.FindItemResult;
+import me.clutchy.thread.core.model.options.ClientOptionsQuery;
+import me.clutchy.thread.core.model.options.ClientOptionsSnapshot;
 import me.clutchy.thread.core.model.player.EquipmentSnapshot;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
@@ -39,6 +41,7 @@ import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.AdvancementProvider;
+import me.clutchy.thread.core.provider.ClientOptionsProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
@@ -63,6 +66,7 @@ public final class VanillaIntegration implements ThreadIntegration {
   private static final String VERSION = "1";
 
   private final GameProvider game;
+  private final ClientOptionsProvider clientOptions;
   private final PlayerProvider player;
   private final AdvancementService advancements;
   private final WorldProvider world;
@@ -76,6 +80,7 @@ public final class VanillaIntegration implements ThreadIntegration {
   /** Creates a vanilla catalog filtered before tools enter discovery or invocation registries. */
   public VanillaIntegration(
       GameProvider game,
+      ClientOptionsProvider clientOptions,
       AdvancementProvider advancements,
       PlayerProvider player,
       WorldProvider world,
@@ -84,6 +89,7 @@ public final class VanillaIntegration implements ThreadIntegration {
       Predicate<ToolId> enabledTools,
       Supplier<CapabilitiesSnapshot> capabilities) {
     this.game = Objects.requireNonNull(game, "game");
+    this.clientOptions = Objects.requireNonNull(clientOptions, "clientOptions");
     this.advancements =
         new AdvancementService(Objects.requireNonNull(advancements, "advancements"));
     this.player = Objects.requireNonNull(player, "player");
@@ -117,6 +123,7 @@ public final class VanillaIntegration implements ThreadIntegration {
   public void register(IntegrationContext context) {
     register(context, getStatus());
     register(context, getGameInfo());
+    register(context, getClientOptions());
     register(context, getPlayer());
     register(context, getWorldInfo());
     register(context, getAdvancements());
@@ -158,6 +165,20 @@ public final class VanillaIntegration implements ThreadIntegration {
         JsonCodec.of(GameInfo.class, VanillaToolSchemas.GAME_INFO),
         ToolCapabilities.alwaysAvailable(),
         ignored -> ToolResult.success(game.gameInfo()));
+  }
+
+  private GameTool<ClientOptionsQuery, ClientOptionsSnapshot> getClientOptions() {
+    return tool(
+        "minecraft.get_client_options",
+        "Returns selected local Minecraft client settings as stable read-only sections. It works "
+            + "from menus, single-player, and multiplayer because it reads only client-owned "
+            + "options and never inspects world or server state. Ordinary calls omit the bounded "
+            + "keybind catalog. Use this with KEYBINDS explicitly when bindings or conflicts are "
+            + "needed.",
+        JsonCodec.of(ClientOptionsQuery.class, VanillaToolSchemas.CLIENT_OPTIONS_QUERY),
+        JsonCodec.of(ClientOptionsSnapshot.class, VanillaToolSchemas.CLIENT_OPTIONS_SNAPSHOT),
+        ToolCapabilities.alwaysAvailable(),
+        clientOptions::options);
   }
 
   private GameTool<EmptyInput, PlayerStatus> getPlayer() {

@@ -106,6 +106,102 @@ Example result:
 
 Session/world availability belongs to `minecraft.get_status`; player/world-specific details belong to their dedicated tools. `minecraft.get_game_info` should remain useful from the main menu.
 
+## `minecraft.get_client_options`
+
+Purpose: read bounded local Minecraft client configuration without requiring or inspecting a world,
+player, or integrated server. The tool is available from the main menu, single-player, and
+multiplayer because it does not expose gameplay state.
+
+Input:
+
+```json
+{
+  "sections": ["VIDEO", "AUDIO", "KEYBINDS"],
+  "keybindLimit": 12
+}
+```
+
+`sections` accepts `GENERAL`, `VIDEO`, `AUDIO`, `CONTROLS`, `ACCESSIBILITY`, `CHAT`, and
+`KEYBINDS`. Omission selects the first six sections in that order and excludes `KEYBINDS` to keep
+the normal response compact. `keybindLimit` defaults to 64 and has a hard maximum of 128; it only
+affects a selected `KEYBINDS` section. Duplicate or caller-ordered sections are normalized to the
+stable enum order.
+
+Example result for selected sections:
+
+```json
+{
+  "sections": ["VIDEO", "AUDIO", "KEYBINDS"],
+  "general": null,
+  "video": {
+    "fullscreen": false,
+    "graphicsMode": "FANCY",
+    "renderDistance": 16,
+    "simulationDistance": 12,
+    "vsync": true,
+    "fpsLimit": 120,
+    "guiScale": 3,
+    "gamma": 0.5,
+    "particles": "ALL",
+    "mipmapLevel": 4,
+    "entityShadows": true,
+    "fov": 70
+  },
+  "audio": {
+    "masterVolume": 0.75,
+    "categoryVolumes": [
+      {"category": "music", "volume": 0.5},
+      {"category": "weather", "volume": 1.0}
+    ],
+    "outputDevice": null,
+    "directionalAudio": false
+  },
+  "controls": null,
+  "accessibility": null,
+  "chat": null,
+  "keybinds": {
+    "totalCount": 84,
+    "returnedCount": 12,
+    "limit": 12,
+    "truncated": true,
+    "bindings": [
+      {
+        "actionId": "key.attack",
+        "displayName": "Attack/Destroy",
+        "categoryId": "minecraft:gameplay",
+        "categoryDisplayName": "Gameplay",
+        "inputType": "MOUSE",
+        "boundInput": "key.mouse.left",
+        "boundDisplayName": "Left Button",
+        "unbound": false,
+        "defaultBinding": true,
+        "conflicts": [],
+        "conflictsTruncated": false
+      }
+    ]
+  }
+}
+```
+
+The other section payloads contain:
+
+- `GENERAL`: language code, main hand, pause-on-lost-focus, and advanced item tooltips;
+- `CONTROLS`: mouse sensitivity, X/Y inversion, raw input, auto-jump, and crouch/sprint
+  `HOLD`/`TOGGLE` modes;
+- `ACCESSIBILITY`: subtitles, narrator mode/hotkey, high contrast and block outline, Unicode font,
+  hidden lightning flashes, and notification display time;
+- `CHAT`: visibility, opacity, scale, line spacing, text-background opacity/scope, colors, links,
+  link prompts, and secure-chat-only display.
+
+Audio category entries use Minecraft's stable category names, omit the separately reported master
+category, and sort by name. A default output device is represented as `null`. Keybinds sort by
+action/translation ID and native saved binding. Bound inputs are classified as `KEYBOARD`, `MOUSE`,
+or `SCANCODE`; an unbound action uses `UNBOUND` and null binding fields. Conflict action IDs are
+sorted and capped at 16 per binding, with `conflictsTruncated` showing when the cap omitted more.
+The provider reads native `Minecraft.options`, option getters, sound-source values, and
+`Options.keyMappings` on the client thread. It never serializes Minecraft option objects directly
+and never changes a setting.
+
 ## `minecraft.get_advancements`
 
 Purpose: return a bounded, deterministic list of vanilla advancements Minecraft currently exposes
@@ -1209,7 +1305,7 @@ Example result:
       "id": "vanilla",
       "version": "1",
       "metadata": [
-        {"key": "thread.tool_count", "value": "20"}
+        {"key": "thread.tool_count", "value": "21"}
       ]
     }
   ]
@@ -1227,7 +1323,7 @@ capabilities and their classes are not resolved before presence/compatibility ch
 
 The base artifact reports only the required `vanilla` integration. Future separately installed
 Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
-changing the twenty built-in `minecraft.*` tool contracts.
+changing the twenty-one built-in `minecraft.*` tool contracts.
 
 ## Tool descriptions
 
