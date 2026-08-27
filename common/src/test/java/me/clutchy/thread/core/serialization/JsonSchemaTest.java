@@ -62,6 +62,33 @@ class JsonSchemaTest {
   }
 
   @Test
+  void validatesExclusiveMinimumAndSchemaDefaults() {
+    JsonSchema schema =
+        JsonSchema.parse(
+            """
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 16,
+              "default": 8,
+              "description": "A positive bounded number."
+            }
+            """);
+
+    assertTrue(schema.validate(JsonParser.parseString("8")).isEmpty());
+    assertEquals(
+        "number is not above the exclusive minimum",
+        schema.validate(JsonParser.parseString("0")).getFirst().message());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JsonSchema.parse(
+                """
+                {"type":"integer","minimum":1,"maximum":3,"default":4}
+                """));
+  }
+
+  @Test
   void schemaDocumentsAreDefensivelyCopied() {
     JsonObject source = JsonParser.parseString("{\"type\":\"object\"}").getAsJsonObject();
     JsonSchema schema = JsonSchema.of(source);

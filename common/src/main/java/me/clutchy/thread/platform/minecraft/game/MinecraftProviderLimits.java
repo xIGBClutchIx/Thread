@@ -1,5 +1,7 @@
 package me.clutchy.thread.platform.minecraft.game;
 
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
+
 /** Server-enforced safety bounds used by live Minecraft providers. */
 public record MinecraftProviderLimits(
     double maxEntityRadius,
@@ -8,9 +10,6 @@ public record MinecraftProviderLimits(
     int maxItemSearchResults,
     int maxRecipeDefinitions,
     int maxRecipesPerItem) {
-  private static final double HARD_MAX_CONTAINER_RADIUS = 16;
-  private static final int HARD_MAX_CONTAINER_RESULTS = 64;
-
   public MinecraftProviderLimits {
     if (!Double.isFinite(maxEntityRadius) || maxEntityRadius <= 0) {
       throw new IllegalArgumentException("maxEntityRadius must be finite and positive");
@@ -51,11 +50,11 @@ public record MinecraftProviderLimits(
    * uses a smaller ceiling while still respecting a user-configured lower world-query radius.
    */
   public double maxContainerRadius() {
-    return Math.min(maxEntityRadius, HARD_MAX_CONTAINER_RADIUS);
+    return Math.min(maxEntityRadius, NearbyContainerQuery.HARD_MAX_RADIUS);
   }
 
   /** Returns the container result cap after respecting the configured world-query result limit. */
   public int maxContainerResults() {
-    return Math.min(maxEntityResults, HARD_MAX_CONTAINER_RESULTS);
+    return Math.min(maxEntityResults, NearbyContainerQuery.HARD_MAX_RESULTS);
   }
 }

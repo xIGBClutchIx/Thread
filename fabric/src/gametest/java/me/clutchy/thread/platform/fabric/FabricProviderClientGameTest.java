@@ -297,14 +297,14 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
           "full hopper inventory");
 
       assertEquals(
-          "OUT_OF_RANGE",
+          "INVALID_INPUT",
           invoke(context, tools, "minecraft.get_nearby_containers", "{\"radius\":17,\"limit\":8}")
               .error()
               .code()
               .name(),
           "container radius limit");
       assertEquals(
-          "RESULT_LIMIT_EXCEEDED",
+          "INVALID_INPUT",
           invoke(context, tools, "minecraft.get_nearby_containers", "{\"radius\":8,\"limit\":65}")
               .error()
               .code()

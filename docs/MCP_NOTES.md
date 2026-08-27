@@ -42,6 +42,9 @@ Thread-specific validation experiments are not part of the transport contract.
 - `tools/list` is generated from stable `ToolRegistry` descriptors.
 - Each descriptor includes its input/output schemas and read-only, non-destructive, idempotent,
   closed-world annotations.
+- Each entry also exposes `_meta["me.clutchy.thread/availability"]` as `ALWAYS` or
+  `SUPPORTED_SINGLEPLAYER`. Descriptions restate that availability in ordinary language so a
+  model does not need to understand Thread-specific metadata.
 - `tools/call` accepts a registered name and an object-valued `arguments` field.
 - Input is validated by the core codec before execution; serialized output is checked against the
   declared output schema.
@@ -50,6 +53,26 @@ Thread-specific validation experiments are not part of the transport contract.
   requests use JSON-RPC errors.
 
 MCP never contains crafting, session, or Minecraft query logic. It invokes only the registry.
+
+`openWorldHint: false` is intentional: Thread reads one bounded local Minecraft client rather than
+communicating with an unbounded set of external entities. It does not weaken the single-player
+guard or imply static results. All four annotations remain hints; runtime codecs, safety bounds,
+and session guards are authoritative.
+
+## Catalog contract
+
+The built-in catalog is stable-ID ordered. Tool descriptions state when to choose a tool over its
+closest alternatives, while input schemas carry exact registry-ID semantics, units, enums,
+optional defaults, and absolute numeric ceilings. Runtime configuration may lower a ceiling but
+never raise it. Result schemas keep stable shapes: arrays are present when empty, nullable fields
+are explicit, and truncation/incompleteness flags identify bounded omissions.
+
+A real-loopback catalog contract test requests `tools/list` and validates unique ordered IDs,
+non-empty descriptions, schema structure/defaults/enums/bounds, read-only annotations, session
+metadata, and the absence of loader implementation names. Its SHA-256 semantic fingerprint omits
+description text at both tool and schema-annotation level, so wording-only improvements do not
+require snapshot churn while structural MCP changes do. The complete serialized response also has
+an 80 KiB regression budget; clarity is not removed merely to save bytes.
 
 ## HTTP and security rules
 
@@ -87,6 +110,8 @@ The real local HTTP tests cover:
 - protocol negotiation and required post-initialization headers;
 - request envelope, JSON, content negotiation, origin, size, and concurrency failures;
 - tool schemas, annotations, structured success/error mapping, disconnects, and shutdown.
+- the complete built-in catalog's semantic fingerprint, input metadata, session availability,
+  stable ordering, loader neutrality, and serialized payload budget.
 
 Packaged client tests repeat initialization against each actual loader-specific JAR. A shared
 loader-neutral parity fixture verifies the exact catalog, exercises all twenty-one tool paths across

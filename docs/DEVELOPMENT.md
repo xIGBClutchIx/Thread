@@ -62,6 +62,9 @@ Minecraft is unnecessary.
 Important regression areas include:
 
 - success/error schema validation and deterministic discovery;
+- the real serialized built-in `tools/list` catalog: unique stable IDs/order, non-empty
+  descriptions, schema defaults/enums/bounds, read-only annotations, session metadata, loader
+  neutrality, a wording-insensitive semantic fingerprint, and an 80 KiB payload budget;
 - all session states and multiplayer rejection;
 - authoritative player vitals, game mode/hardcore, armor/air, bounded effects, movement and
   conditions, hotbar/cooldown, optional vehicle/respawn context, and deterministic serialization;
@@ -189,7 +192,9 @@ Use the release JAR, not a development run, for the final human check:
 3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm twenty-one
    read-only `minecraft.*` tools.
 4. Call `minecraft.get_status` in the menu; it must return a controlled unsupported/no-world state.
-   Call `minecraft.get_client_options` there as well and confirm the default local-only sections.
+   Also call `minecraft.get_game_info`, `minecraft.get_client_options`,
+   `minecraft.search_items`, and `minecraft.get_capabilities`; confirm they remain available and
+   the options response contains the default local-only sections.
 5. Load an integrated single-player world and call status, player, world info, inventory, equipment,
    target block, target entity, nearby-entity, nearby-container, container-inspection, unified live item search, vanilla
    advancement list/detail, client options including a bounded keybind request, recipe, crafting,

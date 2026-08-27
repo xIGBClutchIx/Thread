@@ -27,6 +27,11 @@ Twenty-one `minecraft.*` tools cover:
 - direct craftability, missing ingredients, and bounded recursive crafting plans;
 - the active tool and integration capabilities.
 
+The `tools/list` catalog is self-describing: descriptions distinguish overlapping tools, input
+schemas expose defaults and hard limits, and each entry states whether it works in every client
+state or requires supported single-player. A Thread-specific model prompt is not required for tool
+selection.
+
 Recipes come from Minecraft's live integrated-server recipe manager, so active datapack and mod
 recipe additions, replacements, and removals are included. Queries never force-load chunks, scan
 the wider world, resolve unopened loot containers, or mutate game state. Nearby storage is exposed
@@ -123,9 +128,10 @@ See [Thread Integrations](docs/INTEGRATIONS.md) for the supported API and packag
 - No bundled JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or similar adapter.
 - Crafting plans are deterministic and bounded, not exhaustive global optimizers.
 
-`minecraft.get_status`, `minecraft.get_game_info`, and `minecraft.get_client_options` remain
-available in menus, loading states, single-player, and unsupported multiplayer. Client options are
-local configuration only; all gameplay-state tools require a supported integrated single-player
+`minecraft.get_status`, `minecraft.get_game_info`, `minecraft.get_client_options`,
+`minecraft.search_items`, and `minecraft.get_capabilities` remain available in menus, loading
+states, single-player, and unsupported multiplayer. Client options and registry search are local
+client context only; all gameplay-state tools require a supported integrated single-player
 session.
 
 ## Development

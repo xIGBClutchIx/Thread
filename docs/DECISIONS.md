@@ -190,6 +190,25 @@ Initialization is compatibility negotiation, not stored session state. Thread ne
 requires `Mcp-Session-Id`, custom mirrored method/name headers, or per-request protocol metadata.
 Legacy GET/SSE and non-tool MCP feature surfaces are absent.
 
+## The MCP catalog is a model-facing contract
+
+Thread assumes an unfamiliar client may see only initialization and `tools/list`. Built-in tool
+descriptions therefore state the selection boundary against their closest alternatives and append
+one consistent availability sentence. Input schemas, rather than a Thread-specific prompt, carry
+exact-ID matching, units, enums, optional defaults, hard ceilings, and the warning that configured
+limits may be lower. Tool IDs and existing behavior remain unchanged.
+
+Catalog validation uses the actual loopback `tools/list` response. It checks ordered unique IDs,
+schema structure and metadata, read-only/non-destructive/idempotent/closed-domain annotations,
+session availability, loader neutrality, and an 80 KiB serialized-response budget. A semantic
+SHA-256 snapshot excludes tool wording and JSON Schema `description` annotations but retains names,
+schemas, defaults, limits, annotations, availability, and order. This catches meaningful contract
+drift without turning normal copy editing into snapshot maintenance.
+
+`openWorldHint` remains false because Thread's domain is one bounded local Minecraft client; it
+does not communicate with an unbounded external world. Dynamic game state is still guarded and
+validated at call time.
+
 ## Quality and release proofs are part of V1
 
 Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and

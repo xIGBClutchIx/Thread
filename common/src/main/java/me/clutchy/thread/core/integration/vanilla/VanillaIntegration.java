@@ -54,6 +54,7 @@ import me.clutchy.thread.core.service.item.CraftingItemSourceProvider;
 import me.clutchy.thread.core.service.item.ItemFinder;
 import me.clutchy.thread.core.tool.EmptyInput;
 import me.clutchy.thread.core.tool.GameTool;
+import me.clutchy.thread.core.tool.ToolAvailability;
 import me.clutchy.thread.core.tool.ToolCapabilities;
 import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -147,9 +148,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, SessionStatus> getStatus() {
     return tool(
         "minecraft.get_status",
-        "Reports the current Minecraft session state and whether live gameplay tools are usable. "
-            + "Use this as a cheap preflight from menus, loading screens, single-player, or "
-            + "unsupported multiplayer sessions.",
+        "Checks the current client session and whether supported single-player gameplay tools can "
+            + "run. Use this as the preflight for menu, loading, or multiplayer state; use "
+            + "minecraft.get_game_info for installed versions and minecraft.get_world_info for "
+            + "loaded-world details.",
         emptyInputCodec(),
         JsonCodec.of(SessionStatus.class, VanillaToolSchemas.SESSION_STATUS),
         ToolCapabilities.alwaysAvailable(),
@@ -159,8 +161,9 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, GameInfo> getGameInfo() {
     return tool(
         "minecraft.get_game_info",
-        "Returns the running Minecraft, mod loader, and Thread versions. Use this when the "
-            + "answer depends on the actual installed runtime; it remains available from menus.",
+        "Reports the installed Minecraft, mod-loader, and Thread versions. Use this for runtime "
+            + "identity; use minecraft.get_status for session availability and "
+            + "minecraft.get_world_info for live world context.",
         emptyInputCodec(),
         JsonCodec.of(GameInfo.class, VanillaToolSchemas.GAME_INFO),
         ToolCapabilities.alwaysAvailable(),
@@ -170,11 +173,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<ClientOptionsQuery, ClientOptionsSnapshot> getClientOptions() {
     return tool(
         "minecraft.get_client_options",
-        "Returns selected local Minecraft client settings as stable read-only sections. It works "
-            + "from menus, single-player, and multiplayer because it reads only client-owned "
-            + "options and never inspects world or server state. Ordinary calls omit the bounded "
-            + "keybind catalog. Use this with KEYBINDS explicitly when bindings or conflicts are "
-            + "needed.",
+        "Reads selected local client settings without inspecting a world, player, or server. Use "
+            + "this for general, video, audio, control, accessibility, or chat options; request "
+            + "KEYBINDS explicitly for a bounded binding and conflict list. Do not use it for "
+            + "gameplay state.",
         JsonCodec.of(ClientOptionsQuery.class, VanillaToolSchemas.CLIENT_OPTIONS_QUERY),
         JsonCodec.of(ClientOptionsSnapshot.class, VanillaToolSchemas.CLIENT_OPTIONS_SNAPSHOT),
         ToolCapabilities.alwaysAvailable(),
@@ -184,10 +186,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, PlayerStatus> getPlayer() {
     return tool(
         "minecraft.get_player",
-        "Returns the local player's authoritative live vitals, armor, air, effects, movement and "
-            + "condition flags, hotbar/cooldown state, position, dimension, game mode, and "
-            + "hardcore state, plus conditional vehicle and respawn context. Use this when an "
-            + "answer depends on the current supported single-player state.",
+        "Reports the local player's live vitals, effects, movement, position, game mode, and "
+            + "compact vehicle or respawn context. Use this for player condition; use "
+            + "minecraft.get_inventory for carried items, minecraft.get_equipment for held or "
+            + "worn items, and minecraft.get_world_info for the environment.",
         emptyInputCodec(),
         JsonCodec.of(PlayerStatus.class, VanillaToolSchemas.PLAYER_STATUS),
         ToolCapabilities.supportedSingleplayer(),
@@ -197,11 +199,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, WorldInfo> getWorldInfo() {
     return tool(
         "minecraft.get_world_info",
-        "Returns a compact live snapshot of the supported single-player world around the local "
-            + "player: dimension and biome, position and global spawn distance, difficulty, "
-            + "day/time, daylight, weather, local light, moon phase, and native biome climate "
-            + "values. Use this for current surroundings without changing time, weather, chunks, "
-            + "or any world state.",
+        "Reports the current dimension, biome, spawn distance, difficulty, time, weather, light, "
+            + "moon phase, and biome climate around the player. Use this for live environment "
+            + "context; use minecraft.get_player for player condition and minecraft.get_game_info "
+            + "for installed versions.",
         emptyInputCodec(),
         JsonCodec.of(WorldInfo.class, VanillaToolSchemas.WORLD_INFO),
         ToolCapabilities.supportedSingleplayer(),
@@ -211,9 +212,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, InventorySnapshot> getInventory() {
     return tool(
         "minecraft.get_inventory",
-        "Returns the local player's non-empty main-inventory slots with canonical IDs, names, "
-            + "counts, durability, enchantments, and selected safe components. Equipment is "
-            + "excluded. Use this when the answer depends on what the player possesses.",
+        "Lists every non-empty slot in the player's 36-slot main inventory. Use this for a full "
+            + "player-inventory snapshot; it excludes equipment and nearby storage. Use "
+            + "minecraft.get_equipment for held or worn items and minecraft.find_item to locate "
+            + "matching items across all supported live sources.",
         emptyInputCodec(),
         JsonCodec.of(InventorySnapshot.class, VanillaToolSchemas.INVENTORY),
         ToolCapabilities.supportedSingleplayer(),
@@ -223,11 +225,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<AdvancementListQuery, AdvancementListResult> getAdvancements() {
     return tool(
         "minecraft.get_advancements",
-        "Returns a bounded deterministic list of vanilla advancements currently visible or known "
-            + "to the local player, with live completion summaries. Filter by ALL, COMPLETED, or "
-            + "INCOMPLETE and optionally search canonical IDs or display text. Results report both "
-            + "query truncation and an incomplete provider snapshot. Use this for progression "
-            + "overviews without changing advancement state.",
+        "Lists bounded vanilla advancement summaries currently visible or known to the player, "
+            + "with completion filters and optional text search. Use this for progression "
+            + "overviews; use minecraft.get_advancement with one exact advancement ID for "
+            + "criteria and timestamps.",
         JsonCodec.of(AdvancementListQuery.class, VanillaToolSchemas.ADVANCEMENT_LIST_QUERY),
         JsonCodec.of(AdvancementListResult.class, VanillaToolSchemas.ADVANCEMENT_LIST_RESULT),
         ToolCapabilities.supportedSingleplayer(),
@@ -237,10 +238,9 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<AdvancementLookupQuery, AdvancementInfo> getAdvancement() {
     return tool(
         "minecraft.get_advancement",
-        "Returns detailed live vanilla progress for one exact advancement ID already known to the "
-            + "local player, including criteria state and timestamps, parent/tab context, display "
-            + "type, hidden status, and completion. Unknown or undisclosed advancements return "
-            + "NOT_FOUND. Use this for exact progress details; no progress or rewards are changed.",
+        "Reports criteria, timestamps, hierarchy, display metadata, and completion for one exact "
+            + "visible or known vanilla advancement ID. Use this for detailed progress after "
+            + "minecraft.get_advancements; unknown or undisclosed IDs return NOT_FOUND.",
         JsonCodec.of(AdvancementLookupQuery.class, VanillaToolSchemas.ADVANCEMENT_LOOKUP_QUERY),
         JsonCodec.of(AdvancementInfo.class, VanillaToolSchemas.ADVANCEMENT_INFO),
         ToolCapabilities.supportedSingleplayer(),
@@ -250,9 +250,9 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, EquipmentSnapshot> getEquipment() {
     return tool(
         "minecraft.get_equipment",
-        "Returns the local player's live main hand, off hand, armor, and empty equipment positions "
-            + "with the same rich item context as inventory. Use this to answer what is currently "
-            + "held or worn.",
+        "Reports the player's main hand, off hand, and armor slots, including empty positions. Use "
+            + "this for what is held or worn; use minecraft.get_inventory for the 36-slot main "
+            + "inventory or minecraft.find_item to search every supported live item source.",
         emptyInputCodec(),
         JsonCodec.of(EquipmentSnapshot.class, VanillaToolSchemas.EQUIPMENT),
         ToolCapabilities.supportedSingleplayer(),
@@ -262,10 +262,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, BlockInfo> getTargetBlock() {
     return tool(
         "minecraft.get_target_block",
-        "Returns the block currently under the player's normal camera targeting ray, including "
-            + "canonical ID, name, position, state properties, distance, and safe structured "
-            + "block-entity data. Use this to identify or inspect what the player is looking at; "
-            + "no block is a structured NOT_FOUND result.",
+        "Inspects the block under the player's current crosshair, including safe block-entity "
+            + "data when present. Use this for the current visual target; use "
+            + "minecraft.get_nearby_containers to discover container positions or "
+            + "minecraft.inspect_container when a nearby position is already known.",
         emptyInputCodec(),
         JsonCodec.of(BlockInfo.class, VanillaToolSchemas.TARGET_BLOCK),
         ToolCapabilities.supportedSingleplayer(),
@@ -275,11 +275,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, EntityInfo> getTargetEntity() {
     return tool(
         "minecraft.get_target_entity",
-        "Returns the exact entity currently under the player's normal camera targeting ray, "
-            + "including canonical identity, position and distance, health, behavior, equipment, "
-            + "effects, age, tame/owner, and villager details when applicable. Use this for rich "
-            + "focused inspection of what the player is looking at; no entity is a structured "
-            + "NOT_FOUND result and no entity state is changed.",
+        "Inspects the exact entity under the player's current crosshair with bounded living, "
+            + "equipment, effect, tame, and villager details. Use this for one focused visual "
+            + "target; use minecraft.get_nearby_entities for a distance-bounded area scan. No "
+            + "target returns NOT_FOUND.",
         emptyInputCodec(),
         JsonCodec.of(EntityInfo.class, VanillaToolSchemas.TARGET_ENTITY),
         ToolCapabilities.supportedSingleplayer(),
@@ -289,9 +288,9 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<NearbyEntityQuery, NearbyEntityResult> getNearbyEntities() {
     return tool(
         "minecraft.get_nearby_entities",
-        "Returns a bounded snapshot of already-loaded entities around the local player, sorted by "
-            + "distance, type, and position with names, health, and reliable behavior labels. Use "
-            + "this for nearby-entity questions; server-side radius and result limits win and no "
+        "Scans already-loaded entities around the player within explicit radius and result bounds, "
+            + "then sorts them deterministically by distance, type, and position. Use this for an "
+            + "area overview; use minecraft.get_target_entity for the exact crosshair target. No "
             + "chunks are loaded.",
         JsonCodec.of(NearbyEntityQuery.class, VanillaToolSchemas.NEARBY_ENTITY_QUERY),
         JsonCodec.of(NearbyEntityResult.class, VanillaToolSchemas.NEARBY_ENTITY_RESULT),
@@ -302,10 +301,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<NearbyContainerQuery, NearbyContainerResult> getNearbyContainers() {
     return tool(
         "minecraft.get_nearby_containers",
-        "Returns compact distance-ordered summaries of container block entities in already-loaded "
-            + "chunks near the local player. Use this to locate nearby storage or machines before "
-            + "inspecting one position; results include occupancy and at most four representative "
-            + "slots, never full inventories.",
+        "Locates nearby loaded containers and returns distance-ordered occupancy summaries with at "
+            + "most four representative slots. Use this to discover storage or machine positions; "
+            + "use minecraft.inspect_container for one full safe visible inventory. No chunks are "
+            + "loaded.",
         JsonCodec.of(NearbyContainerQuery.class, VanillaToolSchemas.NEARBY_CONTAINER_QUERY),
         JsonCodec.of(NearbyContainerResult.class, VanillaToolSchemas.NEARBY_CONTAINER_RESULT),
         ToolCapabilities.supportedSingleplayer(),
@@ -315,10 +314,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<ContainerInspectionQuery, BlockInfo> inspectContainer() {
     return tool(
         "minecraft.inspect_container",
-        "Returns the full safe visible inventory and selected machine state for one nearby loaded "
-            + "container position. Use this after locating a container; the position must remain "
-            + "loaded and within the server-side range, unresolved loot is not opened, and no "
-            + "items or world state are changed.",
+        "Inspects the full safe visible inventory and selected machine state at one known nearby "
+            + "loaded container position; no crosshair target is required. Use this after "
+            + "minecraft.get_nearby_containers, or use minecraft.get_target_block for the block "
+            + "currently under the crosshair. Unresolved loot stays closed.",
         JsonCodec.of(ContainerInspectionQuery.class, VanillaToolSchemas.CONTAINER_INSPECTION_QUERY),
         JsonCodec.of(BlockInfo.class, VanillaToolSchemas.CONTAINER_INSPECTION),
         ToolCapabilities.supportedSingleplayer(),
@@ -328,9 +327,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<RecipeLookupQuery, RecipeLookupResult> getRecipe() {
     return tool(
         "minecraft.get_recipe",
-        "Returns live recipes from the running integrated server that produce one canonical item "
-            + "registry ID, preserving item and tag alternatives. Use this for crafting questions "
-            + "instead of relying on generic recipe knowledge.",
+        "Lists live recipe variants that produce one exact canonical item ID without assessing "
+            + "available supplies. Use this for recipe definitions; use minecraft.can_craft for a "
+            + "direct current-supply answer, minecraft.get_missing_ingredients for shortages, or "
+            + "minecraft.get_crafting_plan for recursive intermediate steps.",
         JsonCodec.of(RecipeLookupQuery.class, VanillaToolSchemas.RECIPE_LOOKUP_QUERY),
         JsonCodec.of(RecipeLookupResult.class, VanillaToolSchemas.RECIPE_LOOKUP_RESULT),
         ToolCapabilities.supportedSingleplayer(),
@@ -340,11 +340,11 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<CraftingQuery, CraftingResult> canCraft() {
     return tool(
         "minecraft.can_craft",
-        "Determines whether eligible live items can satisfy at least one recipe for a canonical "
-            + "item ID. Omit scope or use PLAYER_ONLY for the main inventory; explicitly use "
-            + "PLAYER_AND_NEARBY to add bounded loaded containers. Results include deterministic "
-            + "source allocations and incomplete-discovery status. Use this for a direct answer; "
-            + "no crafting action occurs.",
+        "Checks whether current eligible supplies satisfy one execution of any live recipe for an "
+            + "exact item ID. Use this for a direct yes/no answer; use "
+            + "minecraft.get_missing_ingredients to explain one-step shortages or "
+            + "minecraft.get_crafting_plan for recursive intermediates. Scope defaults to "
+            + "PLAYER_ONLY; nearby storage is explicit.",
         JsonCodec.of(CraftingQuery.class, VanillaToolSchemas.CRAFTING_QUERY),
         JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
         ToolCapabilities.supportedSingleplayer(),
@@ -354,10 +354,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<CraftingQuery, CraftingResult> getMissingIngredients() {
     return tool(
         "minecraft.get_missing_ingredients",
-        "Returns required, source-allocated, and missing counts for every live recipe variant. "
-            + "Scope defaults to PLAYER_ONLY; explicitly use PLAYER_AND_NEARBY when nearby loaded "
-            + "containers should count. Bounded or unresolved storage omissions are reported, and "
-            + "alternatives never spend one item twice. Use this to explain exact shortages.",
+        "Explains required, allocated, available, and missing counts for one execution of every "
+            + "live recipe variant. Use this for exact one-step shortages; use "
+            + "minecraft.can_craft for a direct yes/no answer or minecraft.get_crafting_plan for "
+            + "recursive intermediates. Scope defaults to PLAYER_ONLY; nearby storage is explicit.",
         JsonCodec.of(CraftingQuery.class, VanillaToolSchemas.CRAFTING_QUERY),
         JsonCodec.of(CraftingResult.class, VanillaToolSchemas.CRAFTING_RESULT),
         ToolCapabilities.supportedSingleplayer(),
@@ -367,11 +367,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<CraftingQuery, CraftingPlan> getCraftingPlan() {
     return tool(
         "minecraft.get_crafting_plan",
-        "Builds a deterministic bounded recursive plan for one canonical item. Scope defaults to "
-            + "PLAYER_ONLY; explicitly use PLAYER_AND_NEARBY to include eligible nearby loaded "
-            + "containers. The result reports live source allocations, incomplete discovery, raw "
-            + "shortages, cycles, and limits. Use this for step-by-step guidance without crafting "
-            + "or moving items.",
+        "Builds a bounded dependency-first crafting plan with intermediate steps, raw shortages, "
+            + "source allocations, cycles, and limit issues. Use this for step-by-step guidance; "
+            + "use minecraft.get_recipe for recipe definitions or the direct crafting tools for "
+            + "one recipe execution. Scope defaults to PLAYER_ONLY; nearby storage is explicit.",
         JsonCodec.of(CraftingQuery.class, VanillaToolSchemas.CRAFTING_QUERY),
         JsonCodec.of(CraftingPlan.class, VanillaToolSchemas.CRAFTING_PLAN),
         ToolCapabilities.supportedSingleplayer(),
@@ -381,9 +380,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<ItemSearchQuery, ItemSearchResult> searchItems() {
     return tool(
         "minecraft.search_items",
-        "Searches the running game's item registry by canonical ID and display-name terms, with a "
-            + "required result limit and accurate truncation metadata. Use this to resolve friendly "
-            + "item names before requesting a recipe.",
+        "Searches registered item definitions by exact canonical ID or display-name terms; it does "
+            + "not inspect what the player owns. Use this to resolve a friendly item name before "
+            + "minecraft.get_recipe, or use minecraft.find_item to locate matching owned and "
+            + "nearby-container stacks.",
         JsonCodec.of(ItemSearchQuery.class, VanillaToolSchemas.ITEM_SEARCH_QUERY),
         JsonCodec.of(ItemSearchResult.class, VanillaToolSchemas.ITEM_SEARCH_RESULT),
         ToolCapabilities.alwaysAvailable(),
@@ -393,11 +393,11 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<FindItemQuery, FindItemResult> findItem() {
     return tool(
         "minecraft.find_item",
-        "Finds matching live items across the player's main inventory, offhand and armor, plus "
-            + "bounded nearby loaded containers. Results aggregate counts by item and source with "
-            + "deterministic slots, container positions, and distances; unopened loot is skipped "
-            + "and crafting includes nearby storage only when its scope explicitly requests it. "
-            + "Use this to locate items without moving them.",
+        "Locates matching live stacks across main inventory, offhand, armor, and nearby loaded "
+            + "containers, with aggregated counts and source positions. Use this to answer where "
+            + "an item is; use minecraft.get_inventory for a complete main-inventory listing or "
+            + "minecraft.search_items for registry definitions. This never changes crafting "
+            + "scope.",
         JsonCodec.of(FindItemQuery.class, VanillaToolSchemas.FIND_ITEM_QUERY),
         JsonCodec.of(FindItemResult.class, VanillaToolSchemas.FIND_ITEM_RESULT),
         ToolCapabilities.supportedSingleplayer(),
@@ -407,8 +407,9 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, CapabilitiesSnapshot> getCapabilities() {
     return tool(
         "minecraft.get_capabilities",
-        "Returns Thread's actual registered read-only tools and active game integrations. Use this "
-            + "for feature discovery instead of assuming that a tool or integration is installed.",
+        "Reports Thread's currently registered read-only tool IDs and active integration metadata. "
+            + "Use this to confirm runtime feature presence after tools/list rather than assuming "
+            + "an optional integration activated.",
         emptyInputCodec(),
         JsonCodec.of(CapabilitiesSnapshot.class, VanillaToolSchemas.CAPABILITIES),
         ToolCapabilities.alwaysAvailable(),
@@ -473,7 +474,21 @@ public final class VanillaIntegration implements ThreadIntegration {
       ToolCapabilities capabilities,
       Function<I, ToolResult<O>> operation) {
     return new FunctionalGameTool<>(
-        id, description, inputCodec, outputCodec, capabilities, operation);
+        id,
+        description + sessionAvailabilityDescription(capabilities.availability()),
+        inputCodec,
+        outputCodec,
+        capabilities,
+        operation);
+  }
+
+  private static String sessionAvailabilityDescription(ToolAvailability availability) {
+    return switch (availability) {
+      case ALWAYS -> " Available in the main menu, single-player, and multiplayer.";
+      case SUPPORTED_SINGLEPLAYER ->
+          " Requires a supported single-player world; menu and multiplayer calls return a "
+              + "structured availability error.";
+    };
   }
 
   private static <I, O> ToolResult<O> map(

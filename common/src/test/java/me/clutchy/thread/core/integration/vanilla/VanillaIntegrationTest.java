@@ -7,6 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.net.InetAddress;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,9 +82,14 @@ import me.clutchy.thread.core.tool.ToolDescriptor;
 import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
+import me.clutchy.thread.transport.mcp.McpHttpServer;
+import me.clutchy.thread.transport.mcp.McpServerOptions;
 import org.junit.jupiter.api.Test;
 
 class VanillaIntegrationTest {
+  private static final int MAX_TOOLS_LIST_BYTES = 80 * 1_024;
+  private static final String CATALOG_SEMANTIC_FINGERPRINT =
+      "cab2c05e06e7fa4e8ad7a82471f604226d5287944cf75e9c404da93625a7c352";
   private static final List<String> V1_TOOL_IDS =
       List.of(
           "minecraft.can_craft",
@@ -104,14 +115,52 @@ class VanillaIntegrationTest {
           "minecraft.search_items");
 
   @Test
+  void validatesTheSerializedCatalogContractAndPayloadBudget() throws Exception {
+    Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
+    McpServerOptions options =
+        new McpServerOptions(
+            InetAddress.getByAddress(new byte[] {127, 0, 0, 1}),
+            0,
+            1_048_576,
+            8,
+            "Thread",
+            "0.1.0");
+    try (McpHttpServer server = McpHttpServer.start(catalog.tools(), options)) {
+      HttpRequest request =
+          HttpRequest.newBuilder(server.endpoint())
+              .timeout(Duration.ofSeconds(5))
+              .header("Accept", "application/json, text/event-stream")
+              .header("Content-Type", "application/json")
+              .header("MCP-Protocol-Version", "2026-07-28")
+              .POST(
+                  HttpRequest.BodyPublishers.ofString(
+                      "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
+              .build();
+      HttpResponse<String> response =
+          HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+
+      assertEquals(200, response.statusCode());
+      JsonObject body = JsonParser.parseString(response.body()).getAsJsonObject();
+      CatalogContractAssertions.assertCatalog(
+          catalog.tools().descriptors(), body, V1_TOOL_IDS, CATALOG_SEMANTIC_FINGERPRINT);
+      int payloadBytes = response.body().getBytes(StandardCharsets.UTF_8).length;
+      assertTrue(
+          payloadBytes <= MAX_TOOLS_LIST_BYTES,
+          () ->
+              "tools/list payload is "
+                  + payloadBytes
+                  + " bytes; budget is "
+                  + MAX_TOOLS_LIST_BYTES);
+    }
+  }
+
+  @Test
   void registersAndInvokesTheCompleteStructuredV1Catalog() {
     Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
 
     List<ToolDescriptor> descriptors = catalog.tools().descriptors();
     assertEquals(V1_TOOL_IDS, descriptors.stream().map(tool -> tool.id().toString()).toList());
     assertTrue(descriptors.stream().allMatch(tool -> tool.capabilities().readOnly()));
-    assertTrue(descriptors.stream().allMatch(tool -> tool.description().contains("Use this")));
-    assertTrue(descriptors.stream().allMatch(tool -> tool.description().length() >= 120));
     assertTrue(
         descriptors.stream()
             .allMatch(
@@ -509,7 +558,13 @@ class VanillaIntegrationTest {
     assertInvalid(catalog.tools(), "minecraft.get_client_options", "{\"sections\":[]}");
     assertInvalid(catalog.tools(), "minecraft.get_client_options", "{\"keybindLimit\":129}");
     assertInvalid(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":0,\"limit\":8}");
+    assertInvalid(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":129,\"limit\":8}");
+    assertInvalid(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":8,\"limit\":513}");
     assertInvalid(catalog.tools(), "minecraft.get_nearby_containers", "{\"radius\":0,\"limit\":8}");
+    assertInvalid(
+        catalog.tools(), "minecraft.get_nearby_containers", "{\"radius\":17,\"limit\":8}");
+    assertInvalid(
+        catalog.tools(), "minecraft.get_nearby_containers", "{\"radius\":8,\"limit\":65}");
     assertInvalid(catalog.tools(), "minecraft.inspect_container", "{\"position\":null}");
     assertInvalid(catalog.tools(), "minecraft.get_recipe", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.can_craft", "{\"itemId\":\"not a registry id\"}");
@@ -522,10 +577,15 @@ class VanillaIntegrationTest {
     assertInvalid(
         catalog.tools(), "minecraft.get_crafting_plan", "{\"itemId\":\"not a registry id\"}");
     assertInvalid(catalog.tools(), "minecraft.search_items", "{\"query\":\"\",\"limit\":0}");
+    assertInvalid(catalog.tools(), "minecraft.search_items", "{\"query\":\"stone\",\"limit\":257}");
     assertInvalid(
         catalog.tools(),
         "minecraft.find_item",
         "{\"query\":\"\",\"radius\":0,\"containerLimit\":0,\"itemLimit\":0}");
+    assertInvalid(
+        catalog.tools(),
+        "minecraft.find_item",
+        "{\"query\":\"stone\",\"radius\":17,\"containerLimit\":65,\"itemLimit\":65}");
   }
 
   @Test

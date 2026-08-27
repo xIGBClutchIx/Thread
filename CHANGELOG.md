@@ -42,6 +42,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Changed
 
+- Clarified all built-in MCP tool descriptions, selection boundaries, session availability, input
+  defaults, units, and hard numeric limits without adding or renaming tools. Added structural and
+  wording-insensitive catalog regression validation plus a serialized payload budget.
 - Expanded `minecraft.get_player` with authoritative armor/air, bounded active effects, movement and
   condition flags, selected hotbar/attack cooldown, game mode/hardcore, and conditional vehicle and
   respawn context while retaining a focused read-only payload.

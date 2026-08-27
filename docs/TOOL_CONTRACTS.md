@@ -2,9 +2,37 @@
 
 These are semantic contracts, not mandatory byte-for-byte JSON. Keep names and meanings stable once V1 clients depend on them.
 
-All results should prefer canonical registry IDs over localized display names.
+All results prefer canonical registry IDs over localized display names. The schemas returned by
+`tools/list` are authoritative for required fields, enums, defaults, and hard numeric limits;
+runtime configuration may impose a lower limit where the field description says so.
 
 ## Common conventions
+
+### Choosing a tool
+
+| Question | Choose | Do not confuse it with |
+| --- | --- | --- |
+| Can gameplay tools run now? | `minecraft.get_status` | `get_game_info` reports installed versions; `get_world_info` reports a loaded world. |
+| What does the player carry? | `minecraft.get_inventory` | `find_item` searches player, equipment, and nearby containers for a particular match. |
+| What is held or worn? | `minecraft.get_equipment` | Main-hand items also occupy the selected inventory hotbar slot. |
+| What produces an item? | `minecraft.get_recipe` | It does not compare recipes with current supplies. |
+| Can current direct supplies craft it once? | `minecraft.can_craft` | `get_missing_ingredients` explains shortages; `get_crafting_plan` recursively plans intermediates. |
+| What block is under the crosshair? | `minecraft.get_target_block` | `inspect_container` takes a known nearby block position without requiring a crosshair target. |
+| What entity is under the crosshair? | `minecraft.get_target_entity` | `get_nearby_entities` performs a bounded area scan. |
+| Where is a particular item? | `minecraft.find_item` | `search_items` searches registered item definitions, not possessions or containers. |
+| What are the local client settings? | `minecraft.get_client_options` | It never returns player, world, or server state. |
+
+All three crafting-analysis tools default to `PLAYER_ONLY`, meaning the player's 36-slot main
+inventory. `PLAYER_AND_NEARBY` is always explicit. `minecraft.find_item` can search nearby storage,
+but its result never changes crafting scope.
+
+### IDs, names, and matching
+
+Canonical item, block, entity, advancement, recipe, dimension, biome, effect, and similar IDs use
+lower-case namespaced registry syntax such as `minecraft:diamond_pickaxe`. IDs are stable keys;
+localized display names and custom names are convenience text. Exact registry-ID queries never
+expand to partial matches. User-facing text queries are case-insensitive all-term matches over the
+fields named in that tool's schema and description.
 
 ### Position
 
@@ -17,6 +45,10 @@ All results should prefer canonical registry IDs over localized display names.
 ```
 
 Block positions should use integers where appropriate.
+
+Coordinates and distances are measured in blocks. Distances are straight-line Euclidean values
+unless a tool explicitly documents another meaning. Durations named `*Ticks` are Minecraft ticks;
+20 ticks normally equal one second while the game is advancing.
 
 ### Item stack
 
@@ -42,6 +74,50 @@ Queries that can return many entries should include:
   "items": []
 }
 ```
+
+Arrays are always present and use `[]` when no entries match. Stable result fields are present even
+when unavailable; nullable schema fields serialize as explicit `null` rather than being omitted.
+`truncated: true` means the requested or configured result bound omitted otherwise eligible
+entries. Tool-specific `sourceTruncated`, `containersTruncated`, `itemsTruncated`,
+`criteriaTruncated`, `conflictsTruncated`, and `complete` fields distinguish the stage or safety
+reason that made a snapshot incomplete.
+
+Progress ratios such as `experienceProgress` and `attackCooldown` range from 0 through 1.
+`completionPercentage` ranges from 0 through 100. Advancement timestamps use ISO-8601 UTC text and
+are `null` when the corresponding progress does not exist.
+
+### Availability and errors
+
+Every `tools/list` entry includes `_meta["me.clutchy.thread/availability"]`:
+
+- `ALWAYS` means the tool is callable from the main menu, single-player, and multiplayer. This
+  applies to status, runtime identity, local client options, item-registry search, and capabilities.
+- `SUPPORTED_SINGLEPLAYER` means the tool requires a loaded integrated single-player world. Menu,
+  loading, missing-player, and multiplayer states fail before gameplay state is exposed.
+
+The same availability is stated in each tool description. `minecraft.get_status` itself returns a
+normal status result in every client state; it is the recommended preflight.
+
+Expected tool failures use one stable shape in MCP `structuredContent` and the text content block:
+
+```json
+{
+  "code": "NOT_FOUND",
+  "message": "Human-readable explanation.",
+  "retryable": true,
+  "details": {}
+}
+```
+
+`code` is one of `INVALID_INPUT`, `NOT_AVAILABLE`, `PLAYER_NOT_AVAILABLE`,
+`WORLD_NOT_AVAILABLE`, `NOT_FOUND`, `OUT_OF_RANGE`, `RESULT_LIMIT_EXCEEDED`, `TIMEOUT`,
+`UNSUPPORTED`, or `INTERNAL_ERROR`. `details` is always an object and contains only small,
+deterministically ordered diagnostic strings. `retryable` means a later game-state or lifecycle
+change may make the same logical request succeed; it is not an instruction to loop without bound.
+Values outside hard bounds advertised by a tool's input schema return `INVALID_INPUT`. A configured
+runtime limit that is lower than the advertised hard bound may instead return `OUT_OF_RANGE` or
+`RESULT_LIMIT_EXCEEDED` after decoding.
+Malformed JSON-RPC, protocol, or unknown-tool requests remain transport-level JSON-RPC errors.
 
 ## `minecraft.get_status`
 
@@ -98,7 +174,7 @@ Example result:
 ```json
 {
   "minecraftVersion": "<pinned-version>",
-  "loader": "<fabric-or-neoforge>",
+  "loader": "<fabric-neoforge-or-forge>",
   "loaderVersion": "<version>",
   "threadVersion": "0.1.0"
 }
@@ -569,7 +645,7 @@ Every response contains each of the six positions once. Empty positions use `ite
 
 Purpose: inspect the block the player is currently looking at within normal interaction/raycast range.
 
-Input: optional bounded distance only if needed by implementation. Prefer game-standard targeting behavior.
+Input: none. Thread uses Minecraft's current game-standard targeting result.
 
 Example result:
 

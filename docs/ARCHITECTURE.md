@@ -148,10 +148,12 @@ local because those are genuine loader APIs rather than portable behavior.
 
 ## Session and threading rules
 
-`minecraft.get_status`, `minecraft.get_game_info`, and `minecraft.get_client_options` are always
-callable. Client options use only local `Minecraft.options` state and never consult a world, player,
-or server. Other gameplay tools pass through the centralized shared session guard and reject menus,
-loading states, missing players, and multiplayer before exposing game state.
+`minecraft.get_status`, `minecraft.get_game_info`, `minecraft.get_client_options`,
+`minecraft.search_items`, and `minecraft.get_capabilities` are always callable. Client options use
+only local `Minecraft.options` state, while item search reads the local item registry; neither
+consults a world, player, or server. Other gameplay tools pass through the centralized shared
+session guard and reject menus, loading states, missing players, and multiplayer before exposing
+game state.
 
 Client-owned reads run on the Minecraft client thread. Integrated-server-owned reads, including
 player status, live recipes, advancement progress, world/environment context, block entities, and

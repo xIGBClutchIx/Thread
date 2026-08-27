@@ -2,6 +2,7 @@ package me.clutchy.thread.core.integration.vanilla;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import me.clutchy.thread.config.ThreadConfig;
 import me.clutchy.thread.core.model.advancement.AdvancementInfo;
 import me.clutchy.thread.core.model.advancement.AdvancementListQuery;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
@@ -12,6 +13,7 @@ import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.EntityInfo;
+import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.serialization.JsonSchema;
 import me.clutchy.thread.core.service.item.ItemFinder;
@@ -22,6 +24,9 @@ final class VanillaToolSchemas {
   private static final String INTEGRATION_ID_PATTERN = "^[a-z][a-z0-9_-]*$";
   private static final String INTEGRATION_METADATA_KEY_PATTERN =
       "^[a-z][a-z0-9_-]*(?:\\.[a-z][a-z0-9_-]*)+$";
+  private static final String DISTANCE_DESCRIPTION = "Euclidean distance in blocks.";
+  private static final String TIMESTAMP_DESCRIPTION =
+      "ISO-8601 UTC timestamp, or null when no such progress exists.";
 
   private static final JsonObject POSITION =
       object(property("x", number()), property("y", number()), property("z", number()));
@@ -114,7 +119,7 @@ final class VanillaToolSchemas {
           property("displayName", string(1, 256, null)),
           property("position", BLOCK_POSITION),
           property("properties", openObject()),
-          property("distance", number(0.0, null)),
+          property("distance", described(number(0.0, null), DISTANCE_DESCRIPTION)),
           property("blockEntityPresent", bool()),
           property("blockEntity", nullable(BLOCK_ENTITY_INFO)));
   private static final JsonObject NEARBY_CONTAINER_SUMMARY =
@@ -123,7 +128,7 @@ final class VanillaToolSchemas {
           property("containerTypeId", registryId()),
           property("displayName", string(1, 256, null)),
           property("position", BLOCK_POSITION),
-          property("distance", number(0.0, null)),
+          property("distance", described(number(0.0, null), DISTANCE_DESCRIPTION)),
           property("slotCount", integer(0, null)),
           property("usedSlotCount", nullable(integer(0, null))),
           property(
@@ -153,7 +158,7 @@ final class VanillaToolSchemas {
               "containerSlots", boundedArray(string(1, 64, null), 0, BlockEntityInfo.MAX_ITEMS)),
           property("containerPosition", nullable(BLOCK_POSITION)),
           property("containerTypeId", nullable(registryId())),
-          property("distance", nullable(number(0.0, null))));
+          property("distance", nullable(described(number(0.0, null), DISTANCE_DESCRIPTION))));
   private static final JsonObject FOUND_ITEM =
       object(
           property("item", ITEM_INFO),
@@ -164,7 +169,7 @@ final class VanillaToolSchemas {
           property("entityType", registryId()),
           property("displayName", string(1, 256, null)),
           property("customName", nullable(string(1, 256, null))),
-          property("distance", number(0.0, null)),
+          property("distance", described(number(0.0, null), DISTANCE_DESCRIPTION)),
           property("position", POSITION),
           property("living", bool()),
           property("health", nullable(number(0.0, null))),
@@ -231,8 +236,9 @@ final class VanillaToolSchemas {
   private static final JsonObject CRAFTING_SOURCE_STATUS =
       object(
           property("complete", bool()),
-          property("nearbyRadius", nullable(number(0.0, null))),
-          property("nearbyContainerLimit", nullable(integer(1, null))),
+          property("nearbyRadius", nullable(number(0.0, NearbyContainerQuery.HARD_MAX_RADIUS))),
+          property(
+              "nearbyContainerLimit", nullable(integer(1, NearbyContainerQuery.HARD_MAX_RESULTS))),
           property("nearbyContainersTruncated", bool()),
           property("unresolvedContainersSkipped", integer(0, null)),
           property("contentLimitedContainersSkipped", integer(0, null)));
@@ -240,14 +246,16 @@ final class VanillaToolSchemas {
       object(
           property("name", string(1, 256, null)),
           property("completed", bool()),
-          property("obtainedAt", nullable(string(1, 64, null))));
+          property("obtainedAt", nullable(timestamp())));
   private static final JsonObject ADVANCEMENT_SUMMARY =
       object(
           property("advancementId", registryId()),
           property("title", nullable(string(1, 512, null))),
           property("description", nullable(string(1, 2_048, null))),
           property("completed", bool()),
-          property("completionPercentage", number(0.0, 100.0)),
+          property(
+              "completionPercentage",
+              described(number(0.0, 100.0), "Completion from 0 through 100 percent.")),
           property("completedCriteria", integer(0, null)),
           property("totalCriteria", integer(0, null)),
           property("completedRequirements", integer(0, null)),
@@ -257,15 +265,17 @@ final class VanillaToolSchemas {
           property("tabTitle", nullable(string(1, 512, null))),
           property("displayType", nullableEnumString("TASK", "GOAL", "CHALLENGE")),
           property("hidden", nullable(bool())),
-          property("firstProgressAt", nullable(string(1, 64, null))),
-          property("completedAt", nullable(string(1, 64, null))));
+          property("firstProgressAt", nullable(timestamp())),
+          property("completedAt", nullable(timestamp())));
   private static final JsonObject ADVANCEMENT_DETAILS =
       object(
           property("advancementId", registryId()),
           property("title", nullable(string(1, 512, null))),
           property("description", nullable(string(1, 2_048, null))),
           property("completed", bool()),
-          property("completionPercentage", number(0.0, 100.0)),
+          property(
+              "completionPercentage",
+              described(number(0.0, 100.0), "Completion from 0 through 100 percent.")),
           property("completedCriteria", integer(0, null)),
           property("totalCriteria", integer(0, null)),
           property("completedRequirements", integer(0, null)),
@@ -276,8 +286,8 @@ final class VanillaToolSchemas {
           property("tabTitle", nullable(string(1, 512, null))),
           property("displayType", nullableEnumString("TASK", "GOAL", "CHALLENGE")),
           property("hidden", nullable(bool())),
-          property("firstProgressAt", nullable(string(1, 64, null))),
-          property("completedAt", nullable(string(1, 64, null))),
+          property("firstProgressAt", nullable(timestamp())),
+          property("completedAt", nullable(timestamp())),
           property(
               "criteria",
               boundedArray(ADVANCEMENT_CRITERION, 0, AdvancementInfo.MAX_RETURNED_CRITERIA)));
@@ -429,7 +439,12 @@ final class VanillaToolSchemas {
               property("playerPosition", POSITION),
               property("worldSpawnDimensionId", registryId()),
               property("worldSpawnPosition", BLOCK_POSITION),
-              property("distanceFromSpawn", nullable(number(0.0, null))),
+              property(
+                  "distanceFromSpawn",
+                  nullable(
+                      described(
+                          number(0.0, null),
+                          "Straight-line distance in blocks, or null across dimensions."))),
               property("difficulty", enumString("peaceful", "easy", "normal", "hard")),
               property("hardcore", bool()),
               property("gameTimeTicks", integer(0, null)),
@@ -461,7 +476,9 @@ final class VanillaToolSchemas {
               property("food", integer(0, null)),
               property("saturation", number(0.0, null)),
               property("experienceLevel", integer(0, null)),
-              property("experienceProgress", number(0.0, 1.0)),
+              property(
+                  "experienceProgress",
+                  described(number(0.0, 1.0), "Progress toward the next level from 0 through 1.")),
               property("position", POSITION),
               property("dimension", registryId()),
               property("gameMode", enumString("survival", "creative", "adventure", "spectator")),
@@ -474,7 +491,9 @@ final class VanillaToolSchemas {
               property("movement", PLAYER_MOVEMENT),
               property("conditions", PLAYER_CONDITIONS),
               property("selectedHotbarSlot", integer(0, InventorySnapshot.HOTBAR_SLOT_COUNT - 1)),
-              property("attackCooldown", number(0.0, 1.0)),
+              property(
+                  "attackCooldown",
+                  described(number(0.0, 1.0), "Attack-strength readiness from 0 through 1.")),
               property("vehicle", nullable(PLAYER_VEHICLE)),
               property("respawn", nullable(PLAYER_RESPAWN))));
   static final JsonSchema INVENTORY =
@@ -489,7 +508,12 @@ final class VanillaToolSchemas {
       schema(
           object(
               optionalProperty("filter", advancementFilter()),
-              optionalProperty("search", string(1, AdvancementListQuery.MAX_SEARCH_LENGTH, null)),
+              optionalProperty(
+                  "search",
+                  described(
+                      string(1, AdvancementListQuery.MAX_SEARCH_LENGTH, null),
+                      "Optional exact registry ID or case-insensitive all-term text filter. "
+                          + "Omission applies no text filter.")),
               optionalProperty("limit", advancementLimit())));
   static final JsonSchema ADVANCEMENT_LIST_RESULT =
       schema(
@@ -506,38 +530,74 @@ final class VanillaToolSchemas {
                   "advancements",
                   boundedArray(ADVANCEMENT_SUMMARY, 0, AdvancementListQuery.MAX_LIMIT))));
   static final JsonSchema ADVANCEMENT_LOOKUP_QUERY =
-      schema(object(property("advancementId", registryId())));
+      schema(
+          object(
+              property(
+                  "advancementId",
+                  described(
+                      registryId(),
+                      "Exact canonical advancement registry ID, such as "
+                          + "minecraft:story/mine_stone."))));
   static final JsonSchema ADVANCEMENT_INFO = schema(ADVANCEMENT_DETAILS);
   static final JsonSchema TARGET_BLOCK = schema(BLOCK_INFO);
   static final JsonSchema TARGET_ENTITY = schema(ENTITY_INFO);
   static final JsonSchema NEARBY_CONTAINER_QUERY =
-      schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
+      schema(
+          object(
+              property(
+                  "radius",
+                  boundedRadius(
+                      NearbyContainerQuery.HARD_MAX_RADIUS,
+                      "Loaded-container search radius in blocks. Configured limits may be "
+                          + "lower.")),
+              property(
+                  "limit",
+                  boundedLimit(
+                      NearbyContainerQuery.HARD_MAX_RESULTS,
+                      "Maximum returned containers. Configured limits may be lower."))));
   static final JsonSchema NEARBY_CONTAINER_RESULT =
       schema(
           object(
-              property("radius", number(0.0, null)),
-              property("limit", integer(1, null)),
+              property("radius", described(number(0.0, null), "Applied radius in blocks.")),
+              property("limit", integer(1, NearbyContainerQuery.HARD_MAX_RESULTS)),
               property("truncated", bool()),
-              property("containers", array(NEARBY_CONTAINER_SUMMARY))));
+              property(
+                  "containers",
+                  boundedArray(
+                      NEARBY_CONTAINER_SUMMARY, 0, NearbyContainerQuery.HARD_MAX_RESULTS))));
   static final JsonSchema CONTAINER_INSPECTION_QUERY =
-      schema(object(property("position", BLOCK_POSITION)));
+      schema(
+          object(
+              property(
+                  "position",
+                  described(
+                      BLOCK_POSITION,
+                      "Exact loaded block coordinates for one nearby container."))));
   static final JsonSchema CONTAINER_INSPECTION = schema(BLOCK_INFO);
   static final JsonSchema NEARBY_ENTITY_QUERY =
-      schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
+      schema(
+          object(
+              property(
+                  "radius",
+                  boundedRadius(
+                      ThreadConfig.HARD_MAX_ENTITY_RADIUS,
+                      "Loaded-entity search radius in blocks. Configured limits may be lower.")),
+              property(
+                  "limit",
+                  boundedLimit(
+                      ThreadConfig.HARD_MAX_ENTITY_RESULTS,
+                      "Maximum returned entities. Configured limits may be lower."))));
   static final JsonSchema NEARBY_ENTITY_RESULT =
       schema(
           object(
-              property("radius", number(0.0, null)),
-              property("limit", integer(1, null)),
+              property("radius", described(number(0.0, null), "Applied radius in blocks.")),
+              property("limit", integer(1, ThreadConfig.HARD_MAX_ENTITY_RESULTS)),
               property("truncated", bool()),
-              property("entities", array(ENTITY_INFO))));
-  static final JsonSchema RECIPE_LOOKUP_QUERY =
-      schema(object(property("itemId", string(1, 256, REGISTRY_ID_PATTERN))));
+              property(
+                  "entities", boundedArray(ENTITY_INFO, 0, ThreadConfig.HARD_MAX_ENTITY_RESULTS))));
+  static final JsonSchema RECIPE_LOOKUP_QUERY = schema(object(property("itemId", exactItemId())));
   static final JsonSchema CRAFTING_QUERY =
-      schema(
-          object(
-              property("itemId", string(1, 256, REGISTRY_ID_PATTERN)),
-              optionalProperty("scope", craftingScope())));
+      schema(object(property("itemId", exactItemId()), optionalProperty("scope", craftingScope())));
   static final JsonSchema RECIPE_LOOKUP_RESULT =
       schema(object(property("itemId", registryId()), property("recipes", array(RECIPE_INFO))));
   static final JsonSchema CRAFTING_RESULT =
@@ -563,27 +623,48 @@ final class VanillaToolSchemas {
               property("missingMaterials", array(MISSING_MATERIAL)),
               property("issues", array(CRAFTING_PLAN_ISSUE))));
   static final JsonSchema ITEM_SEARCH_QUERY =
-      schema(object(property("query", string(1, 128, null)), property("limit", integer(1, null))));
+      schema(
+          object(
+              property("query", itemTextQuery("Item registry")),
+              property(
+                  "limit",
+                  boundedLimit(
+                      ThreadConfig.HARD_MAX_ITEM_SEARCH_RESULTS,
+                      "Maximum returned registry matches. Configured limits may be lower."))));
   static final JsonSchema ITEM_SEARCH_RESULT =
       schema(
           object(
               property("query", string(1, 128, null)),
-              property("limit", integer(1, null)),
+              property("limit", integer(1, ThreadConfig.HARD_MAX_ITEM_SEARCH_RESULTS)),
               property("truncated", bool()),
-              property("items", array(ITEM_INFO))));
+              property(
+                  "items", boundedArray(ITEM_INFO, 0, ThreadConfig.HARD_MAX_ITEM_SEARCH_RESULTS))));
   static final JsonSchema FIND_ITEM_QUERY =
       schema(
           object(
-              property("query", string(1, 128, null)),
-              property("radius", number(0.0, null)),
-              property("containerLimit", integer(1, null)),
-              property("itemLimit", integer(1, null))));
+              property("query", itemTextQuery("Live item")),
+              property(
+                  "radius",
+                  boundedRadius(
+                      NearbyContainerQuery.HARD_MAX_RADIUS,
+                      "Nearby loaded-container search radius in blocks. Configured limits may be "
+                          + "lower.")),
+              property(
+                  "containerLimit",
+                  boundedLimit(
+                      NearbyContainerQuery.HARD_MAX_RESULTS,
+                      "Maximum nearby containers inspected. Configured limits may be lower.")),
+              property(
+                  "itemLimit",
+                  boundedLimit(
+                      ItemFinder.MAX_ITEM_RESULTS,
+                      "Maximum distinct matching item IDs returned."))));
   static final JsonSchema FIND_ITEM_RESULT =
       schema(
           object(
               property("query", string(1, 128, null)),
-              property("radius", number(0.0, null)),
-              property("containerLimit", integer(1, null)),
+              property("radius", number(0.0, NearbyContainerQuery.HARD_MAX_RADIUS)),
+              property("containerLimit", integer(1, NearbyContainerQuery.HARD_MAX_RESULTS)),
               property("itemLimit", integer(1, ItemFinder.MAX_ITEM_RESULTS)),
               property("containersTruncated", bool()),
               property("itemsTruncated", bool()),
@@ -735,6 +816,43 @@ final class VanillaToolSchemas {
         "description",
         "Maximum returned advancements. Results include truncation metadata when this bound or "
             + "the provider scan ceiling omits entries.");
+    return schema;
+  }
+
+  private static JsonObject exactItemId() {
+    return described(
+        registryId(),
+        "Exact canonical item registry ID, such as minecraft:diamond_pickaxe. Use "
+            + "minecraft.search_items first when only a friendly name is known.");
+  }
+
+  private static JsonObject itemTextQuery(String source) {
+    return described(
+        string(1, 128, null),
+        source
+            + " query. A canonical registry ID matches exactly; other text uses "
+            + "case-insensitive all-term matching over IDs and names.");
+  }
+
+  private static JsonObject boundedRadius(double maximum, String description) {
+    JsonObject schema = number();
+    schema.addProperty("exclusiveMinimum", 0.0D);
+    schema.addProperty("maximum", maximum);
+    return described(schema, description);
+  }
+
+  private static JsonObject boundedLimit(int maximum, String description) {
+    return described(integer(1, maximum), description);
+  }
+
+  private static JsonObject timestamp() {
+    JsonObject schema = string(1, 64, null);
+    schema.addProperty("format", "date-time");
+    return described(schema, TIMESTAMP_DESCRIPTION);
+  }
+
+  private static JsonObject described(JsonObject schema, String description) {
+    schema.addProperty("description", description);
     return schema;
   }
 

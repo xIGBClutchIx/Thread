@@ -21,7 +21,8 @@ import java.util.regex.PatternSyntaxException;
  * <p>Thread owns its schemas rather than deriving them from Java reflection. The supported keywords
  * are {@code type}, {@code enum}, {@code properties}, {@code required}, {@code
  * additionalProperties}, {@code items}, {@code minItems}, {@code maxItems}, {@code minLength},
- * {@code maxLength}, {@code pattern}, {@code minimum}, and {@code maximum}.
+ * {@code maxLength}, {@code pattern}, {@code minimum}, {@code exclusiveMinimum}, {@code maximum},
+ * {@code default}, {@code description}, and {@code format}.
  */
 public final class JsonSchema {
   private static final Set<String> SUPPORTED_TYPES =
@@ -89,7 +90,10 @@ public final class JsonSchema {
     requireNonNegativeInteger(schema, "minLength");
     requireNonNegativeInteger(schema, "maxLength");
     requireNumber(schema, "minimum");
+    requireNumber(schema, "exclusiveMinimum");
     requireNumber(schema, "maximum");
+    requireString(schema, "description");
+    requireString(schema, "format");
 
     JsonObject properties = requireObject(schema, "properties");
     if (properties != null) {
@@ -128,6 +132,16 @@ public final class JsonSchema {
         Pattern.compile(pattern.getAsString());
       } catch (PatternSyntaxException exception) {
         throw new IllegalArgumentException(path + ".pattern is invalid", exception);
+      }
+    }
+
+    JsonElement defaultValue = schema.get("default");
+    if (defaultValue != null) {
+      List<SchemaViolation> violations = new ArrayList<>();
+      validateNode(schema, defaultValue, path + ".default", violations);
+      if (!violations.isEmpty()) {
+        throw new IllegalArgumentException(
+            path + ".default does not satisfy its schema: " + violations.getFirst().message());
       }
     }
   }
@@ -205,6 +219,13 @@ public final class JsonSchema {
     JsonElement value = schema.get(name);
     if (value != null && (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber())) {
       throw new IllegalArgumentException(name + " must be a number");
+    }
+  }
+
+  private static void requireString(JsonObject schema, String name) {
+    JsonElement value = schema.get(name);
+    if (value != null && (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString())) {
+      throw new IllegalArgumentException(name + " must be a string");
     }
   }
 
@@ -312,6 +333,10 @@ public final class JsonSchema {
       JsonObject schema, BigDecimal value, String path, List<SchemaViolation> violations) {
     if (schema.has("minimum") && value.compareTo(schema.get("minimum").getAsBigDecimal()) < 0) {
       violations.add(new SchemaViolation(path, "number is below the minimum"));
+    }
+    if (schema.has("exclusiveMinimum")
+        && value.compareTo(schema.get("exclusiveMinimum").getAsBigDecimal()) <= 0) {
+      violations.add(new SchemaViolation(path, "number is not above the exclusive minimum"));
     }
     if (schema.has("maximum") && value.compareTo(schema.get("maximum").getAsBigDecimal()) > 0) {
       violations.add(new SchemaViolation(path, "number is above the maximum"));
