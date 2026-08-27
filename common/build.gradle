@@ -9,4 +9,6 @@ dependencies {
 
 tasks.named('test') {
     systemProperty 'thread.rootDir', rootProject.projectDir.absolutePath
+    systemProperty 'thread.supportedMinecraftVersions',
+            rootProject.ext.threadBuildMatrix.versions.keySet().join(',')
 }

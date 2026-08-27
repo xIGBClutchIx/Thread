@@ -66,7 +66,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
     McpHttpServer mcp = runtime.mcpServer();
 
     try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-      singleplayer.getClientLevel().waitForChunksDownload();
+      FabricGameTestBinding.waitForChunksDownload(singleplayer);
       singleplayer.getServer().runCommand("fill -3 99 -3 3 99 5 minecraft:stone");
       singleplayer
           .getServer()
@@ -110,7 +110,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer
           .getServer()
           .runCommand(
-              "summon minecraft:zombie 3 100 0 "
+              "summon minecraft:zombie 2 100 0 "
                   + "{NoAI:1b,Silent:1b,Invulnerable:1b,IsBaby:1b,"
                   + "CustomName:'Thread Target'}");
       singleplayer
@@ -804,7 +804,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       TestSingleplayerContext singleplayer,
       ToolRegistry tools,
       McpHttpServer mcp) {
-    singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 -90 20");
+    singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 -90 25");
     context.waitFor(client -> targetsEntity(client, "minecraft:zombie"));
 
     JsonObject zombie =

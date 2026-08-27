@@ -7,19 +7,27 @@ releases.
 
 Thread is built across independent Minecraft-version and loader axes. `:common` owns
 version-neutral core, configuration, MCP, and runtime/tool orchestration. `minecraft/shared`
-contains Minecraft-facing sources that compile independently in `:minecraft:26.1.2` and
-`:minecraft:26.2`; only real API/capability bindings remain in the version directories. Thin
+contains Minecraft-facing sources that compile independently in `:minecraft:1.21.11`,
+`:minecraft:26.1.2`, and `:minecraft:26.2`; only real API/capability bindings remain in the
+version directories. Thin
 `:loaders:<loader>:<version>` projects compile one loader's shared source tree against exactly one
 Minecraft lane. Each invokes the lane-compiled `MinecraftRuntime`, which composes the selected
 version implementation with `ThreadRuntime`. Root universal packaging tasks combine matching
 outputs and own no runtime logic.
+
+For 1.21.11, recipe-display traversal, world-clock access, session detection, Fabric game-test
+context access, and Forge `ModList` access are explicit lane bindings. Shared code may call those
+bindings but must not inspect a version string or use reflection to choose an API. The Shadow
+plugin is build-only and is used solely to isolate remapped Fabric bytecode in the 1.21.11
+universal artifact; it is not a runtime dependency.
 
 Root Gradle tasks aggregate all modules and remain the normal contributor interface. See
 [Build](BUILD.md) for module-specific commands and outputs.
 
 ## Source standards
 
-- Use Java 25 and the pinned Fabric, NeoForge, and Forge toolchains.
+- Run Gradle on Java 25. The matrix compiles and tests Minecraft 1.21.11 with Java 21 and both
+  26.x lanes with Java 25, using the pinned Fabric, NeoForge, and Forge toolchains.
 - Do not add Kotlin, `package-info.java`, wildcard imports, or hidden global state.
 - Keep Minecraft-version, loader, core, and MCP dependencies inside their documented module
   boundaries.
@@ -61,7 +69,7 @@ change pass; narrow a noisy rule only when the code has a documented legitimate 
 
 ### Unit and architecture tests
 
-The root `test` task runs common, both Minecraft modules, and both versions of all three loader
+The root `test` task runs common, all three Minecraft modules, and every version of all three loader
 projects. They cover core services, schemas, registries, configuration, integration
 activation/isolation, version-specific conversion/support, loader discovery/version handling, and
 the real loopback MCP HTTP server without launching Minecraft.
@@ -100,7 +108,7 @@ Important regression areas include:
   the shared packaged parity fixture, version-lane isolation, and no version literals in shared
   production Java;
 - full/unsupported/optional-field version capability states and the exact twenty-one fully
-  supported tools declared independently by Minecraft 26.1.2 and 26.2.
+  supported tools declared independently by Minecraft 1.21.11, 26.1.2, and 26.2.
 
 Run focused unit coverage with:
 
@@ -167,8 +175,8 @@ Before committing a V1-complete change, run the release-equivalent gate from the
 ```
 
 Then run the normal, restart, and MCP-disabled tasks from the table above for dedicated and
-universal artifacts in all six loader projects, one invocation at a time, and finish with
-`git diff --check`. CI and the release workflow enumerate the same two-version matrix.
+universal artifacts in all nine loader projects, one invocation at a time, and finish with
+`git diff --check`. CI and the release workflow enumerate the same three-version matrix.
 
 Keep each packaged task in its own Gradle invocation. Loader launch tasks use real client processes
 and must not overlap on the shared MCP port or test-instance preparation.
@@ -177,7 +185,7 @@ Change the release tag argument when `mod_version` changes. Release versions and
 `MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH`, respectively. `verifyReleaseArtifact` rejects test
 classes, source files, and bundled third-party integrations while checking common contracts,
 shared runtime/provider classes, dedicated loader purity, universal loader coverage, and metadata.
-`releaseBundle` writes two version-labeled universal JARs and six dedicated JARs plus SHA-256 files
+`releaseBundle` writes three version-labeled universal JARs and nine dedicated JARs plus SHA-256 files
 to `build/release/`. See
 [Release](RELEASE.md) for the publishing checklist.
 
@@ -185,8 +193,8 @@ to `build/release/`. See
 
 Use the release JAR, not a development run, for the final human check:
 
-1. Put the matching universal release JAR and loader requirements in a clean Minecraft 26.1.2 or
-   26.2 instance. Repeat this smoke test for both versions before release.
+1. Put the matching universal release JAR and loader requirements in a clean Minecraft 1.21.11,
+   26.1.2, or 26.2 instance. Repeat this smoke test for all supported versions before release.
 2. Launch to the menu and confirm `http://127.0.0.1:25580/mcp` is listening.
 3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm twenty-one
    read-only `minecraft.*` tools.

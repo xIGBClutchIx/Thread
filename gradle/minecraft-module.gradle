@@ -17,5 +17,8 @@ sourceSets {
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraftVersion}"
+    if (versionConfig.requiresMappings) {
+        mappings loom.officialMojangMappings()
+    }
     implementation project(':common')
 }

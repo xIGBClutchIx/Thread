@@ -20,7 +20,10 @@ base {
 def loaderSourceDirectory = rootProject.file('loaders/forge')
 sourceSets {
     main {
-        java.setSrcDirs([new File(loaderSourceDirectory, 'src/main/java')])
+        java.setSrcDirs([
+                new File(loaderSourceDirectory, 'src/main/java'),
+                rootProject.file("loaders/forge/${selectedVersion}/src/main/java")
+        ])
         resources.setSrcDirs([new File(loaderSourceDirectory, 'src/main/resources')])
     }
     test {
@@ -76,11 +79,14 @@ def resetRunDirectory = { File runDirectory ->
 }
 def configurePackagedClient = { run, runDirectory, reportName ->
     // Custom ForgeGradle run names do not inherit the generated `client` launch configuration.
-    // These values are stable client metadata supplied by both pinned Forge userdev artifacts.
+    // These values are stable client metadata supplied by every pinned Forge userdev artifact.
     run.mainClass = 'net.minecraftforge.bootstrap.ForgeBootstrap'
     run.args '--gameDir', '.', '--launchTarget', 'forge_userdev_client', '--version', 'MOD_DEV',
             '--assetIndex', '{asset_index}', '--assetsDir', '{assets_root}'
-    run.jvmArgs '-Djava.net.preferIPv6Addresses=system', '-XX:+UseCompactObjectHeaders'
+    run.jvmArgs '-Djava.net.preferIPv6Addresses=system'
+    if (versionConfig.javaVersion >= 25) {
+        run.jvmArgs '-XX:+UseCompactObjectHeaders'
+    }
     run.environment 'MCP_MAPPINGS', '{mcp_mappings}'
     run.workingDir = runDirectory
     run.systemProperty 'eventbus.api.strictRuntimeChecks', 'true'

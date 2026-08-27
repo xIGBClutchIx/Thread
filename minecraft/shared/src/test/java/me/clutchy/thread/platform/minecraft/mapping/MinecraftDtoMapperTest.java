@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import me.clutchy.thread.core.model.item.ItemStackInfo;
 import me.clutchy.thread.platform.minecraft.testing.MinecraftTestBootstrap;
-import net.minecraft.core.Holder;
+import me.clutchy.thread.platform.minecraft.testing.MinecraftTestItemStacks;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -29,7 +29,7 @@ class MinecraftDtoMapperTest {
   @Test
   void mapsMinecraftStacksToDetachedCanonicalData() {
     ItemStack stack =
-        new ItemStack(Holder.direct(Items.DIAMOND, DataComponents.COMMON_ITEM_COMPONENTS), 3);
+        MinecraftTestItemStacks.create(Items.DIAMOND, 3, DataComponents.COMMON_ITEM_COMPONENTS);
     stack.set(DataComponents.ITEM_NAME, Component.literal("Diamond"));
 
     ItemStackInfo mapped = mapper.itemStack(stack);
@@ -52,7 +52,7 @@ class MinecraftDtoMapperTest {
             .set(DataComponents.MAX_STACK_SIZE, 1)
             .set(DataComponents.MAX_DAMAGE, 1561)
             .build();
-    ItemStack stack = new ItemStack(Holder.direct(Items.DIAMOND_PICKAXE, components), 1);
+    ItemStack stack = MinecraftTestItemStacks.create(Items.DIAMOND_PICKAXE, 1, components);
     stack.set(DataComponents.ITEM_NAME, Component.literal("Diamond Pickaxe"));
     stack.set(DataComponents.CUSTOM_NAME, Component.literal("Workhorse"));
     stack.set(DataComponents.REPAIR_COST, 2);

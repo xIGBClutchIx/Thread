@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Minecraft 1.21.11 support as an isolated Java 21 lane with Fabric Loader 0.19.3 plus Fabric API
+  0.141.6+1.21.11, NeoForge 21.11.45, Forge 61.2.1, and universal artifacts. It exposes the same
+  twenty-one fully supported tools as both 26.x lanes without runtime version branching.
 - Minecraft 26.1.2 support as an isolated version adapter with matching Fabric 0.19.3 plus
   Fabric API 0.154.0+26.1.2, NeoForge 26.1.2.41-beta, Forge 64.0.12, and universal artifacts.
   Minecraft 26.2 remains a separate compile-time lane with the same twenty-one-tool capability
@@ -47,6 +50,10 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Changed
 
+- Made Java, mappings, client-option fixtures, CI, release packaging, and loader coordinates
+  version-matrix properties. The 1.21.11 universal JAR isolates Fabric's remapped intermediary
+  runtime from the Mojang-named Forge/NeoForge runtime at build time; no runtime dependency or
+  version selector was added.
 - Clarified all built-in MCP tool descriptions, selection boundaries, session availability, input
   defaults, units, and hard numeric limits without adding or renaming tools. Added structural and
   wording-insensitive catalog regression validation plus a serialized payload budget.

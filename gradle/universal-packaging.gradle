@@ -5,6 +5,37 @@ threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
     def fabricProjectPath = ":loaders:fabric:${minecraftVersion}"
     def neoForgeProjectPath = ":loaders:neoforge:${minecraftVersion}"
     def forgeProjectPath = ":loaders:forge:${minecraftVersion}"
+    def relocatedFabricRuntime = null
+
+    if (versionConfig.requiresMappings) {
+        def fabricRuntimeJar = project(fabricProjectPath).layout.buildDirectory.file(
+                "libs/thread-fabric-${minecraftVersion}-${project.version}.jar")
+        relocatedFabricRuntime = tasks.register(
+                "relocateFabricRuntime${versionConfig.taskSuffix}",
+                rootProject.ext.shadowJarTaskType) {
+            group = 'build'
+            description = "Relocates the remapped Minecraft ${minecraftVersion} Fabric runtime."
+            dependsOn "${fabricProjectPath}:remapJar"
+            archiveBaseName = "thread-fabric-runtime-${minecraftVersion}"
+            destinationDirectory = layout.buildDirectory.dir('universal-runtime')
+            configurations = []
+            duplicatesStrategy = DuplicatesStrategy.FAIL
+            includeEmptyDirs = false
+            preserveFileTimestamps = false
+            reproducibleFileOrder = true
+
+            from { zipTree(fabricRuntimeJar.get().asFile) }
+            include 'me/clutchy/thread/minecraft/**'
+            include 'me/clutchy/thread/platform/minecraft/**'
+            include 'me/clutchy/thread/platform/fabric/**'
+            relocate(
+                    'me.clutchy.thread.minecraft',
+                    'me.clutchy.thread.platform.fabric.intermediary.minecraft')
+            relocate(
+                    'me.clutchy.thread.platform.minecraft',
+                    'me.clutchy.thread.platform.fabric.intermediary.platform')
+        }
+    }
 
     def universalJar = tasks.register("universalJar${versionConfig.taskSuffix}", Jar) {
         group = 'build'
@@ -19,12 +50,21 @@ threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
         dependsOn ':common:classes', "${minecraftProjectPath}:classes",
                 "${fabricProjectPath}:clientClasses", "${neoForgeProjectPath}:classes",
                 "${forgeProjectPath}:classes"
+        if (relocatedFabricRuntime != null) {
+            dependsOn relocatedFabricRuntime
+        }
 
         // Resolve source-set outputs lazily because the version projects configure after the root.
         from { project(':common').sourceSets.main.output }
         from { project(minecraftProjectPath).sourceSets.main.output }
         from { project(fabricProjectPath).sourceSets.main.output }
-        from { project(fabricProjectPath).sourceSets.client.output }
+        if (relocatedFabricRuntime == null) {
+            from { project(fabricProjectPath).sourceSets.client.output }
+        } else {
+            // Pre-unobfuscated Fabric runs intermediary bytecode while Forge and NeoForge use
+            // Mojang names. Keep both copies isolated by relocating only the remapped Fabric side.
+            from { zipTree(relocatedFabricRuntime.get().archiveFile.get().asFile) }
+        }
         from { project(neoForgeProjectPath).sourceSets.main.output }
         from({ project(forgeProjectPath).sourceSets.main.output }) {
             // Forge's descriptor is loader-branded; the universal artifact owns the neutral copy.

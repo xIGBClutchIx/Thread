@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -18,30 +20,49 @@ class ArchitectureBoundaryTest {
   private static final Path COMMON_SOURCE_ROOT = PROJECT_ROOT.resolve("common/src/main/java");
   private static final Path MINECRAFT_SHARED_SOURCE_ROOT =
       PROJECT_ROOT.resolve("minecraft/shared/src/main/java");
-  private static final Path MINECRAFT_2612_SOURCE_ROOT =
-      PROJECT_ROOT.resolve("minecraft/26.1.2/src/main/java");
-  private static final Path MINECRAFT_262_SOURCE_ROOT =
-      PROJECT_ROOT.resolve("minecraft/26.2/src/main/java");
+  private static final List<String> SUPPORTED_VERSIONS =
+      Arrays.asList(System.getProperty("thread.supportedMinecraftVersions", "").split(",", -1));
   private static final List<Path> MINECRAFT_SOURCE_ROOTS =
-      List.of(MINECRAFT_SHARED_SOURCE_ROOT, MINECRAFT_2612_SOURCE_ROOT, MINECRAFT_262_SOURCE_ROOT);
+      Stream.concat(
+              Stream.of(MINECRAFT_SHARED_SOURCE_ROOT),
+              SUPPORTED_VERSIONS.stream()
+                  .map(version -> PROJECT_ROOT.resolve("minecraft/" + version + "/src/main/java")))
+          .toList();
   private static final Path SHARED_GAMETEST_ROOT = PROJECT_ROOT.resolve("common/src/gametest/java");
   private static final List<Path> FABRIC_SOURCE_ROOTS =
-      List.of(
-          PROJECT_ROOT.resolve("loaders/fabric/src/main/java"),
-          PROJECT_ROOT.resolve("loaders/fabric/src/client/java"));
-  private static final Path NEOFORGE_SOURCE_ROOT =
-      PROJECT_ROOT.resolve("loaders/neoforge/src/main/java");
-  private static final Path FORGE_SOURCE_ROOT = PROJECT_ROOT.resolve("loaders/forge/src/main/java");
-  private static final List<Path> PRODUCTION_SOURCE_ROOTS =
       Stream.concat(
               Stream.of(
-                  COMMON_SOURCE_ROOT,
-                  MINECRAFT_SHARED_SOURCE_ROOT,
-                  MINECRAFT_2612_SOURCE_ROOT,
-                  MINECRAFT_262_SOURCE_ROOT,
-                  NEOFORGE_SOURCE_ROOT,
-                  FORGE_SOURCE_ROOT),
-              FABRIC_SOURCE_ROOTS.stream())
+                  PROJECT_ROOT.resolve("loaders/fabric/src/main/java"),
+                  PROJECT_ROOT.resolve("loaders/fabric/src/client/java")),
+              SUPPORTED_VERSIONS.stream()
+                  .map(
+                      version ->
+                          PROJECT_ROOT.resolve("loaders/fabric/" + version + "/src/main/java")))
+          .toList();
+  private static final List<Path> NEOFORGE_SOURCE_ROOTS =
+      Stream.concat(
+              Stream.of(PROJECT_ROOT.resolve("loaders/neoforge/src/main/java")),
+              SUPPORTED_VERSIONS.stream()
+                  .map(
+                      version ->
+                          PROJECT_ROOT.resolve("loaders/neoforge/" + version + "/src/main/java")))
+          .toList();
+  private static final List<Path> FORGE_SOURCE_ROOTS =
+      Stream.concat(
+              Stream.of(PROJECT_ROOT.resolve("loaders/forge/src/main/java")),
+              SUPPORTED_VERSIONS.stream()
+                  .map(
+                      version ->
+                          PROJECT_ROOT.resolve("loaders/forge/" + version + "/src/main/java")))
+          .toList();
+  private static final List<Path> PRODUCTION_SOURCE_ROOTS =
+      Stream.of(
+              List.of(COMMON_SOURCE_ROOT),
+              MINECRAFT_SOURCE_ROOTS,
+              FABRIC_SOURCE_ROOTS,
+              NEOFORGE_SOURCE_ROOTS,
+              FORGE_SOURCE_ROOTS)
+          .flatMap(List::stream)
           .toList();
   private static final Path CORE_MODEL_ROOT =
       COMMON_SOURCE_ROOT.resolve("me/clutchy/thread/core/model");
@@ -118,7 +139,7 @@ class ArchitectureBoundaryTest {
     assertFalse(minecraftConvention.contains("neoforge"));
     assertFalse(minecraftConvention.contains("net.minecraftforge"));
 
-    for (String version : List.of("26.1.2", "26.2")) {
+    for (String version : SUPPORTED_VERSIONS) {
       String minecraftBuild =
           Files.readString(
               PROJECT_ROOT.resolve("minecraft/" + version + "/build.gradle"),
@@ -152,7 +173,7 @@ class ArchitectureBoundaryTest {
     assertTrue(settings.contains("file(\"minecraft/${minecraftVersion}\")"));
     assertTrue(settings.contains("file(\"loaders/${loader}/${minecraftVersion}\")"));
 
-    for (String version : List.of("26.1.2", "26.2")) {
+    for (String version : SUPPORTED_VERSIONS) {
       assertTrue(versionMatrix.contains("'" + version + "'"), version);
       assertTrue(Files.isDirectory(PROJECT_ROOT.resolve("minecraft/" + version)), version);
       for (String loader : List.of("fabric", "neoforge", "forge")) {
@@ -172,7 +193,6 @@ class ArchitectureBoundaryTest {
     assertFalse(
         Files.exists(PROJECT_ROOT.resolve("universal/build.gradle")),
         "universal artifacts must be matrix-driven packaging outputs");
-    assertFalse(Files.exists(PROJECT_ROOT.resolve("universal-26.1.2/build.gradle")));
     assertFalse(
         Files.exists(PROJECT_ROOT.resolve("src")), "legacy root source tree must stay absent");
   }
@@ -182,24 +202,48 @@ class ArchitectureBoundaryTest {
     for (Path source :
         javaSourcesUnder(List.of(COMMON_SOURCE_ROOT, MINECRAFT_SHARED_SOURCE_ROOT))) {
       String contents = Files.readString(source, StandardCharsets.UTF_8);
-      assertFalse(contents.contains("26.1.2"), source::toString);
-      assertFalse(contents.contains("26.2"), source::toString);
+      for (String version : SUPPORTED_VERSIONS) {
+        assertFalse(contents.contains(version), source::toString);
+      }
+    }
+  }
+
+  @Test
+  void sharedMinecraftCodeDoesNotUseReflectionToHideVersionDifferences() throws IOException {
+    for (Path source : javaSourcesUnder(MINECRAFT_SHARED_SOURCE_ROOT)) {
+      String contents = Files.readString(source, StandardCharsets.UTF_8);
+      assertFalse(contents.contains("java.lang.reflect"), source::toString);
+      assertFalse(contents.contains("Class.forName"), source::toString);
+      assertFalse(contents.contains("getDeclaredMethod"), source::toString);
+      assertFalse(contents.contains("getDeclaredField"), source::toString);
     }
   }
 
   @Test
   void versionLanesDoNotReferenceEachOther() throws IOException {
-    assertVersionLaneIsolation(MINECRAFT_2612_SOURCE_ROOT, "26.2", "v26_2");
-    assertVersionLaneIsolation(MINECRAFT_262_SOURCE_ROOT, "26.1.2", "v26_1_2");
-
-    for (String version : List.of("26.1.2", "26.2")) {
+    for (String version : SUPPORTED_VERSIONS) {
+      Path minecraftRoot = PROJECT_ROOT.resolve("minecraft/" + version + "/src/main/java");
+      for (String otherVersion : SUPPORTED_VERSIONS) {
+        if (!otherVersion.equals(version)) {
+          assertVersionLaneIsolation(
+              minecraftRoot, otherVersion, "v" + otherVersion.replace('.', '_'));
+        }
+      }
       for (String loader : List.of("fabric", "neoforge", "forge")) {
         String binding =
             Files.readString(
                 PROJECT_ROOT.resolve("loaders/" + loader + "/" + version + "/build.gradle"),
                 StandardCharsets.UTF_8);
         assertTrue(binding.contains("ext.threadVersion = project.name"), binding);
-        assertFalse(binding.contains(version.equals("26.1.2") ? "26.2" : "26.1.2"), binding);
+        for (String otherVersion : SUPPORTED_VERSIONS) {
+          if (!otherVersion.equals(version)) {
+            assertFalse(binding.contains(otherVersion), binding);
+            assertVersionLaneIsolation(
+                PROJECT_ROOT.resolve("loaders/" + loader + "/" + version + "/src/main/java"),
+                otherVersion,
+                "v" + otherVersion.replace('.', '_'));
+          }
+        }
       }
     }
   }
@@ -220,7 +264,7 @@ class ArchitectureBoundaryTest {
 
   @Test
   void neoForgeProductionCodeStaysInsideTheNeoForgeAdapterPackage() throws IOException {
-    for (Path source : javaSourcesUnder(NEOFORGE_SOURCE_ROOT)) {
+    for (Path source : javaSourcesUnder(NEOFORGE_SOURCE_ROOTS)) {
       String contents = Files.readString(source, StandardCharsets.UTF_8);
       assertTrue(
           normalizedPath(source).contains("/me/clutchy/thread/platform/neoforge/"),
@@ -235,7 +279,7 @@ class ArchitectureBoundaryTest {
 
   @Test
   void forgeProductionCodeStaysInsideTheForgeAdapterPackage() throws IOException {
-    for (Path source : javaSourcesUnder(FORGE_SOURCE_ROOT)) {
+    for (Path source : javaSourcesUnder(FORGE_SOURCE_ROOTS)) {
       String contents = Files.readString(source, StandardCharsets.UTF_8);
       assertTrue(
           normalizedPath(source).contains("/me/clutchy/thread/platform/forge/"), source::toString);
@@ -379,28 +423,30 @@ class ArchitectureBoundaryTest {
       assertFalse(normalizedPath(source).contains("/integration/jei/"), source::toString);
     }
 
-    for (Path artifactInput :
-        List.of(
-            PROJECT_ROOT.resolve("build.gradle"),
-            PROJECT_ROOT.resolve("common/build.gradle"),
-            PROJECT_ROOT.resolve("minecraft/26.1.2/build.gradle"),
-            PROJECT_ROOT.resolve("minecraft/26.2/build.gradle"),
-            PROJECT_ROOT.resolve("loaders/fabric/26.1.2/build.gradle"),
-            PROJECT_ROOT.resolve("loaders/fabric/26.2/build.gradle"),
-            PROJECT_ROOT.resolve("loaders/neoforge/26.1.2/build.gradle"),
-            PROJECT_ROOT.resolve("loaders/neoforge/26.2/build.gradle"),
-            PROJECT_ROOT.resolve("loaders/forge/26.1.2/build.gradle"),
-            PROJECT_ROOT.resolve("loaders/forge/26.2/build.gradle"),
-            PROJECT_ROOT.resolve("gradle/version-matrix.gradle"),
-            PROJECT_ROOT.resolve("gradle/minecraft-module.gradle"),
-            PROJECT_ROOT.resolve("gradle/fabric-module.gradle"),
-            PROJECT_ROOT.resolve("gradle/neoforge-module.gradle"),
-            PROJECT_ROOT.resolve("gradle/forge-module.gradle"),
-            PROJECT_ROOT.resolve("gradle/universal-packaging.gradle"),
-            PROJECT_ROOT.resolve("gradle.properties"),
-            PROJECT_ROOT.resolve("loaders/fabric/src/main/resources/fabric.mod.json"),
-            PROJECT_ROOT.resolve("loaders/neoforge/src/main/resources/META-INF/neoforge.mods.toml"),
-            PROJECT_ROOT.resolve("loaders/forge/src/main/resources/META-INF/mods.toml"))) {
+    List<Path> artifactInputs =
+        new ArrayList<>(
+            List.of(
+                PROJECT_ROOT.resolve("build.gradle"),
+                PROJECT_ROOT.resolve("common/build.gradle"),
+                PROJECT_ROOT.resolve("gradle/version-matrix.gradle"),
+                PROJECT_ROOT.resolve("gradle/minecraft-module.gradle"),
+                PROJECT_ROOT.resolve("gradle/fabric-module.gradle"),
+                PROJECT_ROOT.resolve("gradle/neoforge-module.gradle"),
+                PROJECT_ROOT.resolve("gradle/forge-module.gradle"),
+                PROJECT_ROOT.resolve("gradle/universal-packaging.gradle"),
+                PROJECT_ROOT.resolve("gradle.properties"),
+                PROJECT_ROOT.resolve("loaders/fabric/src/main/resources/fabric.mod.json"),
+                PROJECT_ROOT.resolve(
+                    "loaders/neoforge/src/main/resources/META-INF/neoforge.mods.toml"),
+                PROJECT_ROOT.resolve("loaders/forge/src/main/resources/META-INF/mods.toml")));
+    for (String version : SUPPORTED_VERSIONS) {
+      artifactInputs.add(PROJECT_ROOT.resolve("minecraft/" + version + "/build.gradle"));
+      for (String loader : List.of("fabric", "neoforge", "forge")) {
+        artifactInputs.add(
+            PROJECT_ROOT.resolve("loaders/" + loader + "/" + version + "/build.gradle"));
+      }
+    }
+    for (Path artifactInput : artifactInputs) {
       String contents = Files.readString(artifactInput, StandardCharsets.UTF_8).toLowerCase();
       assertFalse(contents.contains("jei"), artifactInput::toString);
     }

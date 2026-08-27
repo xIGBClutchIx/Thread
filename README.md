@@ -3,9 +3,9 @@
 Thread is a read-only Minecraft context server for AI clients. It exposes structured facts from a
 running single-player world through MCP without embedding an AI model or automating gameplay.
 
-Thread 0.1.0 targets Minecraft 26.1.2 and 26.2 on Java 25. Each Minecraft version has its own
-Fabric, NeoForge, Forge, and universal artifact; no JAR spans Minecraft versions. V1 is
-single-player-only and bound to loopback.
+Thread 0.1.0 targets Minecraft 1.21.11, 26.1.2, and 26.2. Minecraft 1.21.11 uses Java 21; the
+26.x lanes use Java 25. Each Minecraft version has its own Fabric, NeoForge, Forge, and universal
+artifact; no JAR spans Minecraft versions. V1 is single-player-only and bound to loopback.
 
 ## What it exposes
 
@@ -41,12 +41,13 @@ with an explicit `PLAYER_AND_NEARBY` scope when a client wants eligible loaded c
 
 ## Install
 
-1. Install Java 25 and choose one supported Minecraft/loader combination:
+1. Install the Java version listed for your Minecraft lane and choose one supported loader:
 
-   | Minecraft | Fabric | NeoForge | Forge |
-   | --- | --- | --- | --- |
-   | 26.1.2 | Loader 0.19.3 + Fabric API 0.154.0+26.1.2 | 26.1.2.41-beta | 64.0.12 |
-   | 26.2 | Loader 0.19.3 + Fabric API 0.154.0+26.2 | 26.2.0.62 | 65.1.2 |
+   | Minecraft | Java | Fabric | NeoForge | Forge |
+   | --- | --- | --- | --- | --- |
+   | 1.21.11 | 21 | Loader 0.19.3 + Fabric API 0.141.6+1.21.11 | 21.11.45 | 61.2.1 |
+   | 26.1.2 | 25 | Loader 0.19.3 + Fabric API 0.154.0+26.1.2 | 26.1.2.41-beta | 64.0.12 |
+   | 26.2 | 25 | Loader 0.19.3 + Fabric API 0.154.0+26.2 | 26.2.0.62 | 65.1.2 |
 
 2. Put the matching `thread-universal-<minecraft>-0.1.0.jar` in the instance's `mods` folder. It
    works on all three loaders for that exact Minecraft version. Matching dedicated
@@ -144,10 +145,11 @@ session.
 ## Development
 
 The Gradle build separates version-neutral `:common` code, shared Minecraft-facing sources, small
-`:minecraft:26.1.2` and `:minecraft:26.2` API bindings, and nested Fabric/NeoForge/Forge projects.
+`:minecraft:1.21.11`, `:minecraft:26.1.2`, and `:minecraft:26.2` API bindings, and nested
+Fabric/NeoForge/Forge projects.
 Each version lane compiles the same justified shared sources against exactly one Minecraft version,
-then a root packaging task produces its universal JAR. Releases contain two independent
-four-artifact matrices.
+then a root packaging task produces its universal JAR. Releases contain three independent
+four-artifact matrices. All three lanes expose the same twenty-one-tool capability set.
 
 Use the Gradle Wrapper. The normal local gate is:
 

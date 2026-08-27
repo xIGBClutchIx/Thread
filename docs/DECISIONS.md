@@ -11,7 +11,8 @@ not the core API.
 
 ## V1 is deliberately narrow
 
-V1 is Java 25, Fabric/NeoForge/Forge client, Minecraft 26.1.2 and 26.2, single-player,
+V1 is a Java client mod for Fabric, NeoForge, and Forge on Minecraft 1.21.11, 26.1.2, and 26.2.
+The 1.21.11 lane targets Java 21; 26.x targets Java 25. Every lane remains single-player,
 read-only, bounded, and loopback-only.
 Gameplay tools reject multiplayer before exposing state. `minecraft.get_status`,
 `minecraft.get_game_info`, and the local-only `minecraft.get_client_options` remain available from
@@ -26,7 +27,7 @@ JAR is supported.
 `:common` owns version-neutral core, configuration, MCP, runtime/tool orchestration, focused
 provider contracts, DTOs, crafting, item search, serialization, and integrations. It has no
 `net.minecraft` dependency. `minecraft/shared` owns Minecraft-facing code that compiles unchanged
-inside both `:minecraft:26.1.2` and `:minecraft:26.2`; it is not a runtime artifact. Genuine API and
+inside every supported lane; it is not a runtime artifact. Genuine API and
 capability identity differences remain in the matching version directory. Each version project
 depends on common but no loader. The Fabric, NeoForge, and Forge source trees under `loaders/` own
 only their entrypoint, Loader API, lifecycle, config path, version predicate, and
@@ -43,6 +44,13 @@ exactly one Minecraft implementation, and the three matching loader outputs from
 matrix. Dedicated JARs remain canonical and independently installable. Unexpected duplicate entries
 fail the build; the one known loader-branded `pack.mcmeta` collision is replaced by a neutral
 universal descriptor.
+
+Minecraft 1.21.11's production Fabric artifact uses intermediary names after remapping, while its
+Forge and NeoForge artifacts use Mojang names. Its universal packaging task therefore relocates
+only the remapped Fabric runtime copy beneath the Fabric namespace and retains the Mojang-named
+copy for the other loaders. This build-time namespace isolation is source-less, deterministic, and
+limited to one Minecraft version. It is not a runtime loader/version selector. The Shadow plugin
+exists only on the build classpath for this transformation.
 
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
 component map, or optional-mod type. Each Minecraft adapter converts live game objects into
@@ -61,17 +69,19 @@ unsupported, or supported with explicitly named optional fields unavailable. Mis
 are unsupported and never enter discovery or capabilities. Partial support is legal only when the
 existing Thread contract marks those fields optional; providers return ordinary absence rather
 than fabricated values. Core consumes this map and provider contracts without comparing version
-strings. Minecraft 26.1.2 and 26.2 each explicitly declare all twenty-one tools fully supported.
+strings. Minecraft 1.21.11, 26.1.2, and 26.2 each explicitly declare all twenty-one tools fully
+supported.
 
 Java type documentation belongs on public types and architecture documentation belongs under
 `docs/`; `package-info.java` is not used.
 
 ## Versions and dependencies are pinned
 
-The V1 baselines are Minecraft 26.1.2 with Fabric API 0.154.0+26.1.2, NeoForge
-26.1.2.41-beta, and Forge 64.0.12; and Minecraft 26.2 with Fabric API 0.154.0+26.2, NeoForge
-26.2.0.62, and Forge 65.1.2. Both use Java 25 and Fabric Loader 0.19.3. Shared build pins are Loom
-1.17.19, ModDevGradle 2.0.144, ForgeGradle 7.0.35, Gradle 9.5.1, Spotless 8.10.0,
+The V1 baselines are Minecraft 1.21.11 on Java 21 with Fabric API 0.141.6+1.21.11, NeoForge
+21.11.45, and Forge 61.2.1; Minecraft 26.1.2 on Java 25 with Fabric API 0.154.0+26.1.2,
+NeoForge 26.1.2.41-beta, and Forge 64.0.12; and Minecraft 26.2 on Java 25 with Fabric API
+0.154.0+26.2, NeoForge 26.2.0.62, and Forge 65.1.2. All use Fabric Loader 0.19.3. Shared build
+pins are Loom 1.17.19, ModDevGradle 2.0.144, ForgeGradle 7.0.35, Shadow 9.6.1, Gradle 9.5.1, Spotless 8.10.0,
 google-java-format 1.36.0, Checkstyle 14.0.0, and JUnit 6.1.2.
 
 `gradle/version-matrix.gradle` is the single source of truth for Java, Minecraft, Fabric
@@ -79,14 +89,16 @@ Loader/API, NeoForge, Forge, and supported loader-combination metadata. Settings
 conventions, universal packaging, release validation, and release bundling consume that ordered
 matrix instead of maintaining parallel version constants.
 
-Minecraft 26.1.2 exposes the multiplayer predicate differently from 26.2. Its small session binding uses the
-public inverse `!Minecraft.isSingleplayer()` after confirming a loaded world, preserving rejection
-of LAN-published integrated sessions without reflection or runtime version branching. This is the
-only current production API difference; test-only screen access also stays version-bound. Tool
-contracts and capability states are equal.
+Minecraft 1.21.11 and 26.1.2 expose the multiplayer predicate differently from 26.2. Their small
+session bindings use the public inverse `!Minecraft.isSingleplayer()` after confirming a loaded
+world, preserving rejection of LAN-published integrated sessions without reflection or runtime
+version branching. The older lane also owns its recipe-display traversal and world-clock access;
+the matching 26.x implementations stay in their lanes. Test-only screen, Fabric context, and Forge
+`ModList` access follow the same compile-time rule. Tool contracts and capability states are equal.
 
-Minecraft supplies Gson 2.14.0. Thread uses it behind explicit Thread-owned JSON schemas rather
-than bundling another JSON library or generating schemas through reflection.
+Minecraft supplies Gson in every supported lane. Thread uses that game-provided runtime behind
+explicit Thread-owned JSON schemas rather than bundling another JSON library or generating schemas
+through reflection.
 
 ## Live native state is authoritative
 

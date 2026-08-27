@@ -15,6 +15,8 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Minecraft Java Edition
 - Fabric, NeoForge, and Forge client loaders
 - Java implementation
+- Minecraft 1.21.11 on Java 21 with Fabric Loader 0.19.3 plus Fabric API 0.141.6+1.21.11,
+  NeoForge 21.11.45, or Forge 61.2.1
 - Minecraft 26.1.2 with Fabric Loader 0.19.3 plus Fabric API 0.154.0+26.1.2,
   NeoForge 26.1.2.41-beta, or Forge 64.0.12
 - Minecraft 26.2 with Fabric Loader 0.19.3 plus Fabric API 0.154.0+26.2,
@@ -23,8 +25,9 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
 
-V1 ships separate 26.1.2 and 26.2 implementations and artifacts. It never selects or branches
-across versions at runtime. Both require Java 25, which is also the project toolchain.
+V1 ships separate 1.21.11, 26.1.2, and 26.2 implementations and artifacts. It never selects or
+branches across versions at runtime. Minecraft 1.21.11 requires Java 21; both 26.x lanes require
+Java 25, which is also the Gradle build runtime.
 
 ## In scope
 
@@ -74,8 +77,9 @@ across versions at runtime. Both require Java 25, which is also the project tool
 
 ### Engineering baseline
 
-- Gradle `:common`, `minecraft/shared`, isolated `:minecraft:26.1.2` and `:minecraft:26.2`
-  bindings, nested thin loader projects, and matrix-driven universal packaging tasks
+- Gradle `:common`, `minecraft/shared`, isolated `:minecraft:1.21.11`, `:minecraft:26.1.2`, and
+  `:minecraft:26.2` bindings, nested thin loader projects, and matrix-driven universal packaging
+  tasks
 - a version-specific universal JAR and independently installable dedicated JAR for every supported
   Minecraft/loader combination
 - meaningful comments for non-obvious implementation decisions

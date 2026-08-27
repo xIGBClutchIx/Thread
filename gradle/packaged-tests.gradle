@@ -8,6 +8,19 @@ def gametestJar = tasks.register('gametestJar', Jar) {
 }
 
 def minecraftVersion = project.ext.threadMinecraftVersion
+def versionConfig = rootProject.ext.threadBuildMatrix.versions[minecraftVersion]
+def packagedGametestJar = gametestJar
+if (versionConfig.requiresMappings) {
+    packagedGametestJar = tasks.register('remapGametestJar', project.ext.remapJarTaskType) {
+        group = 'build'
+        description = 'Remaps the isolated client game-test harness for production.'
+        dependsOn gametestJar
+        inputFile.set(gametestJar.flatMap { it.archiveFile })
+        archiveClassifier.set('gametest-remapped')
+        addNestedDependencies.set(false)
+    }
+}
+
 def runPrefix = "run/minecraft-${minecraftVersion}/fabric"
 def productionRunDirectory = rootProject.layout.buildDirectory.dir(
         "${runPrefix}ProductionClientGameTest")
@@ -26,7 +39,7 @@ def writeThreadTestConfig = { directoryProvider, String source ->
 
 tasks.register('prepareFreshProductionClientGameTest') {
     mustRunAfter rootProject.tasks.named('clean')
-    dependsOn tasks.named('build'), gametestJar
+    dependsOn tasks.named('build'), packagedGametestJar
     outputs.upToDateWhen { false }
     doLast {
         def runDirectory = productionRunDirectory.get().asFile
@@ -41,7 +54,7 @@ tasks.register(
     group = 'verification'
     description = 'Runs the client game test against the packaged mod.'
     dependsOn tasks.named('prepareFreshProductionClientGameTest')
-    mods.from(gametestJar.flatMap { it.archiveFile })
+    mods.from(packagedGametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll('-Dfabric.client.gametest', expectedMinecraftVersionArgument)
     runDir = productionRunDirectory.get().asFile
     // Loom owns runDir as task output and may clean it after dependency preparation. Restaging in
@@ -68,9 +81,9 @@ tasks.register(
         productionClientTaskType) {
     group = 'verification'
     description = 'Restarts the packaged client with an existing config.'
-    dependsOn tasks.named('build'), gametestJar,
+    dependsOn tasks.named('build'), packagedGametestJar,
             tasks.named('prepareRestartProductionClientGameTest')
-    mods.from(gametestJar.flatMap { it.archiveFile })
+    mods.from(packagedGametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll(
             '-Dfabric.client.gametest',
             expectedMinecraftVersionArgument,
@@ -89,7 +102,7 @@ def disabledRunDirectory = rootProject.layout.buildDirectory.dir(
 
 tasks.register('prepareMcpDisabledClientGameTest') {
     mustRunAfter rootProject.tasks.named('clean')
-    dependsOn tasks.named('build'), gametestJar
+    dependsOn tasks.named('build'), packagedGametestJar
     outputs.upToDateWhen { false }
     doLast {
         def runDirectory = disabledRunDirectory.get().asFile
@@ -107,7 +120,7 @@ tasks.register(
     group = 'verification'
     description = 'Proves the packaged client starts with MCP disabled.'
     dependsOn tasks.named('prepareMcpDisabledClientGameTest')
-    mods.from(gametestJar.flatMap { it.archiveFile })
+    mods.from(packagedGametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll(
             '-Dfabric.client.gametest',
             expectedMinecraftVersionArgument,
@@ -128,7 +141,7 @@ def universalRunDirectory = rootProject.layout.buildDirectory.dir(
 
 tasks.register('prepareFreshUniversalProductionClientGameTest') {
     mustRunAfter rootProject.tasks.named('clean')
-    dependsOn universalJarTask, gametestJar
+    dependsOn universalJarTask, packagedGametestJar
     outputs.upToDateWhen { false }
     doLast {
         def runDirectory = universalRunDirectory.get().asFile
@@ -146,7 +159,7 @@ tasks.register(
     mods.setFrom(
             configurations.productionRuntimeMods,
             universalJar,
-            gametestJar.flatMap { it.archiveFile })
+            packagedGametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll('-Dfabric.client.gametest', expectedMinecraftVersionArgument)
     runDir = universalRunDirectory.get().asFile
     doFirst {
@@ -169,12 +182,12 @@ tasks.register(
         productionClientTaskType) {
     group = 'verification'
     description = 'Restarts the Fabric client against the universal JAR and existing config.'
-    dependsOn universalJarTask, gametestJar,
+    dependsOn universalJarTask, packagedGametestJar,
             tasks.named('prepareUniversalRestartProductionClientGameTest')
     mods.setFrom(
             configurations.productionRuntimeMods,
             universalJar,
-            gametestJar.flatMap { it.archiveFile })
+            packagedGametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll(
             '-Dfabric.client.gametest',
             expectedMinecraftVersionArgument,
@@ -193,7 +206,7 @@ def universalDisabledRunDirectory = rootProject.layout.buildDirectory.dir(
 
 tasks.register('prepareUniversalMcpDisabledClientGameTest') {
     mustRunAfter rootProject.tasks.named('clean')
-    dependsOn universalJarTask, gametestJar
+    dependsOn universalJarTask, packagedGametestJar
     outputs.upToDateWhen { false }
     doLast {
         def runDirectory = universalDisabledRunDirectory.get().asFile
@@ -214,7 +227,7 @@ tasks.register(
     mods.setFrom(
             configurations.productionRuntimeMods,
             universalJar,
-            gametestJar.flatMap { it.archiveFile })
+            packagedGametestJar.flatMap { it.archiveFile })
     jvmArgs.addAll(
             '-Dfabric.client.gametest',
             expectedMinecraftVersionArgument,

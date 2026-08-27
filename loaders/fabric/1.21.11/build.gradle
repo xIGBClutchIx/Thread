@@ -1,0 +1,9 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap'
+}
+
+ext.threadVersion = project.name
+// Applied scripts do not inherit Loom plugin classes on their compilation classpath.
+ext.productionClientTaskType = net.fabricmc.loom.task.prod.ClientProductionRunTask
+ext.remapJarTaskType = net.fabricmc.loom.task.RemapJarTask
+apply from: rootProject.file('gradle/fabric-module.gradle')

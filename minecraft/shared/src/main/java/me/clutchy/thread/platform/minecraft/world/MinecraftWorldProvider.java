@@ -455,7 +455,7 @@ public final class MinecraftWorldProvider implements WorldProvider {
         new BlockPosition(spawn.pos().getX(), spawn.pos().getY(), spawn.pos().getZ());
     Double spawnDistance =
         dimensionId.equals(spawnDimensionId) ? distance(playerPosition, spawnPosition) : null;
-    long dayTimeTicks = level.getOverworldClockTime();
+    long dayTimeTicks = MinecraftWorldTimeBinding.dayTimeTicks(level);
     int timeOfDayTicks = Math.floorMod(dayTimeTicks, WorldInfo.TICKS_PER_DAY);
     Identifier biomeId = biomeIdentifier.orElseThrow();
     String biomeTranslationKey = Util.makeDescriptionId("biome", biomeId);

@@ -3,6 +3,7 @@ package me.clutchy.thread.platform.minecraft.mapping;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.StreamSupport;
 import me.clutchy.thread.core.model.item.ItemComponentsInfo;
 import me.clutchy.thread.core.model.item.ItemDurabilityInfo;
 import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
@@ -292,7 +293,10 @@ public final class MinecraftDtoMapper {
                 .orElse(null);
     ItemContainerContents container = stack.get(DataComponents.CONTAINER);
     int storedItemStacks =
-        container == null ? 0 : Math.toIntExact(container.nonEmptyItemCopyStream().count());
+        container == null
+            ? 0
+            : Math.toIntExact(
+                StreamSupport.stream(container.nonEmptyItems().spliterator(), false).count());
     if (rarity == null
         && !unbreakable
         && repairCost == 0

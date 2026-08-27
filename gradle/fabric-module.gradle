@@ -53,6 +53,7 @@ sourceSets {
     gametest {
         java.setSrcDirs([
                 new File(loaderSourceDirectory, 'src/gametest/java'),
+                rootProject.file("loaders/fabric/${minecraftVersion}/src/gametest/java"),
                 rootProject.file('common/src/gametest/java')
         ])
         resources.setSrcDirs([new File(loaderSourceDirectory, 'src/gametest/resources')])
@@ -64,10 +65,18 @@ sourceSets {
 def minecraftProjectPath = ":minecraft:${minecraftVersion}"
 dependencies {
     minecraft "com.mojang:minecraft:${minecraftVersion}"
+    if (versionConfig.requiresMappings) {
+        mappings loom.officialMojangMappings()
+    }
     implementation project(':common')
     implementation project(minecraftProjectPath)
-    implementation "net.fabricmc:fabric-loader:${versionConfig.fabricLoader}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${versionConfig.fabricApi}"
+    if (versionConfig.requiresMappings) {
+        modImplementation "net.fabricmc:fabric-loader:${versionConfig.fabricLoader}"
+        modImplementation "net.fabricmc.fabric-api:fabric-api:${versionConfig.fabricApi}"
+    } else {
+        implementation "net.fabricmc:fabric-loader:${versionConfig.fabricLoader}"
+        implementation "net.fabricmc.fabric-api:fabric-api:${versionConfig.fabricApi}"
+    }
     productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${versionConfig.fabricApi}"
 }
 
@@ -76,7 +85,7 @@ processResources {
     inputs.property 'minecraftVersion', minecraftVersion
     inputs.property 'loaderVersion', versionConfig.fabricLoader
     inputs.property 'fabricApiVersion', versionConfig.fabricApi
-    inputs.property 'javaVersion', rootProject.ext.threadBuildMatrix.javaVersion
+    inputs.property 'javaVersion', versionConfig.javaVersion
 
     filesMatching('fabric.mod.json') {
         expand(
@@ -84,7 +93,7 @@ processResources {
                 minecraftVersion: minecraftVersion,
                 loaderVersion: versionConfig.fabricLoader,
                 fabricApiVersion: versionConfig.fabricApi,
-                javaVersion: rootProject.ext.threadBuildMatrix.javaVersion)
+                javaVersion: versionConfig.javaVersion)
     }
 }
 

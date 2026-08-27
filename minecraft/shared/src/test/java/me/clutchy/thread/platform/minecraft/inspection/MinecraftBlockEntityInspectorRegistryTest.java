@@ -12,8 +12,8 @@ import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.platform.minecraft.integration.MinecraftIntegrationExtensionPoints;
 import me.clutchy.thread.platform.minecraft.mapping.MinecraftDtoMapper;
 import me.clutchy.thread.platform.minecraft.testing.MinecraftTestBootstrap;
+import me.clutchy.thread.platform.minecraft.testing.MinecraftTestItemStacks;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -50,10 +50,10 @@ class MinecraftBlockEntityInspectorRegistryTest {
     FurnaceBlockEntity furnace =
         new FurnaceBlockEntity(BlockPos.ZERO, Blocks.FURNACE.defaultBlockState());
     ItemStack input =
-        new ItemStack(Holder.direct(Items.IRON_ORE, DataComponents.COMMON_ITEM_COMPONENTS), 3);
+        MinecraftTestItemStacks.create(Items.IRON_ORE, 3, DataComponents.COMMON_ITEM_COMPONENTS);
     input.set(DataComponents.ITEM_NAME, Component.literal("Iron Ore"));
     ItemStack fuel =
-        new ItemStack(Holder.direct(Items.COAL, DataComponents.COMMON_ITEM_COMPONENTS), 1);
+        MinecraftTestItemStacks.create(Items.COAL, 1, DataComponents.COMMON_ITEM_COMPONENTS);
     fuel.set(DataComponents.ITEM_NAME, Component.literal("Coal"));
     furnace.setItem(0, input);
     furnace.setItem(1, fuel);

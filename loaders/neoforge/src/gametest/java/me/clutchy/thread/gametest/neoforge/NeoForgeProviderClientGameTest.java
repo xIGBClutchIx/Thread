@@ -20,6 +20,7 @@ import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -145,8 +146,10 @@ public final class NeoForgeProviderClientGameTest {
       return;
     }
     proof.join();
-    client.disconnectWithSavingScreen();
+    // The complete world-disconnect path closes the local connection before 1.21.11 waits
+    // for its integrated server, and advancing first keeps the nested tick loop reentrant-safe.
     stage = Stage.WAITING_FOR_RETURN_TO_MENU;
+    client.disconnectFromWorld(Component.literal("Thread packaged test finished"));
   }
 
   private void finishAfterReturn(Minecraft client) {

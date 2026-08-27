@@ -7,6 +7,12 @@ threadJavaTargets.addAll(
         rootProject.ext.threadBuildMatrix.loaders.collect {
             loader -> "loaders/${loader}/src/**/*.java".toString()
         })
+threadJavaTargets.addAll(
+        rootProject.ext.threadBuildMatrix.loaders.collectMany { loader ->
+            rootProject.ext.threadBuildMatrix.versions.keySet().collect { minecraftVersion ->
+                "loaders/${loader}/${minecraftVersion}/src/**/*.java".toString()
+            }
+        })
 
 spotless {
     java {
@@ -31,9 +37,13 @@ spotless {
 }
 
 def threadModuleProjects = rootProject.ext.threadModulePaths.collect { project(it) }
-def threadJavaVersion = rootProject.ext.threadBuildMatrix.javaVersion
+def minimumJavaVersion = rootProject.ext.threadBuildMatrix.versions.values()
+        .collect { it.javaVersion }
+        .min()
 
-configure(threadModuleProjects) {
+configure(threadModuleProjects) { moduleProject ->
+    def versionConfig = rootProject.ext.threadBuildMatrix.versions[moduleProject.name]
+    def threadJavaVersion = versionConfig == null ? minimumJavaVersion : versionConfig.javaVersion
     apply plugin: 'java-library'
     apply plugin: 'checkstyle'
 

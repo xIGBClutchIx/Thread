@@ -1,8 +1,10 @@
 plugins {
     id 'base'
     id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
     id 'net.neoforged.moddev' version "${moddev_version}" apply false
     id 'net.minecraftforge.gradle' version "${forgegradle_version}" apply false
+    id 'com.gradleup.shadow' version "${shadow_version}"
     id 'com.diffplug.spotless' version "${spotless_version}"
 }
 
@@ -20,6 +22,8 @@ allprojects {
 
 apply from: 'gradle/version-matrix.gradle'
 
+// Applied scripts do not inherit plugin implementation classes on their compilation classpath.
+ext.shadowJarTaskType = com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 ext.threadModulePaths = [':common']
 threadBuildMatrix.versions.keySet().each { minecraftVersion ->
     threadModulePaths.add(":minecraft:${minecraftVersion}")
@@ -36,4 +40,33 @@ tasks.register('test') {
     group = 'verification'
     description = 'Runs unit tests in every Thread module.'
     dependsOn threadModulePaths.collect { "${it}:test" }
+}
+
+tasks.register('verifyBuildJavaVersion') {
+    group = 'verification'
+    description = 'Verifies the Gradle runtime meets the build-matrix Java baseline.'
+    doLast {
+        def currentJavaVersion = JavaVersion.current().majorVersion.toInteger()
+        if (currentJavaVersion < threadBuildMatrix.buildJavaVersion) {
+            throw new GradleException(
+                    "Thread's build requires Java ${threadBuildMatrix.buildJavaVersion} or newer; " +
+                            "current runtime is Java ${currentJavaVersion}.")
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyBuildJavaVersion')
+}
+
+tasks.register('writeSupportedMinecraftVersions') {
+    group = 'help'
+    description = 'Writes the ordered Minecraft version matrix for CI and release scripts.'
+    def outputFile = layout.buildDirectory.file('matrix/supported-minecraft-versions.txt')
+    outputs.file(outputFile)
+    doLast {
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.setText(threadBuildMatrix.versions.keySet().join('\n') + '\n', 'UTF-8')
+    }
 }

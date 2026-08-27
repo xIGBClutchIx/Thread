@@ -2,7 +2,7 @@ package me.clutchy.thread.platform.forge.integration;
 
 import java.util.Optional;
 import me.clutchy.thread.core.integration.IntegrationEnvironment;
-import net.minecraftforge.fml.ModList;
+import me.clutchy.thread.platform.forge.ForgeModListBinding;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
 import org.apache.maven.artifact.versioning.VersionRange;
@@ -33,7 +33,7 @@ public final class ForgeIntegrationEnvironment implements IntegrationEnvironment
   }
 
   private Optional<ArtifactVersion> loadedVersion(String modId) {
-    return ModList.getMods().stream()
+    return ForgeModListBinding.mods().stream()
         .filter(info -> info.getModId().equals(modId))
         .findFirst()
         .map(info -> info.getVersion());

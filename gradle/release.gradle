@@ -35,13 +35,11 @@ tasks.register('verifyReleaseVersion') {
 
 def releaseMatrices = []
 threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
-    def otherVersion = threadBuildMatrix.versions.find { candidateVersion, ignored ->
-        candidateVersion != minecraftVersion
-    }.value
     releaseMatrices.add([
             taskSuffix          : versionConfig.taskSuffix,
             minecraftVersion    : minecraftVersion,
-            javaVersion         : threadBuildMatrix.javaVersion,
+            javaVersion         : versionConfig.javaVersion,
+            requiresMappings    : versionConfig.requiresMappings,
             fabricLoaderVersion : versionConfig.fabricLoader,
             fabricApiVersion    : versionConfig.fabricApi,
             neoForgeVersion     : versionConfig.neoForge,
@@ -51,7 +49,10 @@ threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
             forgeProject        : project(":loaders:forge:${minecraftVersion}"),
             archiveVersion      : minecraftVersion,
             capabilityEntry     : versionConfig.capabilityEntry,
-            otherCapabilityEntry: otherVersion.capabilityEntry,
+            otherCapabilityEntries: threadBuildMatrix.versions
+                    .findAll { candidateVersion, ignored -> candidateVersion != minecraftVersion }
+                    .values()
+                    .collect { it.capabilityEntry },
             universalTask       : threadUniversalJarTasks[minecraftVersion],
             universalJar        : threadUniversalJarTasks[minecraftVersion]
                     .flatMap { it.archiveFile }
@@ -59,7 +60,10 @@ threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
 }
 
 releaseMatrices.each { matrix ->
-    matrix.fabricJar = matrix.fabricProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
+    matrix.fabricJarTaskPath = "${matrix.fabricProject.path}:" +
+            (matrix.requiresMappings ? 'remapJar' : 'jar')
+    matrix.fabricJar = matrix.fabricProject.layout.buildDirectory.file(
+            "libs/thread-fabric-${matrix.minecraftVersion}-${project.version}.jar")
     matrix.neoForgeJar = matrix.neoForgeProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
     matrix.forgeJar = matrix.forgeProject.tasks.named('jar', Jar).flatMap { it.archiveFile }
     matrix.fabricReleaseJarName =
@@ -95,7 +99,7 @@ def validateArchiveShape = {
             throw new GradleException("Runtime JAR is missing ${entry}")
         }
     }
-    if (entries.contains(matrix.otherCapabilityEntry)) {
+    if (matrix.otherCapabilityEntries.any { entries.contains(it) }) {
         throw new GradleException('Runtime JAR contains another Minecraft version implementation.')
     }
     if (entries.any { it.contains('/gametest/') || it.endsWith('.java') }
@@ -117,7 +121,7 @@ releaseMatrices.each { matrix ->
     def fabricTask = tasks.register("verify${matrix.taskSuffix}FabricReleaseArtifact") {
         group = 'verification'
         description = "Validates the Minecraft ${matrix.minecraftVersion} Fabric JAR."
-        dependsOn matrix.fabricProject.tasks.named('jar'), tasks.named('validateReleaseVersion')
+        dependsOn matrix.fabricJarTaskPath, tasks.named('validateReleaseVersion')
         inputs.file(matrix.fabricJar)
         doLast {
             def jarFile = matrix.fabricJar.get().asFile
@@ -292,6 +296,33 @@ releaseMatrices.each { matrix ->
                         throw new GradleException("Universal runtime JAR is missing ${entry}")
                     }
                 }
+                def relocatedFabricPrefix =
+                        'me/clutchy/thread/platform/fabric/intermediary/'
+                if (matrix.requiresMappings) {
+                    [
+                            relocatedFabricPrefix + 'minecraft/MinecraftRuntime.class',
+                            relocatedFabricPrefix +
+                                    'platform/game/MinecraftGameProvider.class'
+                    ].each { entry ->
+                        if (!entries.contains(entry)) {
+                            throw new GradleException(
+                                    "Mapped universal runtime JAR is missing ${entry}")
+                        }
+                    }
+                    def fabricEntrypoint = new String(
+                            archive.getInputStream(archive.getEntry(
+                                    'me/clutchy/thread/platform/fabric/ThreadFabricClient.class'))
+                                    .readAllBytes(),
+                            java.nio.charset.StandardCharsets.ISO_8859_1)
+                    if (!fabricEntrypoint.contains(
+                            relocatedFabricPrefix + 'minecraft/MinecraftRuntime')) {
+                        throw new GradleException(
+                                'Mapped universal Fabric entrypoint does not use its relocated runtime.')
+                    }
+                } else if (entries.any { it.startsWith(relocatedFabricPrefix) }) {
+                    throw new GradleException(
+                            'Unobfuscated universal runtime unexpectedly contains relocated Fabric classes.')
+                }
                 [
                         'me/clutchy/thread/platform/fabric/',
                         'me/clutchy/thread/platform/neoforge/',
@@ -358,13 +389,13 @@ releaseMatrices.each { matrix ->
 
 tasks.register('verifyReleaseArtifact') {
     group = 'verification'
-    description = 'Validates both version-specific universal and dedicated release matrices.'
+    description = 'Validates all version-specific universal and dedicated release matrices.'
     dependsOn releaseVerificationTasks
 }
 
 tasks.register('releaseBundle') {
     group = 'build'
-    description = 'Creates both validated version-specific release matrices with checksums.'
+    description = 'Creates all validated version-specific release matrices with checksums.'
     dependsOn tasks.named('verifyReleaseArtifact')
     inputs.files(releaseMatrices.collectMany { matrix ->
         [matrix.universalJar, matrix.fabricJar, matrix.neoForgeJar, matrix.forgeJar]

@@ -7,7 +7,6 @@ import me.clutchy.thread.platform.forge.integration.ForgeIntegrationEnvironment;
 import me.clutchy.thread.runtime.ThreadRuntime;
 import me.clutchy.thread.runtime.ThreadRuntimeInfo;
 import net.minecraftforge.event.GameShuttingDownEvent;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -57,7 +56,7 @@ public final class ThreadForgeClient {
   }
 
   private static String requiredVersion(String modId) {
-    return ModList.getMods().stream()
+    return ForgeModListBinding.mods().stream()
         .filter(info -> info.getModId().equals(modId))
         .findFirst()
         .orElseThrow(

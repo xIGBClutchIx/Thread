@@ -6,22 +6,30 @@
 common/                         -> :common
 minecraft/
   shared/                       -> shared source sets compiled inside every version lane
+  1.21.11/                      -> :minecraft:1.21.11
   26.1.2/                       -> :minecraft:26.1.2
   26.2/                         -> :minecraft:26.2
 loaders/
-  fabric/{src,26.1.2,26.2}/     -> :loaders:fabric:<version>
-  neoforge/{src,26.1.2,26.2}/   -> :loaders:neoforge:<version>
-  forge/{src,26.1.2,26.2}/      -> :loaders:forge:<version>
+  fabric/{src,1.21.11,26.1.2,26.2}/   -> :loaders:fabric:<version>
+  neoforge/{src,1.21.11,26.1.2,26.2}/ -> :loaders:neoforge:<version>
+  forge/{src,1.21.11,26.1.2,26.2}/    -> :loaders:forge:<version>
 gradle/                          -> version matrix, conventions, packaging, quality, release
 ```
 
 The build produces independent `thread-<loader>-<minecraft>-<version>.jar` artifacts for Minecraft
-26.1.2 and 26.2. `:common` is internal and not installed separately. Universal JARs are root
+1.21.11, 26.1.2, and 26.2. `:common` is internal and not installed separately. Universal JARs are root
 packaging tasks driven by `gradle/version-matrix.gradle`; they are not source projects. Each
 packages one version's intended source-set outputs and metadata directly without making loader
 modules depend on one another or merging their release JARs.
 
-There are two independent adaptation axes. `:minecraft:26.1.2` and `:minecraft:26.2` each depend
+The 1.21.11 universal artifact crosses a namespace boundary that the unobfuscated 26.x lanes do
+not have. Fabric consumes the remapped intermediary runtime, while Forge and NeoForge consume the
+Mojang-named runtime. The packaging task relocates only the remapped Fabric copy beneath its loader
+namespace and retains the ordinary Mojang-named copy for the other loaders. This is deterministic
+build-time isolation; the artifact still contains one Minecraft version and performs no runtime
+version selection.
+
+There are two independent adaptation axes. Each `:minecraft:<version>` lane depends
 only on `:common` and supply one implementation of the focused provider contracts. Each nested
 loader/version project consumes common and exactly one Minecraft project, then supplies only
 loader-specific startup inputs. Common has no Minecraft or loader dependency, Minecraft sources
@@ -56,7 +64,7 @@ The `minecraft` tree owns code that uses Minecraft classes but no loader API:
 - conversion from Minecraft objects to detached Thread DTOs;
 - safe Minecraft-facing block/entity extension points and registries.
 
-`minecraft/shared` contains sources and tests that compile unchanged against both current versions,
+`minecraft/shared` contains sources and tests that compile unchanged against every current version,
 including provider assembly and the twenty-one-tool capability set. It is not a separately packaged
 module. Each version directory contains only real API/capability bindings: its capability identity,
 its multiplayer predicate, and test-only screen access. `MinecraftRuntime` assembles focused
@@ -78,10 +86,10 @@ never appear in `tools/list`, invocation, or `minecraft.get_capabilities`.
 Partial support does not permit invented placeholder data. The relevant Thread DTO/schema must
 already define the named field as optional, and the version provider returns that ordinary absence.
 Core consumes this support map and focused provider contracts; it never compares Minecraft version
-strings. Both current bindings delegate to the same proven twenty-one-tool capability set. The only
-current production API delta is the 26.1.2 session binding's public inverse
-`!Minecraft.isSingleplayer()`; 26.2 can call its direct multiplayer predicate. The difference stays
-inside two small compile-time bindings.
+strings. All three current bindings explicitly expose the same twenty-one fully supported tools.
+Minecraft 1.21.11 keeps its older recipe-display traversal, world-clock access, session predicate,
+and test APIs in small compile-time bindings. The 26.x lanes retain their newer equivalents; no
+runtime version test or reflective compatibility path is used.
 
 ## Shared runtime
 
@@ -277,8 +285,9 @@ Architecture and release tests enforce that:
 - only the supported JDK HTTP server uses `com.sun` APIs;
 - optional implementations remain deferred class-name strings;
 - each dedicated JAR contains common, exactly one Minecraft implementation, and exactly one loader
-  adapter, while each universal JAR contains one Minecraft implementation and all three matching
-  loaders; none contains cross-version classes, tests, or a bundled third-party adapter;
+  adapter, while each universal JAR contains one Minecraft version and all three matching loaders;
+  mapped lanes may contain a relocated Fabric namespace copy but never cross-version classes,
+  tests, or a bundled third-party adapter;
 - matrix-driven universal packaging has no per-version source project, fails on unexpected
   duplicate entries, validates consistent metadata, and scans compiled shared classes for eager
   loader-specific references;

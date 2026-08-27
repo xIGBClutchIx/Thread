@@ -38,7 +38,6 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
-import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.item.crafting.display.SlotDisplayContext;
 import net.minecraft.world.level.Level;
 
@@ -240,7 +239,7 @@ public final class MinecraftRecipeProvider implements RecipeProvider {
           .forEach(itemIds::add);
 
       TreeSet<String> tagIds = new TreeSet<>();
-      collectTagIds(ingredient.display(), tagIds);
+      MinecraftRecipeDisplayBinding.collectTagIds(ingredient.display(), tagIds);
       IngredientAlternatives alternatives =
           new IngredientAlternatives(List.copyOf(itemIds), List.copyOf(tagIds));
       if (!alternatives.itemIds().isEmpty() || !alternatives.tagIds().isEmpty()) {
@@ -254,20 +253,6 @@ public final class MinecraftRecipeProvider implements RecipeProvider {
                 new RecipeIngredientInfo(
                     entry.getKey().itemIds(), entry.getKey().tagIds(), entry.getValue()))
         .toList();
-  }
-
-  private static void collectTagIds(SlotDisplay display, TreeSet<String> tagIds) {
-    if (display instanceof SlotDisplay.TagSlotDisplay tagDisplay) {
-      tagIds.add(tagDisplay.tag().location().toString());
-    } else if (display instanceof SlotDisplay.Composite composite) {
-      composite.contents().forEach(child -> collectTagIds(child, tagIds));
-    } else if (display instanceof SlotDisplay.WithRemainder withRemainder) {
-      collectTagIds(withRemainder.input(), tagIds);
-    } else if (display instanceof SlotDisplay.OnlyWithComponent withComponent) {
-      collectTagIds(withComponent.source(), tagIds);
-    } else if (display instanceof SlotDisplay.WithAnyPotion withPotion) {
-      collectTagIds(withPotion.display(), tagIds);
-    }
   }
 
   private static Optional<ItemStack> resultFor(

@@ -1,0 +1,6 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap'
+}
+
+ext.threadVersion = project.name
+apply from: rootProject.file('gradle/minecraft-module.gradle')

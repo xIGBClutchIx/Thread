@@ -94,7 +94,7 @@ public final class MinecraftClientOptionsProvider implements ClientOptionsProvid
     return new ClientOptionsSnapshot.Audio(
         options.getSoundSourceVolume(SoundSource.MASTER),
         categories,
-        Options.isSoundDeviceDefault(device) ? null : device,
+        device.isEmpty() ? null : device,
         options.directionalAudio().get());
   }
 

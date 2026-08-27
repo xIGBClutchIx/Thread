@@ -6,21 +6,23 @@ Thread keeps the compatibility axes visible in the filesystem and Gradle graph:
 common/
 minecraft/
   shared/
+  1.21.11/
   26.1.2/
   26.2/
 loaders/
-  fabric/{src,26.1.2,26.2}/
-  neoforge/{src,26.1.2,26.2}/
-  forge/{src,26.1.2,26.2}/
+  fabric/{src,1.21.11,26.1.2,26.2}/
+  neoforge/{src,1.21.11,26.1.2,26.2}/
+  forge/{src,1.21.11,26.1.2,26.2}/
 gradle/
 ```
 
-`gradle/version-matrix.gradle` is the single source of truth for the Java version, supported
+`gradle/version-matrix.gradle` is the single source of truth for each lane's Java version, supported
 Minecraft versions, Fabric Loader/API versions, NeoForge versions, Forge versions, and supported
 loader combinations. `settings.gradle` derives the nested projects from that matrix:
 
 | Lane | Minecraft module | Fabric | NeoForge | Forge | Universal output task |
 | --- | --- | --- | --- | --- | --- |
+| 1.21.11 | `:minecraft:1.21.11` | `:loaders:fabric:1.21.11` | `:loaders:neoforge:1.21.11` | `:loaders:forge:1.21.11` | `universalJarMinecraft12111` |
 | 26.1.2 | `:minecraft:26.1.2` | `:loaders:fabric:26.1.2` | `:loaders:neoforge:26.1.2` | `:loaders:forge:26.1.2` | `universalJarMinecraft2612` |
 | 26.2 | `:minecraft:26.2` | `:loaders:fabric:26.2` | `:loaders:neoforge:26.2` | `:loaders:forge:26.2` | `universalJarMinecraft262` |
 
@@ -44,10 +46,10 @@ Run commands from the repository root:
 Focused version compilation is also available:
 
 ```powershell
-.\gradlew.bat :minecraft:26.1.2:test :minecraft:26.2:test
-.\gradlew.bat :loaders:fabric:26.1.2:compileClientJava :loaders:fabric:26.2:compileClientJava
-.\gradlew.bat :loaders:neoforge:26.1.2:compileJava :loaders:neoforge:26.2:compileJava
-.\gradlew.bat :loaders:forge:26.1.2:compileJava :loaders:forge:26.2:compileJava
+.\gradlew.bat :minecraft:1.21.11:test :minecraft:26.1.2:test :minecraft:26.2:test
+.\gradlew.bat :loaders:fabric:1.21.11:compileClientJava
+.\gradlew.bat :loaders:neoforge:1.21.11:compileJava
+.\gradlew.bat :loaders:forge:1.21.11:compileJava
 ```
 
 The architecture suite in `:common:test` rejects Minecraft dependencies in common, loader
@@ -61,10 +63,19 @@ Universal JARs are root packaging outputs registered by `gradle/universal-packag
 is no universal source project per version. Each task packages common, one Minecraft lane, all three
 matching loader outputs, and neutral universal metadata directly from the build matrix.
 
-`releaseBundle` validates and writes eight installable JARs under `build/release/`, plus their
+Minecraft 1.21.11 still ships obfuscated production bytecode. Its universal task consumes the
+remapped Fabric artifact and relocates that Fabric-only runtime copy, while retaining the
+Mojang-named runtime used by Forge and NeoForge. This is a build-time namespace split, not runtime
+version or loader selection. The unobfuscated 26.x lanes need no relocation.
+
+`releaseBundle` validates and writes twelve installable JARs under `build/release/`, plus their
 checksum files:
 
 ```text
+thread-universal-1.21.11-<version>.jar
+thread-fabric-1.21.11-<version>.jar
+thread-neoforge-1.21.11-<version>.jar
+thread-forge-1.21.11-<version>.jar
 thread-universal-26.1.2-<version>.jar
 thread-fabric-26.1.2-<version>.jar
 thread-neoforge-26.1.2-<version>.jar
@@ -84,12 +95,9 @@ Every nested loader/version project provides normal, restart, and MCP-disabled t
 dedicated and matching universal artifact. Use a fully qualified project path; for example:
 
 ```powershell
-.\gradlew.bat :loaders:fabric:26.1.2:runRestartProductionClientGameTest
-.\gradlew.bat :loaders:fabric:26.2:runRestartProductionClientGameTest
-.\gradlew.bat :loaders:neoforge:26.1.2:verifyUniversalNeoForgeRestartProductionClientGameTest
-.\gradlew.bat :loaders:neoforge:26.2:verifyUniversalNeoForgeRestartProductionClientGameTest
-.\gradlew.bat :loaders:forge:26.1.2:verifyForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat :loaders:forge:26.2:verifyForgeMcpDisabledProductionClientGameTest
+.\gradlew.bat :loaders:fabric:1.21.11:runRestartProductionClientGameTest
+.\gradlew.bat :loaders:neoforge:1.21.11:verifyUniversalNeoForgeRestartProductionClientGameTest
+.\gradlew.bat :loaders:forge:1.21.11:verifyForgeMcpDisabledProductionClientGameTest
 ```
 
 All lanes compile the same loader-neutral parity fixture from `common/src/gametest/java`. See

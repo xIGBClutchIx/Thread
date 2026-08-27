@@ -2,11 +2,27 @@
 // declarative so settings, module conventions, packaging, release checks, and docs tooling can all
 // consume the same ordered matrix without runtime version selection.
 ext.threadBuildMatrix = [
-        javaVersion: 25,
+        buildJavaVersion: 25,
         loaders    : ['fabric', 'neoforge', 'forge'],
         versions   : [
+                '1.21.11': [
+                        taskSuffix      : 'Minecraft12111',
+                        javaVersion     : 21,
+                        requiresMappings: true,
+                        clientOptionsHeader: 'version:4671\n',
+                        fabricLoader    : '0.19.3',
+                        fabricApi       : '0.141.6+1.21.11',
+                        neoForge        : '21.11.45',
+                        forge           : '1.21.11-61.2.1',
+                        capabilityEntry :
+                                'me/clutchy/thread/minecraft/v1_21_11/' +
+                                        'Minecraft12111Capabilities.class'
+                ],
                 '26.1.2': [
                         taskSuffix      : 'Minecraft2612',
+                        javaVersion     : 25,
+                        requiresMappings: false,
+                        clientOptionsHeader: 'version:4790\n',
                         fabricLoader    : '0.19.3',
                         fabricApi       : '0.154.0+26.1.2',
                         neoForge        : '26.1.2.41-beta',
@@ -17,6 +33,9 @@ ext.threadBuildMatrix = [
                 ],
                 '26.2'  : [
                         taskSuffix      : 'Minecraft262',
+                        javaVersion     : 25,
+                        requiresMappings: false,
+                        clientOptionsHeader: '',
                         fabricLoader    : '0.19.3',
                         fabricApi       : '0.154.0+26.2',
                         neoForge        : '26.2.0.62',
