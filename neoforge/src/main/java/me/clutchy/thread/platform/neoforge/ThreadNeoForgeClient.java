@@ -1,11 +1,11 @@
 package me.clutchy.thread.platform.neoforge;
 
 import java.util.Objects;
+import me.clutchy.thread.minecraft.v26_2.Minecraft262Runtime;
 import me.clutchy.thread.platform.neoforge.integration.NeoForgeIntegrationCatalog;
 import me.clutchy.thread.platform.neoforge.integration.NeoForgeIntegrationEnvironment;
 import me.clutchy.thread.runtime.ThreadRuntime;
 import me.clutchy.thread.runtime.ThreadRuntimeInfo;
-import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
@@ -45,8 +45,7 @@ public final class ThreadNeoForgeClient {
             requiredVersion(modList, "neoforge"));
     ClassLoader modClassLoader = ThreadNeoForgeClient.class.getClassLoader();
     runtime =
-        ThreadRuntime.start(
-            Minecraft.getInstance(),
+        Minecraft262Runtime.start(
             FMLPaths.CONFIGDIR.get().resolve("thread.json"),
             versions,
             NeoForgeIntegrationCatalog.candidates(modClassLoader),

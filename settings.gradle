@@ -19,4 +19,4 @@ pluginManagement {
 
 rootProject.name = 'thread'
 
-include 'common', 'fabric', 'neoforge', 'forge', 'universal'
+include 'common', 'minecraft-26.2', 'fabric', 'neoforge', 'forge', 'universal'

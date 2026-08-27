@@ -2,6 +2,7 @@ package me.clutchy.thread.platform.fabric;
 
 import java.util.Objects;
 import java.util.Optional;
+import me.clutchy.thread.minecraft.v26_2.Minecraft262Runtime;
 import me.clutchy.thread.platform.fabric.integration.FabricIntegrationCatalog;
 import me.clutchy.thread.platform.fabric.integration.FabricIntegrationEnvironment;
 import me.clutchy.thread.runtime.ThreadRuntime;
@@ -10,7 +11,6 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.client.Minecraft;
 
 /** Fabric client entry point for Thread. */
 public final class ThreadFabricClient implements ClientModInitializer {
@@ -28,11 +28,10 @@ public final class ThreadFabricClient implements ClientModInitializer {
             "fabric",
             "Fabric Loader",
             requiredVersion(loader, "fabricloader"));
-    // Fabric invokes this entrypoint before Minecraft's client task loop is ready. Constructing
-    // providers is safe here, but even a read-only dispatch must wait until initialization returns.
+    // Fabric invokes this entrypoint before Minecraft's client task loop is ready. The version
+    // adapter may assemble providers here, but read-only dispatch still waits for the task loop.
     runtime =
-        ThreadRuntime.start(
-            Minecraft.getInstance(),
+        Minecraft262Runtime.start(
             loader.getConfigDir().resolve("thread.json"),
             versions,
             FabricIntegrationCatalog.candidates(loader),

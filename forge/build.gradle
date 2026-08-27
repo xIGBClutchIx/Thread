@@ -99,13 +99,16 @@ repositories {
 }
 
 dependencies {
-    // The distributable Forge JAR embeds common below. Keeping these project outputs off the
-    // runtime classpath prevents ModLauncher from treating common as a second JPMS module.
+    // The distributable Forge JAR embeds both internal modules below. Keeping these project
+    // outputs off the runtime classpath prevents ModLauncher from treating either as a second mod.
     compileOnly project(':common')
+    compileOnly project(':minecraft-26.2')
     implementation minecraft.dependency("net.minecraftforge:forge:${project.forge_version}")
     annotationProcessor "net.minecraftforge:eventbus-validator:${project.forge_eventbus_validator_version}"
     testImplementation project(':common')
+    testImplementation project(':minecraft-26.2')
     gametestCompileOnly project(':common')
+    gametestCompileOnly project(':minecraft-26.2')
     gametestCompileOnly sourceSets.main.output
 }
 
@@ -131,12 +134,14 @@ processResources {
 }
 
 tasks.named('jar') {
-    dependsOn ':common:classes'
+    dependsOn ':common:classes', ':minecraft-26.2:classes'
     from project(':common').sourceSets.main.output
+    from project(':minecraft-26.2').sourceSets.main.output
 }
 
 tasks.named('sourcesJar') {
     from project(':common').sourceSets.main.allSource
+    from project(':minecraft-26.2').sourceSets.main.allSource
 }
 
 def gametestJar = tasks.register('gametestJar', Jar) {

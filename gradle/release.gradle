@@ -51,6 +51,7 @@ def requiredSharedEntries = [
         'me/clutchy/thread/core/integration/IntegrationCandidateCatalog.class',
         'me/clutchy/thread/core/integration/extension/IntegrationExtensionPoint.class',
         'me/clutchy/thread/core/integration/extension/IntegrationRecipeProvider.class',
+        'me/clutchy/thread/minecraft/v26_2/Minecraft262Runtime.class',
         'me/clutchy/thread/platform/minecraft/integration/MinecraftIntegrationExtensionPoints.class',
         'me/clutchy/thread/platform/minecraft/game/MinecraftGameProvider.class',
         'me/clutchy/thread/runtime/ThreadRuntime.class',
@@ -264,7 +265,7 @@ tasks.register('verifyUniversalReleaseArtifact') {
                 }
             }
 
-            def forbiddenCommonReferences = [
+            def forbiddenSharedReferences = [
                     'net/fabricmc/',
                     'net/neoforged/',
                     'net/minecraftforge/',
@@ -281,10 +282,10 @@ tasks.register('verifyUniversalReleaseArtifact') {
                 def bytecode = new String(
                         archive.getInputStream(archive.getEntry(entry)).readAllBytes(),
                         java.nio.charset.StandardCharsets.ISO_8859_1)
-                forbiddenCommonReferences.each { reference ->
+                forbiddenSharedReferences.each { reference ->
                     if (bytecode.contains(reference)) {
                         throw new GradleException(
-                                "Common class ${entry} eagerly references loader-specific ${reference}")
+                                "Shared class ${entry} eagerly references loader-specific ${reference}")
                     }
                 }
             }

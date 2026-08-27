@@ -16,34 +16,47 @@ Gameplay tools reject multiplayer before exposing state. `minecraft.get_status`,
 `minecraft.get_game_info`, and the local-only `minecraft.get_client_options` remain available from
 every client state.
 
-Thread does not implement remote access, authentication, actions, dedicated-server behavior, or
-multiple Minecraft versions until those products have their own trust and compatibility designs.
+Thread does not implement remote access, authentication, actions, dedicated-server behavior, or a
+second Minecraft version in V1. The code has a real version boundary, but 26.2 is the only current
+implementation.
 
-## Common and loader adapters are separate modules without a portability framework
+## Minecraft-version and loader adapters are separate axes
 
-`:common` owns core, configuration, MCP, runtime assembly, and Minecraft-facing code that can run
-unchanged across client loaders. `:fabric`, `:neoforge`, and `:forge` own only their entrypoint, Loader API,
-lifecycle, config-path, version-predicate, and integration-discovery wiring. Each release JAR merges
-common classes; common is not installed or published independently.
+`:common` owns version-neutral core, configuration, MCP, runtime/tool orchestration, focused
+provider contracts, DTOs, crafting, item search, serialization, and integrations. It has no
+`net.minecraft` dependency. `:minecraft-26.2` owns Minecraft access, mapping, threading, provider
+implementations, Minecraft-edge integration contracts, and version capability declarations. It
+depends on common but no loader. `:fabric`, `:neoforge`, and `:forge` own only their entrypoint,
+Loader API, lifecycle, config path, version predicate, and integration-discovery wiring.
 
-All three entrypoints resolve those loader-specific values and call `ThreadRuntime.start`. Configuration
-fallback, reflective integration activation, MCP bind handling, startup diagnostics, and resource
-close behavior are one shared lifecycle rather than parallel loader implementations.
+All three entrypoints resolve those loader-specific values and call `Minecraft262Runtime.start`.
+The version module assembles the existing focused providers, then enters `ThreadRuntime` through a
+small provider-factory contract. Configuration fallback, capability filtering, reflective
+integration activation, MCP bind handling, startup diagnostics, and resource close behavior are one
+shared lifecycle rather than parallel loader implementations.
 
-`:universal` is a packaging-only module. It combines common and all three adapter source-set outputs
-directly, keeps dedicated JARs canonical and independently installable, and adds no portability
-framework or cross-loader dependency. Unexpected duplicate entries fail the build; the one known
-loader-branded `pack.mcmeta` collision is replaced by a neutral universal descriptor.
+`:universal` is a packaging-only module. It combines common, Minecraft 26.2, and all three loader
+source-set outputs directly, keeps dedicated JARs canonical and independently installable, and adds
+no portability framework or cross-loader dependency. Unexpected duplicate entries fail the build;
+the one known loader-branded `pack.mcmeta` collision is replaced by a neutral universal descriptor.
 
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
-component map, or optional-mod type. Shared Minecraft adapters convert live game objects into
-detached DTOs. MCP maps only the tool registry. Common source has no loader imports or runtime
-dependencies.
+component map, or optional-mod type. The Minecraft 26.2 adapter converts live game objects into
+detached DTOs. MCP maps only the tool registry. Common has neither Minecraft nor loader imports or
+runtime dependencies.
 
-Thread does not use Architectury or a custom platform god object, and it does not wrap every
-Minecraft class. Config-directory and lifecycle abstractions are intentionally absent because the
-thin loader entrypoints resolve those values once and pass them into the existing shared runtime.
-Add another contract only when a concrete loader difference requires shared behavior.
+Thread does not use Architectury or a custom platform/version god object, and it does not wrap every
+Minecraft class. `RuntimeProviders` is only a composition bundle over the existing focused
+interfaces. Config-directory and lifecycle abstractions remain absent because thin loader
+entrypoints resolve those values once. Future Minecraft versions receive separate modules and
+implementations rather than runtime `if (minecraftVersion)` branches.
+
+Each version supplies `VersionCapabilities` keyed by stable tool ID. Support is fully supported,
+unsupported, or supported with explicitly named optional fields unavailable. Missing map entries
+are unsupported and never enter discovery or capabilities. Partial support is legal only when the
+existing Thread contract marks those fields optional; providers return ordinary absence rather
+than fabricated values. Core consumes this map and provider contracts without comparing version
+strings. Minecraft 26.2 explicitly declares all twenty-one tools fully supported.
 
 Java type documentation belongs on public types and architecture documentation belongs under
 `docs/`; `package-info.java` is not used.
@@ -220,5 +233,6 @@ a real temporary single-player world; restart proves persisted configuration rel
 startup proves tools initialize without MCP. All three loader proof mods compile one shared parity
 fixture for the exact catalog, config, lifecycle, MCP, recipes/crafting, and integration contract;
 only their launch mechanics remain separate. Artifact inspection keeps dedicated JARs loader-pure,
-requires all adapters in the universal JAR, rejects duplicates, and scans compiled common classes
-for eager loader-specific references. A release is not validated by compilation alone.
+requires common, Minecraft 26.2, and all loader adapters in the universal JAR, rejects duplicates,
+and scans compiled shared classes for eager loader-specific references. A release is not validated
+by compilation alone.

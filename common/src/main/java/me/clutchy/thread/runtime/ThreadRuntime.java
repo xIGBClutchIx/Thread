@@ -2,7 +2,6 @@ package me.clutchy.thread.runtime;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import me.clutchy.thread.config.ThreadConfig;
@@ -16,31 +15,10 @@ import me.clutchy.thread.core.integration.ReflectiveIntegrationLoader;
 import me.clutchy.thread.core.integration.extension.CompositeRecipeProvider;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.vanilla.VanillaIntegration;
-import me.clutchy.thread.core.model.world.NearbyContainerQuery;
-import me.clutchy.thread.core.provider.AdvancementProvider;
-import me.clutchy.thread.core.provider.ClientOptionsProvider;
-import me.clutchy.thread.core.provider.GameProvider;
-import me.clutchy.thread.core.provider.GameThreadExecutor;
-import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
-import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.tool.ToolRegistry;
-import me.clutchy.thread.platform.minecraft.advancement.MinecraftAdvancementProvider;
-import me.clutchy.thread.platform.minecraft.game.MinecraftGameProvider;
-import me.clutchy.thread.platform.minecraft.game.MinecraftProviderLimits;
-import me.clutchy.thread.platform.minecraft.game.MinecraftSessionGuard;
-import me.clutchy.thread.platform.minecraft.inspection.MinecraftBlockEnricherRegistry;
-import me.clutchy.thread.platform.minecraft.inspection.MinecraftBlockEntityInspectorRegistry;
-import me.clutchy.thread.platform.minecraft.mapping.MinecraftDtoMapper;
-import me.clutchy.thread.platform.minecraft.options.MinecraftClientOptionsProvider;
-import me.clutchy.thread.platform.minecraft.player.MinecraftPlayerProvider;
-import me.clutchy.thread.platform.minecraft.recipe.MinecraftRecipeProvider;
-import me.clutchy.thread.platform.minecraft.threading.MinecraftThreadExecutor;
-import me.clutchy.thread.platform.minecraft.world.MinecraftEntityEnricherRegistry;
-import me.clutchy.thread.platform.minecraft.world.MinecraftWorldProvider;
 import me.clutchy.thread.transport.mcp.McpHttpServer;
 import me.clutchy.thread.transport.mcp.McpServerOptions;
-import net.minecraft.client.Minecraft;
 
 /** Shared assembly and lifecycle for one loader-provided Thread client runtime. */
 public final class ThreadRuntime implements AutoCloseable {
@@ -75,23 +53,23 @@ public final class ThreadRuntime implements AutoCloseable {
    * on every loader and therefore live here.
    */
   public static ThreadRuntime start(
-      Minecraft client,
       Path configPath,
       ThreadRuntimeInfo info,
       List<IntegrationCandidate> candidates,
       IntegrationEnvironment integrationEnvironment,
-      ClassLoader integrationClassLoader) {
+      ClassLoader integrationClassLoader,
+      RuntimeProviderFactory providerFactory) {
     Objects.requireNonNull(configPath, "configPath");
     Objects.requireNonNull(integrationClassLoader, "integrationClassLoader");
     ThreadConfig config = loadConfig(configPath);
     ThreadRuntime runtime =
         create(
-            client,
             config,
             info,
             candidates,
             integrationEnvironment,
-            new ReflectiveIntegrationLoader(integrationClassLoader));
+            new ReflectiveIntegrationLoader(integrationClassLoader),
+            providerFactory);
 
     if (config.mcpEnabled()) {
       try {
@@ -132,78 +110,39 @@ public final class ThreadRuntime implements AutoCloseable {
    * candidates.
    */
   public static ThreadRuntime create(
-      Minecraft client,
       ThreadConfig config,
       ThreadRuntimeInfo info,
       List<IntegrationCandidate> candidates,
       IntegrationEnvironment integrationEnvironment,
-      IntegrationLoader integrationLoader) {
-    Objects.requireNonNull(client, "client");
+      IntegrationLoader integrationLoader,
+      RuntimeProviderFactory providerFactory) {
     Objects.requireNonNull(config, "config");
     Objects.requireNonNull(info, "info");
     candidates = List.copyOf(Objects.requireNonNull(candidates, "candidates"));
     Objects.requireNonNull(integrationEnvironment, "integrationEnvironment");
     Objects.requireNonNull(integrationLoader, "integrationLoader");
+    Objects.requireNonNull(providerFactory, "providerFactory");
 
-    Duration gameThreadTimeout = Duration.ofMillis(config.gameThreadTimeoutMillis());
-    GameThreadExecutor clientThread = MinecraftThreadExecutor.forClient(client, gameThreadTimeout);
-    MinecraftSessionGuard sessionGuard = new MinecraftSessionGuard();
-    MinecraftProviderLimits limits =
-        MinecraftProviderLimits.configured(
-            config.maxEntityRadius(), config.maxEntityResults(), config.maxItemSearchResults());
-    MinecraftDtoMapper mapper = new MinecraftDtoMapper();
     IntegrationExtensionRegistry extensionRegistry = new IntegrationExtensionRegistry();
-    MinecraftBlockEntityInspectorRegistry blockEntityInspectors =
-        MinecraftBlockEntityInspectorRegistry.vanilla(mapper, extensionRegistry);
-    MinecraftBlockEnricherRegistry blockEnrichers =
-        new MinecraftBlockEnricherRegistry(extensionRegistry);
-    MinecraftEntityEnricherRegistry entityEnrichers =
-        new MinecraftEntityEnricherRegistry(extensionRegistry);
+    RuntimeProviders providers =
+        Objects.requireNonNull(
+            providerFactory.create(config, info, extensionRegistry), "runtime providers");
     RecipeProvider recipeProvider =
-        new CompositeRecipeProvider(
-            new MinecraftRecipeProvider(
-                client, clientThread, sessionGuard, limits, mapper, gameThreadTimeout),
-            extensionRegistry);
-
-    GameProvider gameProvider = new MinecraftGameProvider(client, clientThread, info.gameInfo());
-    ClientOptionsProvider clientOptionsProvider =
-        new MinecraftClientOptionsProvider(client, clientThread);
-    AdvancementProvider advancementProvider =
-        new MinecraftAdvancementProvider(client, clientThread, sessionGuard, gameThreadTimeout);
-    PlayerProvider playerProvider =
-        new MinecraftPlayerProvider(
-            client,
-            clientThread,
-            sessionGuard,
-            mapper,
-            blockEntityInspectors,
-            blockEnrichers,
-            gameThreadTimeout);
-    WorldProvider worldProvider =
-        new MinecraftWorldProvider(
-            client,
-            clientThread,
-            sessionGuard,
-            limits,
-            mapper,
-            entityEnrichers,
-            blockEntityInspectors,
-            blockEnrichers,
-            gameThreadTimeout);
+        new CompositeRecipeProvider(providers.recipes(), extensionRegistry);
 
     ToolRegistry toolRegistry = new ToolRegistry();
     IntegrationRegistry integrationRegistry =
         new IntegrationRegistry(toolRegistry, new ContextRegistry(), extensionRegistry);
     integrationRegistry.register(
         new VanillaIntegration(
-            gameProvider,
-            clientOptionsProvider,
-            advancementProvider,
-            playerProvider,
-            worldProvider,
+            providers.game(),
+            providers.clientOptions(),
+            providers.advancements(),
+            providers.player(),
+            providers.world(),
             recipeProvider,
-            new NearbyContainerQuery(limits.maxContainerRadius(), limits.maxContainerResults()),
-            config::toolEnabled,
+            providers.craftingNearbyBounds(),
+            toolId -> config.toolEnabled(toolId) && providers.capabilities().advertises(toolId),
             () -> integrationRegistry.capabilities(info.threadVersion())));
     int activatedCandidates =
         integrationRegistry

@@ -1,13 +1,10 @@
-plugins {
-    id 'net.fabricmc.fabric-loom'
-}
-
 base {
     archivesName = 'thread-common'
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    compileOnly "com.google.code.gson:gson:${rootProject.gson_version}"
+    testImplementation "com.google.code.gson:gson:${rootProject.gson_version}"
 }
 
 tasks.named('test') {

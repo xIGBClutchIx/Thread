@@ -31,11 +31,12 @@ selected Minecraft object:
 - `MinecraftBlockEnricher`;
 - `MinecraftEntityEnricher`.
 
-Those interfaces deliberately live under `platform.minecraft`, outside core. They can be reused by
-any client loader because they depend on Minecraft rather than Fabric, but they are not plain-Java
-core API. They may accept Minecraft inputs on the owning logical thread; contributions must return
-detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and component
-maps must never be returned. Their stable extension IDs use the `minecraft.*` namespace.
+Those interfaces deliberately live under `platform.minecraft` in `:minecraft-26.2`, outside core.
+They can be reused by any client loader for that Minecraft version because they depend on Minecraft
+rather than Fabric, NeoForge, or Forge, but they are not plain-Java core API or cross-version
+promises. They may accept Minecraft inputs on the owning logical thread; contributions must return
+detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and component maps
+must never be returned. Their stable extension IDs use the `minecraft.*` namespace.
 
 The same block-entity inspector registry serves targeted-block details,
 `minecraft.get_nearby_containers`, `minecraft.inspect_container`, and the container side of
@@ -59,7 +60,7 @@ promises:
 - `IntegrationEnvironment`, `IntegrationLoader`, `IntegrationLoadException`, and
   `ReflectiveIntegrationLoader`;
 - `IntegrationExtensionRegistry` and `CompositeRecipeProvider`;
-- loader integration catalogs/environments, shared Minecraft provider/enricher
+- loader integration catalogs/environments, Minecraft-version provider/enricher
   registries, client runtime/lifecycle wiring, configuration, and MCP classes;
 - `ItemFinder`, `CraftingItemSourceProvider`, and `ItemSource`, which are transport-independent
   internal composition types but not registered public extension points; the explicit composition

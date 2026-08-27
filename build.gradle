@@ -24,7 +24,7 @@ apply from: 'gradle/release.gradle'
 tasks.register('test') {
     group = 'verification'
     description = 'Runs unit tests in every Thread module.'
-    dependsOn ':common:test', ':fabric:test', ':neoforge:test', ':forge:test'
+    dependsOn ':common:test', ':minecraft-26.2:test', ':fabric:test', ':neoforge:test', ':forge:test'
 }
 
 [

@@ -82,6 +82,8 @@ import me.clutchy.thread.core.tool.ToolDescriptor;
 import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
+import me.clutchy.thread.core.tool.ToolSupport;
+import me.clutchy.thread.core.tool.VersionCapabilities;
 import me.clutchy.thread.transport.mcp.McpHttpServer;
 import me.clutchy.thread.transport.mcp.McpServerOptions;
 import org.junit.jupiter.api.Test;
@@ -900,6 +902,25 @@ class VanillaIntegrationTest {
     assertEquals(
         me.clutchy.thread.core.error.ToolErrorCode.NOT_FOUND,
         catalog.tools().invoke("minecraft.get_player", object("{}")).error().code());
+  }
+
+  @Test
+  void unsupportedVersionToolsNeverEnterDiscoveryOrCapabilities() {
+    VersionCapabilities capabilities =
+        VersionCapabilities.of(
+            Map.of(
+                ToolId.of("minecraft.get_status"), ToolSupport.fullySupported(),
+                ToolId.of("minecraft.get_capabilities"),
+                    ToolSupport.missingOptionalFields(List.of("future.optionalField"))));
+    Catalog catalog =
+        catalog(new SupportedGameProvider(), new FakePlayerProvider(), capabilities::advertises);
+
+    assertEquals(
+        List.of("minecraft.get_capabilities", "minecraft.get_status"),
+        catalog.tools().descriptors().stream().map(tool -> tool.id().value()).toList());
+    assertEquals(
+        List.of("minecraft.get_capabilities", "minecraft.get_status"),
+        strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools"));
   }
 
   private static Catalog catalog(GameProvider game, PlayerProvider player) {

@@ -136,9 +136,10 @@ session.
 
 ## Development
 
-The Gradle build has a `:common` module for core/MCP/shared Minecraft behavior, thin `:fabric`,
-`:neoforge`, and `:forge` adapters, and a packaging-only `:universal` module. Releases contain the
-recommended universal JAR plus all three dedicated loader JARs.
+The Gradle build separates version-neutral `:common` code from the loader-neutral
+`:minecraft-26.2` implementation, then adds thin `:fabric`, `:neoforge`, and `:forge` adapters plus
+a packaging-only `:universal` module. Releases contain the recommended universal JAR plus all three
+dedicated loader JARs.
 
 Use the Gradle Wrapper. The normal local gate is:
 

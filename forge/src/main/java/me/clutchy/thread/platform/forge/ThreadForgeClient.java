@@ -1,11 +1,11 @@
 package me.clutchy.thread.platform.forge;
 
 import java.util.Objects;
+import me.clutchy.thread.minecraft.v26_2.Minecraft262Runtime;
 import me.clutchy.thread.platform.forge.integration.ForgeIntegrationCatalog;
 import me.clutchy.thread.platform.forge.integration.ForgeIntegrationEnvironment;
 import me.clutchy.thread.runtime.ThreadRuntime;
 import me.clutchy.thread.runtime.ThreadRuntimeInfo;
-import net.minecraft.client.Minecraft;
 import net.minecraftforge.event.GameShuttingDownEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
@@ -42,8 +42,7 @@ public final class ThreadForgeClient {
             requiredVersion("forge"));
     ClassLoader modClassLoader = ThreadForgeClient.class.getClassLoader();
     runtime =
-        ThreadRuntime.start(
-            Minecraft.getInstance(),
+        Minecraft262Runtime.start(
             FMLPaths.CONFIGDIR.get().resolve("thread.json"),
             versions,
             ForgeIntegrationCatalog.candidates(modClassLoader),

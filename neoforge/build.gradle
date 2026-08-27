@@ -110,7 +110,9 @@ neoForge.addModdingDependenciesTo(sourceSets.test)
 
 dependencies {
     implementation project(':common')
+    implementation project(':minecraft-26.2')
     gametestImplementation project(':common')
+    gametestImplementation project(':minecraft-26.2')
     gametestImplementation sourceSets.main.output
 }
 
@@ -128,12 +130,14 @@ processResources {
 }
 
 tasks.named('jar') {
-    dependsOn ':common:classes'
+    dependsOn ':common:classes', ':minecraft-26.2:classes'
     from project(':common').sourceSets.main.output
+    from project(':minecraft-26.2').sourceSets.main.output
 }
 
 tasks.named('sourcesJar') {
     from project(':common').sourceSets.main.allSource
+    from project(':minecraft-26.2').sourceSets.main.allSource
 }
 
 def gametestJar = tasks.register('gametestJar', Jar) {

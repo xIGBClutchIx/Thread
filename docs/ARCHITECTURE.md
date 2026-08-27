@@ -3,14 +3,18 @@
 ## Module shape
 
 ```text
-:fabric   -- Fabric entrypoint, lifecycle, and integration discovery --\
-:neoforge -- NeoForge entrypoint, lifecycle, and integration discovery ---> :common
-:forge    -- Forge entrypoint, lifecycle, and integration discovery -----/
-:universal -- packaging only: common plus all three adapter outputs
-
 :common
-    runtime assembly -> Minecraft providers -> core provider contracts
-    MCP transport    -> tool registry      -> core services and DTOs
+    MCP/runtime/tool orchestration -> focused provider contracts -> core services and DTOs
+        ^
+        |
+:minecraft-26.2
+    Minecraft 26.2 access, mapping, threading, and provider assembly
+        ^
+        |
+:fabric / :neoforge / :forge
+    loader bootstrap, metadata, config paths, lifecycle, and integration discovery
+
+:universal -- packaging only: common plus Minecraft 26.2 plus all loader outputs
 ```
 
 The build produces the recommended `thread-universal-<version>.jar` plus dedicated
@@ -19,8 +23,12 @@ The build produces the recommended `thread-universal-<version>.jar` plus dedicat
 `:universal` contains no Java source: it packages intended source-set outputs and metadata directly
 without making loader modules depend on one another or merging their release JARs.
 
-Dependencies point from each loader adapter to `:common`. Common production source has no Fabric,
-NeoForge, or Forge imports or runtime dependencies. The loader modules do not depend on one another.
+There are two independent adaptation axes. `:minecraft-26.2` depends on `:common` and supplies one
+Minecraft-version implementation of the focused provider contracts. Each loader adapter depends on
+`:common` and `:minecraft-26.2`, then supplies only loader-specific startup inputs. Common has no
+Minecraft or loader dependency, `:minecraft-26.2` has no loader dependency, and loader modules do
+not depend on one another. A future Minecraft version gets another version module instead of
+runtime version branches inside the current implementation.
 
 ## Common ownership
 
@@ -39,9 +47,9 @@ Minecraft:
 Core public contracts use plain Java and Thread types. Raw NBT, component maps, Minecraft objects,
 loader types, MCP types, and optional-mod types do not cross this boundary.
 
-### Shared Minecraft edge
+## Minecraft 26.2 ownership
 
-`me.clutchy.thread.platform.minecraft` owns code that uses Minecraft classes but no loader API:
+`:minecraft-26.2` owns code that uses Minecraft 26.2 classes but no loader API:
 
 - client and integrated-server thread dispatch;
 - the single-player session guard and status mapping;
@@ -50,28 +58,45 @@ loader types, MCP types, and optional-mod types do not cross this boundary.
 - conversion from Minecraft objects to detached Thread DTOs;
 - safe Minecraft-facing block/entity extension points and registries.
 
-This code stays shared because it can run unchanged after another client loader invokes it. It does
-not wrap every Minecraft class. Providers receive the actual `Minecraft` client at assembly time
-and keep Minecraft objects at this outer edge.
+`Minecraft262Runtime` assembles these focused providers and composes them with the version-neutral
+runtime. It does not replace them with one giant adapter, wrap every Minecraft class, or inspect a
+loader API. Providers receive the actual `Minecraft` client inside this module and keep Minecraft
+objects at this outer edge.
 
 Providers read only already-loaded state. They never generate chunks, scan arbitrary world areas,
 open hidden containers, resolve unopened loot tables, or mutate Minecraft.
 
-### Shared runtime
+### Version capabilities
+
+Each Minecraft-version module supplies a `VersionCapabilities` map keyed by `ToolId`. A tool is
+either fully supported, unsupported, or supported with a sorted list of contract-defined optional
+fields that the version cannot supply. An absent entry is unsupported. `ThreadRuntime` combines
+this support with user configuration before vanilla tools enter the registry, so unsupported tools
+never appear in `tools/list`, invocation, or `minecraft.get_capabilities`.
+
+Partial support does not permit invented placeholder data. The relevant Thread DTO/schema must
+already define the named field as optional, and the version provider returns that ordinary absence.
+Core consumes this support map and focused provider contracts; it never compares Minecraft version
+strings. The 26.2 map explicitly marks all twenty-one current tools fully supported.
+
+## Shared runtime
 
 `me.clutchy.thread.runtime.ThreadRuntime` performs loader-neutral assembly:
 
 1. load the loader-supplied config path, preserving invalid files while falling back safely;
-2. create logical-thread dispatch, session guards, limits, mappers, and extension registries;
-3. construct the shared Minecraft providers and composite recipe provider;
+2. create the shared extension registry and ask the selected version module for focused providers;
+3. combine version support with configured tool filtering and construct the composite recipe provider;
 4. register the built-in vanilla integration;
 5. activate compatible enabled candidates supplied by the loader adapter;
 6. start the configured MCP listener and report consistent startup diagnostics;
 7. expose the final tool/integration registries and close shared resources when the loader signals
    shutdown.
 
-`ThreadRuntimeInfo` carries the running Thread, Minecraft, and loader identity/version without
-depending on a loader API. There is no global service locator or background integration lifecycle.
+`RuntimeProviderFactory` and `RuntimeProviders` are composition contracts, not a gameplay god
+object: the bundle retains the existing game, options, advancement, player, world, and recipe
+interfaces. `ThreadRuntimeInfo` carries the running Thread, Minecraft, and loader identity/version
+without depending on Minecraft or a loader API. There is no global service locator or background
+integration lifecycle.
 
 ### MCP and configuration
 
@@ -95,7 +120,9 @@ ceilings. Each loader adapter supplies its config-file location.
 - Fabric version-predicate evaluation for optional integration candidates.
 
 The entrypoint supplies loader metadata, configuration, candidates, and the active mod classloader
-to `ThreadRuntime`. It does not contain tool, crafting, MCP, mapping, or live-query behavior.
+to `Minecraft262Runtime`, which composes the version implementation with `ThreadRuntime`. It does
+not contain tool, crafting, MCP, mapping, or live-query behavior and imports no `net.minecraft`
+classes.
 
 No generic client-lifecycle or config-directory interface is introduced: those values are consumed
 once by each thin entrypoint. Shared providers resolve the current integrated server for each
@@ -118,18 +145,20 @@ Fabric and avoids loader-specific state drifting from the game.
 `forge/src/main/java/me/clutchy/thread/platform/forge` is the equivalent thin Forge boundary. It
 owns the `@Mod` client bootstrap, `ModList` and Maven-version-range queries, `FMLPaths` config path,
 Forge client setup and shutdown events, and Java `ServiceLoader` candidate-provider discovery.
-Common output is compile-only for the adapter and embedded once in the final JAR so ModLauncher does
-not see common as a second module.
+Common and Minecraft 26.2 outputs are compile-only for the adapter and embedded once in the final
+JAR so ModLauncher does not see either internal module as a second mod.
 
-Forge uses the same shared runtime and Minecraft providers as the other loaders. ForgeGradle launch
-metadata and packaged-test wiring stay local to `:forge`; no Forge API leaks into common.
+Forge uses the same shared runtime and Minecraft 26.2 providers as the other loaders. ForgeGradle
+launch metadata and packaged-test wiring stay local to `:forge`; no Forge API leaks into common or
+the version module.
 
 ## Loader behavior contract
 
 Every supported loader must hand its metadata, config path, integration candidates, environment,
-and mod classloader to the same `ThreadRuntime`. That common path guarantees identical config
-fallback, runtime assembly, tool registration, MCP bind handling, diagnostics, and resource close
-behavior.
+and mod classloader to the same selected version runtime. For 26.2 that is
+`Minecraft262Runtime.start`, which then enters the same `ThreadRuntime` path. This guarantees
+identical config fallback, provider assembly, capability filtering, tool registration, MCP bind
+handling, diagnostics, and resource close behavior.
 
 Packaged parity coverage requires each loader to prove:
 
@@ -230,18 +259,21 @@ detached Thread DTOs.
 
 Architecture and release tests enforce that:
 
-- common production source imports no Fabric, NeoForge, or Forge API;
+- common production source imports no Minecraft, Fabric, NeoForge, or Forge API and has no
+  Minecraft build dependency;
+- the Minecraft 26.2 module imports no Fabric, NeoForge, or Forge API and depends on no loader
+  module;
 - core imports no Minecraft, loader, or MCP API;
 - MCP imports no Minecraft or loader API;
-- Fabric production code stays inside the Fabric adapter package;
-- NeoForge production code stays inside the NeoForge adapter package;
-- Forge production code stays inside the Forge adapter package;
+- loader production code stays inside its adapter package, imports no `net.minecraft` gameplay
+  classes, and does not reach into Minecraft provider/service implementations;
 - only the supported JDK HTTP server uses `com.sun` APIs;
 - optional implementations remain deferred class-name strings;
-- each dedicated JAR contains common plus exactly one loader adapter, while the universal JAR
-  intentionally contains all three; none contains tests or a bundled third-party adapter;
+- each dedicated JAR contains common, Minecraft 26.2, and exactly one loader adapter, while the
+  universal JAR intentionally contains all three loaders; none contains tests or a bundled
+  third-party adapter;
 - universal packaging fails on unexpected duplicate entries, validates consistent metadata, and
-  scans compiled common classes for eager loader-specific references;
+  scans compiled shared classes for eager loader-specific references;
 - no loader module imports or depends on another loader implementation;
 - shared packaged parity fixtures import neither loader API;
 - each loader's packaged-client tests exercise both its dedicated JAR and the universal JAR through

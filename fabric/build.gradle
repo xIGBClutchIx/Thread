@@ -43,6 +43,7 @@ sourceSets {
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation project(':common')
+    implementation project(':minecraft-26.2')
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
@@ -64,12 +65,14 @@ processResources {
 }
 
 tasks.named('jar') {
-    dependsOn ':common:classes'
+    dependsOn ':common:classes', ':minecraft-26.2:classes'
     from project(':common').sourceSets.main.output
+    from project(':minecraft-26.2').sourceSets.main.output
 }
 
 tasks.named('sourcesJar') {
     from project(':common').sourceSets.main.allSource
+    from project(':minecraft-26.2').sourceSets.main.allSource
 }
 
 tasks.named('compileTestJava') {

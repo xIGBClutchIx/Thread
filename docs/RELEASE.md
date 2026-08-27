@@ -33,8 +33,9 @@ Change the tag argument when `mod_version` changes. Versions use `MAJOR.MINOR.PA
 
 `verifyReleaseArtifact` delegates to independent universal, Fabric, NeoForge, and Forge checks. The
 dedicated checks prove loader purity. The universal check requires all adapters and metadata,
-rejects duplicate entries and development/bundled-integration content, and scans compiled common
-classes for eager loader-specific references.
+rejects duplicate entries and development/bundled-integration content, requires the version-neutral
+core plus Minecraft 26.2 adapter, and scans compiled shared classes for eager loader-specific
+references.
 
 `releaseBundle` writes four JARs and SHA-256 checksums under `build/release/`:
 

@@ -7,19 +7,22 @@ base {
 }
 
 evaluationDependsOn(':common')
+evaluationDependsOn(':minecraft-26.2')
 evaluationDependsOn(':fabric')
 evaluationDependsOn(':neoforge')
 evaluationDependsOn(':forge')
 
 def commonProject = project(':common')
+def minecraftProject = project(':minecraft-26.2')
 def fabricProject = project(':fabric')
 def neoForgeProject = project(':neoforge')
 def forgeProject = project(':forge')
 
 tasks.named('jar', Jar) {
     group = 'build'
-    description = 'Packages common and all three loader adapters into one installable JAR.'
+    description = 'Packages core, Minecraft 26.2, and all loader adapters into one installable JAR.'
     dependsOn commonProject.tasks.named('classes'),
+            minecraftProject.tasks.named('classes'),
             fabricProject.tasks.named('clientClasses'),
             neoForgeProject.tasks.named('classes'),
             forgeProject.tasks.named('classes')
@@ -33,6 +36,7 @@ tasks.named('jar', Jar) {
     // Package source-set outputs rather than unpacking release JARs. Forge's pack descriptor is
     // loader-branded, so the universal artifact replaces that one known resource explicitly.
     from commonProject.sourceSets.main.output
+    from minecraftProject.sourceSets.main.output
     from fabricProject.sourceSets.main.output
     from fabricProject.sourceSets.client.output
     from neoForgeProject.sourceSets.main.output

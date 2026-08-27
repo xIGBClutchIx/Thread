@@ -98,6 +98,11 @@ Every `tools/list` entry includes `_meta["me.clutchy.thread/availability"]`:
 The same availability is stated in each tool description. `minecraft.get_status` itself returns a
 normal status result in every client state; it is the recommended preflight.
 
+A Minecraft-version adapter may omit a tool it cannot implement safely; omitted/unsupported tools
+never enter `tools/list`, invocation, or `minecraft.get_capabilities`. A supported tool may lack a
+field only when its existing schema explicitly makes that field optional. The adapter declares that
+field as unavailable and returns the normal contracted absence rather than a fabricated value.
+
 Expected tool failures use one stable shape in MCP `structuredContent` and the text content block:
 
 ```json

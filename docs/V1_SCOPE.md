@@ -21,8 +21,9 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
 
-V1 does not attempt multi-version compatibility. Minecraft 26.2 requires Java 25, which is also the
-project toolchain.
+V1 ships only Minecraft 26.2. It establishes a separate Minecraft-version adapter boundary for
+future work but does not implement, select, or branch across multiple versions at runtime.
+Minecraft 26.2 requires Java 25, which is also the project toolchain.
 
 ## In scope
 
@@ -72,7 +73,8 @@ project toolchain.
 
 ### Engineering baseline
 
-- Gradle `:common`/`:fabric`/`:neoforge`/`:forge` separation plus packaging-only `:universal`
+- Gradle `:common`/`:minecraft-26.2` version separation, thin
+  `:fabric`/`:neoforge`/`:forge` loader adapters, and packaging-only `:universal`
 - a recommended universal JAR and independently installable dedicated JAR for each supported loader
 - meaningful comments for non-obvious implementation decisions
 - Javadocs on public Thread contracts/extension points

@@ -97,6 +97,7 @@ jobs:
                   path: |
                       build/reports/
                       common/build/reports/
+                      minecraft-26.2/build/reports/
                       fabric/build/reports/
                       neoforge/build/reports/
                       forge/build/reports/

@@ -5,11 +5,13 @@ releases.
 
 ## Module workflow
 
-Thread is built as `:common` plus thin `:fabric`, `:neoforge`, and `:forge` adapters. Shared core,
-configuration, MCP, runtime assembly, and loader-neutral Minecraft providers belong in `:common`.
-Loader API access, lifecycle events, metadata, and integration discovery stay in their adapter.
-All three entrypoints call the same `ThreadRuntime.start` path after resolving those loader values.
-The source-free `:universal` module packages these existing outputs and does not own runtime logic.
+Thread is built across two independent adapter axes. `:common` owns version-neutral core,
+configuration, MCP, and runtime/tool orchestration. `:minecraft-26.2` owns Minecraft access,
+mapping, logical-thread dispatch, focused provider implementations, and version capability
+declarations without importing a loader API. Thin `:fabric`, `:neoforge`, and `:forge` adapters own
+loader API access, lifecycle events, metadata, config paths, and integration discovery. They invoke
+`Minecraft262Runtime.start`, which composes the version implementation with `ThreadRuntime`. The
+source-free `:universal` module packages these existing outputs and owns no runtime logic.
 
 Root Gradle tasks aggregate all modules and remain the normal contributor interface. See
 [Build](BUILD.md) for module-specific commands and outputs.
@@ -18,9 +20,11 @@ Root Gradle tasks aggregate all modules and remain the normal contributor interf
 
 - Use Java 25 and the pinned Fabric, NeoForge, and Forge toolchains.
 - Do not add Kotlin, `package-info.java`, wildcard imports, or hidden global state.
-- Keep Minecraft, loader, core, and MCP dependencies inside their documented module boundaries.
-- Apply the portability rule literally: code that another loader can invoke unchanged stays in
-  common; code that calls a loader API stays in that loader's adapter.
+- Keep Minecraft-version, loader, core, and MCP dependencies inside their documented module
+  boundaries.
+- Apply both portability rules literally: version-neutral code stays in `:common`; code that uses
+  Minecraft 26.2 stays in `:minecraft-26.2`; code that calls a loader API stays in that loader's
+  adapter.
 - Prefer small immutable DTOs, explicit wiring, explicit schemas, and machine-readable errors.
 - Keep every game query bounded and every gameplay path behind the single-player guard.
 - Do not add a dependency when the JDK or Minecraft-provided runtime already supplies the narrow
@@ -53,11 +57,11 @@ change pass; narrow a noisy rule only when the code has a documented legitimate 
 
 ### Unit and architecture tests
 
-The root `test` task runs `:common:test`, `:fabric:test`, `:neoforge:test`, and `:forge:test`. They cover core
-services, schemas, registries, configuration, integration activation/isolation, shared Minecraft
-conversion/support, loader-specific discovery/version handling, and the real loopback MCP HTTP
-server without launching Minecraft. Fake providers should prove core behavior whenever live
-Minecraft is unnecessary.
+The root `test` task runs `:common:test`, `:minecraft-26.2:test`, `:fabric:test`,
+`:neoforge:test`, and `:forge:test`. They cover core services, schemas, registries, configuration,
+integration activation/isolation, Minecraft 26.2 conversion/support, loader-specific
+discovery/version handling, and the real loopback MCP HTTP server without launching Minecraft.
+Fake providers should prove core behavior whenever live Minecraft is unnecessary.
 
 Important regression areas include:
 
@@ -87,8 +91,11 @@ Important regression areas include:
 - MCP initialize and stateless discovery, protocol validation, request/origin limits, shutdown, and
   same-port restart;
 - package/import and release-artifact boundaries.
-- loader-to-common module direction, cross-loader isolation, and the absence of Fabric/NeoForge/Forge
-  imports in common or the shared packaged parity fixture.
+- common-to-version-to-loader module direction, cross-loader isolation, the absence of Minecraft
+  dependencies in common, and the absence of Fabric/NeoForge/Forge dependencies in the version
+  module or shared packaged parity fixture;
+- full/unsupported/optional-field version capability states and the exact twenty-one fully
+  supported tools declared by Minecraft 26.2.
 
 Run focused unit coverage with:
 
