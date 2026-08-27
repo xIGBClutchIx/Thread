@@ -72,7 +72,8 @@ non-empty descriptions, schema structure/defaults/enums/bounds, read-only annota
 metadata, and the absence of loader implementation names. Its SHA-256 semantic fingerprint omits
 description text at both tool and schema-annotation level, so wording-only improvements do not
 require snapshot churn while structural MCP changes do. The complete serialized response also has
-an 80 KiB regression budget; clarity is not removed merely to save bytes.
+a 128 KiB regression ceiling to catch unexpected schema growth. The ceiling is not intended to
+constrain useful descriptions, schemas, or features.
 
 ## HTTP and security rules
 

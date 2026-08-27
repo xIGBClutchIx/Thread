@@ -200,10 +200,12 @@ limits may be lower. Tool IDs and existing behavior remain unchanged.
 
 Catalog validation uses the actual loopback `tools/list` response. It checks ordered unique IDs,
 schema structure and metadata, read-only/non-destructive/idempotent/closed-domain annotations,
-session availability, loader neutrality, and an 80 KiB serialized-response budget. A semantic
-SHA-256 snapshot excludes tool wording and JSON Schema `description` annotations but retains names,
-schemas, defaults, limits, annotations, availability, and order. This catches meaningful contract
-drift without turning normal copy editing into snapshot maintenance.
+session availability, loader neutrality, and a 128 KiB serialized-response regression ceiling. The
+ceiling catches unexpected schema growth; it is not a target for constraining useful descriptions,
+schemas, or features. A semantic SHA-256 snapshot excludes tool wording and JSON Schema
+`description` annotations but retains names, schemas, defaults, limits, annotations, availability,
+and order. This catches meaningful contract drift without turning normal copy editing into snapshot
+maintenance.
 
 `openWorldHint` remains false because Thread's domain is one bounded local Minecraft client; it
 does not communicate with an unbounded external world. Dynamic game state is still guarded and

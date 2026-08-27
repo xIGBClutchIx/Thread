@@ -64,7 +64,8 @@ Important regression areas include:
 - success/error schema validation and deterministic discovery;
 - the real serialized built-in `tools/list` catalog: unique stable IDs/order, non-empty
   descriptions, schema defaults/enums/bounds, read-only annotations, session metadata, loader
-  neutrality, a wording-insensitive semantic fingerprint, and an 80 KiB payload budget;
+  neutrality, a wording-insensitive semantic fingerprint, and a 128 KiB payload regression ceiling
+  that catches unexpected schema growth without constraining useful catalog content;
 - all session states and multiplayer rejection;
 - authoritative player vitals, game mode/hardcore, armor/air, bounded effects, movement and
   conditions, hotbar/cooldown, optional vehicle/respawn context, and deterministic serialization;

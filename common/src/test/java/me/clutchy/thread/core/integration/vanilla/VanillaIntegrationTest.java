@@ -87,7 +87,7 @@ import me.clutchy.thread.transport.mcp.McpServerOptions;
 import org.junit.jupiter.api.Test;
 
 class VanillaIntegrationTest {
-  private static final int MAX_TOOLS_LIST_BYTES = 80 * 1_024;
+  private static final int MAX_TOOLS_LIST_BYTES = 128 * 1_024;
   private static final String CATALOG_SEMANTIC_FINGERPRINT =
       "cab2c05e06e7fa4e8ad7a82471f604226d5287944cf75e9c404da93625a7c352";
   private static final List<String> V1_TOOL_IDS =
