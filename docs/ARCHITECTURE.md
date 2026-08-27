@@ -133,7 +133,7 @@ behavior.
 
 Packaged parity coverage requires each loader to prove:
 
-- the exact same nineteen-tool catalog and active vanilla integration;
+- the exact same twenty-tool catalog and active vanilla integration;
 - correct loader identity plus menu, single-player, and return-to-menu status;
 - MCP-enabled, restarted-config, and MCP-disabled startup;
 - standard MCP initialization, discovery, tool listing, calls, and controlled menu rejection;
@@ -159,6 +159,13 @@ tree on the client thread so only entries Minecraft has exposed as visible/known
 authoritative server-player progress into detached DTOs. Dispatch has a configured deadline;
 timeout and lifecycle rejection become structured retryable errors. A request may fail safely if
 the world unloads while it is waiting.
+
+Target-entity inspection captures only Minecraft's current client `EntityHitResult`, the exact
+entity/player identities, and the dimension on the client thread. The server thread then resolves
+that same entity from the authoritative loaded level, rechecks the normal interaction distance
+under a fixed six-block ceiling, and maps it through the same bounded `EntityInfo` and entity
+enricher path as nearby discovery. It never substitutes a nearby scan or force-loads a chunk when
+the target disappears.
 
 ## Tools, crafting, and integrations
 

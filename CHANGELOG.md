@@ -6,6 +6,8 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Actual-look entity inspection through `minecraft.get_target_entity`, reusing the nearby-entity
+  contract with bounded equipment, active effects, age, tame ownership, and villager metadata.
 - Compact live world/environment context through `minecraft.get_world_info`, including dimension,
   biome, player and global spawn positions, same-dimension spawn distance, difficulty and hardcore,
   day/time, daylight, weather, local light, moon phase, and native biome climate values.

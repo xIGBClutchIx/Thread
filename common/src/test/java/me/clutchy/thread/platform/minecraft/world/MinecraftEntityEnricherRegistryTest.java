@@ -2,6 +2,7 @@ package me.clutchy.thread.platform.minecraft.world;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.List;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.model.world.EntityInfo;
@@ -36,7 +37,23 @@ class MinecraftEntityEnricherRegistryTest {
 
   private static EntityInfo entity(String customName) {
     return new EntityInfo(
-        "minecraft:pig", "Pig", customName, 4, new Position(0, 64, 0), true, 10.0, 10.0, null);
+        "minecraft:pig",
+        "Pig",
+        customName,
+        4,
+        new Position(0, 64, 0),
+        true,
+        10.0,
+        10.0,
+        null,
+        List.of(),
+        List.of(),
+        false,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   private static EntityInfo rename(EntityInfo current, String suffix) {
@@ -49,6 +66,14 @@ class MinecraftEntityEnricherRegistryTest {
         current.living(),
         current.health(),
         current.maxHealth(),
-        current.classification());
+        current.classification(),
+        current.equipment(),
+        current.activeEffects(),
+        current.activeEffectsTruncated(),
+        current.age(),
+        current.tamed(),
+        current.ownerName(),
+        current.villagerProfession(),
+        current.villagerLevel());
   }
 }

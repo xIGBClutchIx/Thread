@@ -474,6 +474,76 @@ higher-priority safe inspector for richer mod-specific state later.
 When the normal client raycast has no valid block target, Thread returns a structured `NOT_FOUND`
 tool error rather than inventing block data.
 
+## `minecraft.get_target_entity`
+
+Purpose: inspect the entity under the player's current crosshair using Minecraft's normal client
+targeting result and authoritative loaded integrated-server state.
+
+Input: none.
+
+Example result:
+
+```json
+{
+  "entityType": "minecraft:zombie",
+  "displayName": "Zombie",
+  "customName": "Thread Target",
+  "distance": 2.5,
+  "position": {"x": 156.0, "y": 67.0, "z": -381.0},
+  "living": true,
+  "health": 20.0,
+  "maxHealth": 20.0,
+  "classification": "HOSTILE",
+  "equipment": [
+    {
+      "slot": "MAIN_HAND",
+      "item": {
+        "itemId": "minecraft:iron_sword",
+        "displayName": "Iron Sword",
+        "customName": null,
+        "count": 1,
+        "maxCount": 1,
+        "durability": {"remaining": 250, "maximum": 250, "damage": 0},
+        "enchantments": [],
+        "components": null
+      }
+    }
+  ],
+  "activeEffects": [
+    {
+      "effectId": "minecraft:speed",
+      "displayName": "Speed",
+      "amplifier": 1,
+      "durationTicks": 1200,
+      "infinite": false,
+      "ambient": false,
+      "visible": true,
+      "showIcon": true
+    }
+  ],
+  "activeEffectsTruncated": false,
+  "age": "BABY",
+  "tamed": null,
+  "ownerName": null,
+  "villagerProfession": null,
+  "villagerLevel": null
+}
+```
+
+The tool does not perform its own entity search. The client must currently have an
+`EntityHitResult`; Thread captures that exact entity identity and resolves it in the same dimension
+on the integrated-server thread. Vanilla interaction reach applies and is additionally capped at
+six blocks. A changed, removed, out-of-range, or unloaded target returns a structured retryable
+absence/error instead of another nearby entity. No call loads chunks or mutates the target.
+
+The result reuses the `EntityInfo` shape returned by `minecraft.get_nearby_entities`. Living
+entities include only non-empty equipment slots and up to 64 active effects, ordered by slot/effect
+ID. Finite effects include `durationTicks`; infinite effects use `durationTicks: null` and
+`infinite: true`. `age` appears only for vanilla families with reliable baby/adult state. `tamed`
+and `ownerName` appear only where vanilla exposes tame state and a loaded owner name; owner UUIDs
+are never returned. Villagers expose canonical profession ID and level together. Unsupported or
+non-living fields are null/empty, and raw NBT/components are never serialized.
+
 ## `minecraft.get_nearby_containers`
 
 Purpose: locate container block entities near the local player without returning every complete
@@ -602,16 +672,25 @@ Example result:
       "living": true,
       "health": 20.0,
       "maxHealth": 20.0,
-      "classification": "HOSTILE"
+      "classification": "HOSTILE",
+      "equipment": [],
+      "activeEffects": [],
+      "activeEffectsTruncated": false,
+      "age": "ADULT",
+      "tamed": null,
+      "ownerName": null,
+      "villagerProfession": null,
+      "villagerLevel": null
     }
   ]
 }
 ```
 
-Living entities include health and max health. Non-living entities use null for both fields.
-Classification is nullable. Thread assigns it to Minecraft's hostile enemy, passive animal/ambient
-creature/villager, and neutral-mob families. Thread does not infer labels for other entities or
-return entity NBT.
+Living entities use the same conditional rich metadata documented for
+`minecraft.get_target_entity`. Non-living entities use null for health, classification, age, tame,
+owner, and villager fields and empty equipment/effect lists. Classification is nullable. Thread
+assigns it to Minecraft's hostile enemy, passive animal/ambient creature/villager, and neutral-mob
+families. Thread does not infer labels for other entities or return entity NBT.
 
 ## `minecraft.get_recipe`
 
@@ -1077,7 +1156,7 @@ Example result:
       "id": "vanilla",
       "version": "1",
       "metadata": [
-        {"key": "thread.tool_count", "value": "19"}
+        {"key": "thread.tool_count", "value": "20"}
       ]
     }
   ]
@@ -1095,7 +1174,7 @@ capabilities and their classes are not resolved before presence/compatibility ch
 
 The base artifact reports only the required `vanilla` integration. Future separately installed
 Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
-changing the nineteen built-in `minecraft.*` tool contracts.
+changing the twenty built-in `minecraft.*` tool contracts.
 
 ## Tool descriptions
 

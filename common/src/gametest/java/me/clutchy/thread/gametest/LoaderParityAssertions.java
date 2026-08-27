@@ -48,6 +48,7 @@ public final class LoaderParityAssertions {
           "minecraft.get_recipe",
           "minecraft.get_status",
           "minecraft.get_target_block",
+          "minecraft.get_target_entity",
           "minecraft.get_world_info",
           "minecraft.inspect_container",
           "minecraft.search_items");
@@ -172,6 +173,12 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "menu world-info rejection");
+    assertToolError(
+        mcpToolResult(endpoint, 38, "minecraft.get_target_entity", new JsonObject()),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu target-entity rejection");
     JsonObject expandedCrafting = new JsonObject();
     expandedCrafting.addProperty("itemId", "minecraft:command_block");
     expandedCrafting.addProperty("scope", "PLAYER_AND_NEARBY");
@@ -207,6 +214,7 @@ public final class LoaderParityAssertions {
     assertEquals("minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
     JsonObject worldInfo = invoke(tools, "minecraft.get_world_info", "{}");
     verifyWorldInfo(worldInfo, player);
+    verifyOptionalTargetEntity(invokeResult(tools, "minecraft.get_target_entity", "{}"));
     invoke(tools, "minecraft.get_inventory", "{}");
     assertEquals(
         6,
@@ -414,6 +422,8 @@ public final class LoaderParityAssertions {
           mcpTool(endpoint, 29, "minecraft.get_advancement", advancementArguments), advancementId);
     }
     verifyWorldInfo(mcpTool(endpoint, 37, "minecraft.get_world_info", new JsonObject()), player);
+    verifyOptionalTargetEntity(
+        mcpToolResult(endpoint, 38, "minecraft.get_target_entity", new JsonObject()));
   }
 
   /** Verifies clean world detachment while the loader-owned client remains running. */
@@ -459,6 +469,13 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "return-to-menu world-info rejection");
+    assertToolError(
+        mcpToolResult(
+            runtime.mcpServer().endpoint(), 38, "minecraft.get_target_entity", new JsonObject()),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu target-entity rejection");
     JsonObject expandedCrafting = new JsonObject();
     expandedCrafting.addProperty("itemId", "minecraft:command_block");
     expandedCrafting.addProperty("scope", "PLAYER_AND_NEARBY");
@@ -599,6 +616,41 @@ public final class LoaderParityAssertions {
     assertTrue(!world.get("moonPhase").getAsString().isBlank(), "moon phase");
     assertTrue(Double.isFinite(world.get("biomeTemperature").getAsDouble()), "biome temperature");
     assertTrue(world.get("biomeHasPrecipitation").isJsonPrimitive(), "biome precipitation flag");
+  }
+
+  private static void verifyOptionalTargetEntity(ToolResult<JsonElement> result) {
+    if (!result.successful()) {
+      assertEquals("NOT_FOUND", result.error().code().name(), "no target entity code");
+      assertEquals(
+          "The player is not currently targeting a valid entity.",
+          result.error().message(),
+          "no target entity message");
+      assertTrue(result.error().retryable(), "no target entity retryability");
+      return;
+    }
+    verifyTargetEntity(result.value().getAsJsonObject());
+  }
+
+  private static void verifyOptionalTargetEntity(JsonObject result) {
+    if (result.get("isError").getAsBoolean()) {
+      assertToolError(
+          result,
+          "NOT_FOUND",
+          "The player is not currently targeting a valid entity.",
+          true,
+          "no MCP target entity");
+      return;
+    }
+    verifyTargetEntity(result.getAsJsonObject("structuredContent"));
+  }
+
+  private static void verifyTargetEntity(JsonObject entity) {
+    assertTrue(entity.get("entityType").getAsString().contains(":"), "target entity identity");
+    assertTrue(entity.get("distance").getAsDouble() >= 0, "target entity distance");
+    assertTrue(entity.get("position").isJsonObject(), "target entity position");
+    assertTrue(entity.get("equipment").isJsonArray(), "target entity equipment");
+    assertTrue(entity.get("activeEffects").isJsonArray(), "target entity effects");
+    assertTrue(entity.get("activeEffectsTruncated").isJsonPrimitive(), "target effect bound");
   }
 
   /** Invokes a tool and returns its object result, failing on a controlled tool error. */

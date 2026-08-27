@@ -28,11 +28,13 @@ import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.DaylightState;
+import me.clutchy.thread.core.model.world.EntityAgeState;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.model.world.StatusEffectInfo;
 import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
@@ -126,6 +128,14 @@ class CoreModelTest {
                 false,
                 20.0,
                 20.0,
+                null,
+                List.of(),
+                List.of(),
+                false,
+                null,
+                null,
+                null,
+                null,
                 null));
     EntityInfo zombie =
         new EntityInfo(
@@ -137,9 +147,28 @@ class CoreModelTest {
             true,
             18.0,
             20.0,
-            EntityClassification.HOSTILE);
+            EntityClassification.HOSTILE,
+            List.of(
+                new EquipmentSlotInfo(
+                    EquipmentPosition.HEAD, item("minecraft:iron_helmet", "Iron Helmet", 1, 1)),
+                new EquipmentSlotInfo(
+                    EquipmentPosition.MAIN_HAND, item("minecraft:iron_sword", "Iron Sword", 1, 1))),
+            List.of(
+                new StatusEffectInfo("minecraft:speed", "Speed", 1, 200, false, false, true, true),
+                new StatusEffectInfo(
+                    "minecraft:regeneration", "Regeneration", 0, null, true, false, true, true)),
+            false,
+            EntityAgeState.BABY,
+            false,
+            null,
+            null,
+            null);
     assertTrue(zombie.living());
     assertEquals(EntityClassification.HOSTILE, zombie.classification());
+    assertEquals(EquipmentPosition.MAIN_HAND, zombie.equipment().getFirst().slot());
+    assertEquals("minecraft:iron_sword", zombie.equipment().getFirst().item().itemId());
+    assertEquals("minecraft:regeneration", zombie.activeEffects().getFirst().effectId());
+    assertEquals(EntityAgeState.BABY, zombie.age());
   }
 
   @Test

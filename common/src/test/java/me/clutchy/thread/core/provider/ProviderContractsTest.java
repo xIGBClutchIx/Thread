@@ -68,6 +68,7 @@ class ProviderContractsTest {
             .item());
     assertEquals("minecraft:stone", player.targetBlock().value().orElseThrow().blockId());
     assertEquals("minecraft:plains", world.worldInfo().value().biomeId());
+    assertEquals("minecraft:zombie", world.targetEntity().value().orElseThrow().entityType());
     assertEquals(
         "minecraft:zombie",
         world
@@ -221,23 +222,14 @@ class ProviderContractsTest {
     }
 
     @Override
+    public ToolResult<Optional<EntityInfo>> targetEntity() {
+      return ToolResult.success(Optional.of(zombie()));
+    }
+
+    @Override
     public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
       return ToolResult.success(
-          new NearbyEntityResult(
-              query.radius(),
-              query.limit(),
-              false,
-              List.of(
-                  new EntityInfo(
-                      "minecraft:zombie",
-                      "Zombie",
-                      null,
-                      4,
-                      new Position(4, 64, 0),
-                      true,
-                      20.0,
-                      20.0,
-                      EntityClassification.HOSTILE))));
+          new NearbyEntityResult(query.radius(), query.limit(), false, List.of(zombie())));
     }
 
     @Override
@@ -291,6 +283,27 @@ class ProviderContractsTest {
               true,
               new BlockEntityInfo("minecraft:barrel", 27, List.of(), Map.of())));
     }
+  }
+
+  private static EntityInfo zombie() {
+    return new EntityInfo(
+        "minecraft:zombie",
+        "Zombie",
+        null,
+        4,
+        new Position(4, 64, 0),
+        true,
+        20.0,
+        20.0,
+        EntityClassification.HOSTILE,
+        List.of(),
+        List.of(),
+        false,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   private static final class FakeRecipeProvider implements RecipeProvider {

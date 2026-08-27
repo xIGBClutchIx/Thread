@@ -32,6 +32,7 @@ import me.clutchy.thread.core.model.recipe.RecipeLookupQuery;
 import me.clutchy.thread.core.model.recipe.RecipeLookupResult;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
@@ -123,6 +124,7 @@ public final class VanillaIntegration implements ThreadIntegration {
     register(context, getInventory());
     register(context, getEquipment());
     register(context, getTargetBlock());
+    register(context, getTargetEntity());
     register(context, getNearbyContainers());
     register(context, inspectContainer());
     register(context, getNearbyEntities());
@@ -246,6 +248,20 @@ public final class VanillaIntegration implements ThreadIntegration {
         JsonCodec.of(BlockInfo.class, VanillaToolSchemas.TARGET_BLOCK),
         ToolCapabilities.supportedSingleplayer(),
         ignored -> targetBlock());
+  }
+
+  private GameTool<EmptyInput, EntityInfo> getTargetEntity() {
+    return tool(
+        "minecraft.get_target_entity",
+        "Returns the exact entity currently under the player's normal camera targeting ray, "
+            + "including canonical identity, position and distance, health, behavior, equipment, "
+            + "effects, age, tame/owner, and villager details when applicable. Use this for rich "
+            + "focused inspection of what the player is looking at; no entity is a structured "
+            + "NOT_FOUND result and no entity state is changed.",
+        emptyInputCodec(),
+        JsonCodec.of(EntityInfo.class, VanillaToolSchemas.TARGET_ENTITY),
+        ToolCapabilities.supportedSingleplayer(),
+        ignored -> targetEntity());
   }
 
   private GameTool<NearbyEntityQuery, NearbyEntityResult> getNearbyEntities() {
@@ -390,6 +406,23 @@ public final class VanillaIntegration implements ThreadIntegration {
                     new ToolError(
                         ToolErrorCode.NOT_FOUND,
                         "The player is not currently targeting a valid block.",
+                        true,
+                        Map.of())));
+  }
+
+  private ToolResult<EntityInfo> targetEntity() {
+    ToolResult<Optional<EntityInfo>> result = world.targetEntity();
+    if (!result.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(result.error()));
+    }
+    return Objects.requireNonNull(result.value())
+        .map(ToolResult::success)
+        .orElseGet(
+            () ->
+                ToolResult.failure(
+                    new ToolError(
+                        ToolErrorCode.NOT_FOUND,
+                        "The player is not currently targeting a valid entity.",
                         true,
                         Map.of())));
   }

@@ -25,10 +25,49 @@ import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.Position;
 import me.clutchy.thread.core.tool.ToolResult;
 import me.clutchy.thread.platform.minecraft.game.MinecraftProviderLimits;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.Test;
 
 class MinecraftWorldProviderTest {
   private static final MinecraftProviderLimits LIMITS = MinecraftProviderLimits.defaults();
+
+  @Test
+  void acceptsOnlyActualEntityHitsWithinTheHardTargetDistance() {
+    Vec3 eye = Vec3.ZERO;
+    EntityHitResult withinRange = new EntityHitResult(null, new Vec3(0, 0, 6));
+    EntityHitResult outOfRange = new EntityHitResult(null, new Vec3(0, 0, 6.01));
+    BlockHitResult block =
+        new BlockHitResult(new Vec3(0, 0, 2), Direction.UP, BlockPos.ZERO, false);
+
+    assertFalse(
+        MinecraftWorldProvider.isValidEntityTarget(
+            null, eye, MinecraftWorldProvider.MAX_TARGET_ENTITY_DISTANCE));
+    assertFalse(
+        MinecraftWorldProvider.isValidEntityTarget(
+            block, eye, MinecraftWorldProvider.MAX_TARGET_ENTITY_DISTANCE));
+    assertTrue(
+        MinecraftWorldProvider.isValidEntityTarget(
+            withinRange, eye, MinecraftWorldProvider.MAX_TARGET_ENTITY_DISTANCE));
+    assertFalse(
+        MinecraftWorldProvider.isValidEntityTarget(
+            outOfRange, eye, MinecraftWorldProvider.MAX_TARGET_ENTITY_DISTANCE));
+
+    assertTrue(
+        MinecraftWorldProvider.isWithinEntityTargetDistance(
+            new AABB(5.9, -0.5, -0.5, 6.9, 0.5, 0.5),
+            eye,
+            MinecraftWorldProvider.MAX_TARGET_ENTITY_DISTANCE));
+    assertFalse(
+        MinecraftWorldProvider.isWithinEntityTargetDistance(
+            new AABB(6.01, -0.5, -0.5, 7.01, 0.5, 0.5),
+            eye,
+            MinecraftWorldProvider.MAX_TARGET_ENTITY_DISTANCE));
+  }
 
   @Test
   void classifiesDayNightTransitionsAndFixedTimeDimensionsDeterministically() {

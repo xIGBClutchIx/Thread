@@ -50,6 +50,7 @@ import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
 import me.clutchy.thread.core.model.world.DaylightState;
+import me.clutchy.thread.core.model.world.EntityAgeState;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
@@ -59,6 +60,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.model.world.StatusEffectInfo;
 import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.AdvancementProvider;
 import me.clutchy.thread.core.provider.GameProvider;
@@ -91,6 +93,7 @@ class VanillaIntegrationTest {
           "minecraft.get_recipe",
           "minecraft.get_status",
           "minecraft.get_target_block",
+          "minecraft.get_target_entity",
           "minecraft.get_world_info",
           "minecraft.inspect_container",
           "minecraft.search_items");
@@ -184,6 +187,16 @@ class VanillaIntegrationTest {
     assertEquals("minecraft:stone", target.get("blockId").getAsString());
     assertEquals("Stone", target.get("displayName").getAsString());
     assertFalse(target.get("blockEntityPresent").getAsBoolean());
+
+    JsonObject targetEntity = invoke(catalog.tools(), "minecraft.get_target_entity", "{}");
+    assertEquals("minecraft:zombie", targetEntity.get("entityType").getAsString());
+    assertEquals("Thread Target", targetEntity.get("customName").getAsString());
+    assertEquals(
+        "minecraft:iron_sword",
+        first(targetEntity, "equipment").getAsJsonObject("item").get("itemId").getAsString());
+    assertEquals(
+        "minecraft:speed", first(targetEntity, "activeEffects").get("effectId").getAsString());
+    assertEquals("BABY", targetEntity.get("age").getAsString());
 
     JsonObject entities =
         invoke(catalog.tools(), "minecraft.get_nearby_entities", "{\"radius\":16,\"limit\":8}");
@@ -352,7 +365,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        19, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        20, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -483,6 +496,8 @@ class VanillaIntegrationTest {
     assertToolFailure(
         noWorld.tools(), "minecraft.get_world_info", "{}", ToolErrorCode.WORLD_NOT_AVAILABLE);
     assertToolFailure(
+        noWorld.tools(), "minecraft.get_target_entity", "{}", ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertToolFailure(
         noWorld.tools(),
         "minecraft.get_nearby_containers",
         "{\"radius\":8,\"limit\":8}",
@@ -502,6 +517,8 @@ class VanillaIntegrationTest {
             ignored -> true);
     assertToolFailure(
         multiplayer.tools(), "minecraft.get_world_info", "{}", ToolErrorCode.UNSUPPORTED);
+    assertToolFailure(
+        multiplayer.tools(), "minecraft.get_target_entity", "{}", ToolErrorCode.UNSUPPORTED);
     assertToolFailure(
         multiplayer.tools(),
         "minecraft.inspect_container",
@@ -566,14 +583,25 @@ class VanillaIntegrationTest {
 
   @Test
   void targetAbsenceIsAStableStructuredNotFoundResult() {
-    Catalog catalog = catalog(new SupportedGameProvider(), new EmptyTargetPlayerProvider());
+    Catalog catalog =
+        catalog(
+            new SupportedGameProvider(),
+            new EmptyTargetPlayerProvider(),
+            new EmptyTargetWorldProvider(),
+            new FakeRecipeProvider(),
+            ignored -> true);
 
-    ToolResult<JsonElement> result =
+    ToolResult<JsonElement> block =
         catalog.tools().invoke("minecraft.get_target_block", object("{}"));
+    ToolResult<JsonElement> entity =
+        catalog.tools().invoke("minecraft.get_target_entity", object("{}"));
 
-    assertFalse(result.successful());
-    assertEquals(me.clutchy.thread.core.error.ToolErrorCode.NOT_FOUND, result.error().code());
-    assertTrue(result.error().retryable());
+    assertFalse(block.successful());
+    assertEquals(ToolErrorCode.NOT_FOUND, block.error().code());
+    assertTrue(block.error().retryable());
+    assertFalse(entity.successful());
+    assertEquals(ToolErrorCode.NOT_FOUND, entity.error().code());
+    assertTrue(entity.error().retryable());
   }
 
   @Test
@@ -602,7 +630,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(20, strings(capabilities, "tools").size());
+    assertEquals(21, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -660,7 +688,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(19, strings(capabilities, "tools").size());
+    assertEquals(20, strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -1043,7 +1071,7 @@ class VanillaIntegrationTest {
     }
   }
 
-  private static final class FakeWorldProvider implements WorldProvider {
+  private static class FakeWorldProvider implements WorldProvider {
     @Override
     public ToolResult<WorldInfo> worldInfo() {
       return ToolResult.success(
@@ -1071,23 +1099,14 @@ class VanillaIntegrationTest {
     }
 
     @Override
+    public ToolResult<Optional<EntityInfo>> targetEntity() {
+      return ToolResult.success(Optional.of(fakeEntity()));
+    }
+
+    @Override
     public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
       return ToolResult.success(
-          new NearbyEntityResult(
-              query.radius(),
-              query.limit(),
-              false,
-              List.of(
-                  new EntityInfo(
-                      "minecraft:zombie",
-                      "Zombie",
-                      null,
-                      8.4,
-                      new Position(160, 67, -380),
-                      true,
-                      20.0,
-                      20.0,
-                      EntityClassification.HOSTILE))));
+          new NearbyEntityResult(query.radius(), query.limit(), false, List.of(fakeEntity())));
     }
 
     @Override
@@ -1149,6 +1168,13 @@ class VanillaIntegrationTest {
     }
   }
 
+  private static final class EmptyTargetWorldProvider extends FakeWorldProvider {
+    @Override
+    public ToolResult<Optional<EntityInfo>> targetEntity() {
+      return ToolResult.success(Optional.empty());
+    }
+  }
+
   private static final class UnavailableWorldProvider implements WorldProvider {
     private final ToolError error;
 
@@ -1158,6 +1184,11 @@ class VanillaIntegrationTest {
 
     @Override
     public ToolResult<WorldInfo> worldInfo() {
+      return ToolResult.failure(error);
+    }
+
+    @Override
+    public ToolResult<Optional<EntityInfo>> targetEntity() {
       return ToolResult.failure(error);
     }
 
@@ -1229,6 +1260,30 @@ class VanillaIntegrationTest {
 
   private static ItemStackInfo item(String itemId, String displayName, int count, int maxCount) {
     return new ItemStackInfo(itemId, displayName, null, count, maxCount, null, List.of(), null);
+  }
+
+  private static EntityInfo fakeEntity() {
+    return new EntityInfo(
+        "minecraft:zombie",
+        "Zombie",
+        "Thread Target",
+        8.4,
+        new Position(160, 67, -380),
+        true,
+        20.0,
+        20.0,
+        EntityClassification.HOSTILE,
+        List.of(
+            new EquipmentSlotInfo(
+                EquipmentPosition.MAIN_HAND, item("minecraft:iron_sword", "Iron Sword", 1, 1))),
+        List.of(
+            new StatusEffectInfo("minecraft:speed", "Speed", 1, 1_200, false, false, true, true)),
+        false,
+        EntityAgeState.BABY,
+        false,
+        null,
+        null,
+        null);
   }
 
   private static EquipmentSnapshot equipmentWithMainHand(ItemStackInfo mainHand) {

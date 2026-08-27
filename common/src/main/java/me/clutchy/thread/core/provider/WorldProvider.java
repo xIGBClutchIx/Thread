@@ -1,7 +1,9 @@
 package me.clutchy.thread.core.provider;
 
+import java.util.Optional;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
@@ -20,8 +22,14 @@ public interface WorldProvider {
   ToolResult<WorldInfo> worldInfo();
 
   /**
-   * Returns detached nearby entity identity, position, health, and reliable behavior context from
-   * already-loaded state, bounded by the supplied radius and limit.
+   * Returns the exact normal client crosshair entity resolved from authoritative loaded server
+   * state, or an empty value when no entity is targeted.
+   */
+  ToolResult<Optional<EntityInfo>> targetEntity();
+
+  /**
+   * Returns detached nearby entity identity, position, health, and bounded conditional vanilla
+   * metadata from already-loaded state, bounded by the supplied radius and limit.
    */
   ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query);
 

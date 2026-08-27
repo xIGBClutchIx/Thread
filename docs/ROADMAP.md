@@ -23,9 +23,9 @@ bounded DTOs, and preserve native fallback behavior. Do not add an integration t
 
 ## Better player context
 
-Potential read-only additions include status effects and more precise bounded inspection. Add a
-tool only when it answers a distinct question better than the existing nineteen
-tools; avoid large background snapshots or generic world scanning.
+Add a tool only when it answers a distinct question better than the existing twenty tools; avoid
+large background snapshots or generic world scanning. Prefer focused, conditional metadata over
+expanding every response into a large entity or world dump.
 
 ## Future product phases
 

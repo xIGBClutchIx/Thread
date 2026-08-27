@@ -44,6 +44,11 @@ it discoverable, inspectable, and searchable through the existing bounded provid
 still avoid chunk loading, world mutation, unresolved loot access, and unbounded payloads. Base
 Thread contains no third-party machine logic.
 
+The same entity enricher registry serves both `minecraft.get_target_entity` and
+`minecraft.get_nearby_entities`. Enrichers receive only an entity already selected by a bounded
+vanilla provider; they must not start a second scan, load chunks, mutate the entity, or return raw
+Minecraft state.
+
 ## Internal implementation surface
 
 The following types may be public for cross-package wiring or tests but are not external API

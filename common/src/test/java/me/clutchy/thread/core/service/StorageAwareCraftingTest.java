@@ -30,6 +30,7 @@ import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
@@ -347,6 +348,11 @@ class StorageAwareCraftingTest {
     @Override
     public ToolResult<WorldInfo> worldInfo() {
       throw new AssertionError("world info was not expected");
+    }
+
+    @Override
+    public ToolResult<Optional<EntityInfo>> targetEntity() {
+      throw new AssertionError("target entity was not expected");
     }
 
     @Override

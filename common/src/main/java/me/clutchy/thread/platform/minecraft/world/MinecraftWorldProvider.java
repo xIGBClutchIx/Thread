@@ -54,11 +54,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
-/** Loader-neutral bounded queries over entities already present in the client level. */
+/** Loader-neutral bounded world and entity queries over already-loaded Minecraft state. */
 public final class MinecraftWorldProvider implements WorldProvider {
   private static final EntityTypeTest<Entity, Entity> ALL_ENTITIES =
       EntityTypeTest.forClass(Entity.class);
+  static final double MAX_TARGET_ENTITY_DISTANCE = 6.0;
 
   private final Minecraft client;
   private final GameThreadExecutor clientThread;
@@ -105,6 +109,25 @@ public final class MinecraftWorldProvider implements WorldProvider {
         MinecraftThreadExecutor.forServer(context.server(), gameThreadTimeout);
     return MinecraftProviderSupport.read(
         serverThread, "world.info.read", () -> readWorldInfo(context));
+  }
+
+  @Override
+  public ToolResult<Optional<EntityInfo>> targetEntity() {
+    ToolResult<Optional<TargetEntityContext>> captured =
+        MinecraftProviderSupport.read(
+            clientThread, "world.target_entity.capture", this::captureTargetEntity);
+    if (!captured.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(captured.error()));
+    }
+    Optional<TargetEntityContext> target = Objects.requireNonNull(captured.value());
+    if (target.isEmpty()) {
+      return ToolResult.success(Optional.empty());
+    }
+    TargetEntityContext context = target.orElseThrow();
+    GameThreadExecutor serverThread =
+        MinecraftThreadExecutor.forServer(context.server(), gameThreadTimeout);
+    return MinecraftProviderSupport.read(
+        serverThread, "world.target_entity.inspect", () -> inspectTargetEntity(context));
   }
 
   @Override
@@ -302,6 +325,81 @@ public final class MinecraftWorldProvider implements WorldProvider {
             .toList();
     return ToolResult.success(
         new NearbyEntityResult(query.radius(), query.limit(), truncated, entities));
+  }
+
+  private ToolResult<Optional<TargetEntityContext>> captureTargetEntity() {
+    Optional<ToolError> unavailable = sessionGuard.gameplayUnavailable(client);
+    if (unavailable.isPresent()) {
+      return ToolResult.failure(unavailable.orElseThrow());
+    }
+    Entity camera = client.getCameraEntity();
+    HitResult hitResult = client.hitResult;
+    double interactionRange =
+        Math.min(MAX_TARGET_ENTITY_DISTANCE, Math.max(0, client.player.entityInteractionRange()));
+    if (camera == null
+        || !isValidEntityTarget(hitResult, camera.getEyePosition(), interactionRange)) {
+      return ToolResult.success(Optional.empty());
+    }
+    Entity target = Objects.requireNonNull(((EntityHitResult) hitResult).getEntity());
+    return ToolResult.success(
+        Optional.of(
+            new TargetEntityContext(
+                Objects.requireNonNull(client.getSingleplayerServer()),
+                Objects.requireNonNull(client.level).dimension(),
+                client.player.getUUID(),
+                target.getUUID(),
+                interactionRange)));
+  }
+
+  private ToolResult<Optional<EntityInfo>> inspectTargetEntity(TargetEntityContext context) {
+    ServerLevel level = context.server().getLevel(context.dimension());
+    if (level == null) {
+      return targetEntityUnavailable("The targeted entity's world is no longer available.");
+    }
+    ServerPlayer player = context.server().getPlayerList().getPlayer(context.playerId());
+    if (player == null || player.level() != level) {
+      return targetEntityUnavailable("The local player is no longer available.");
+    }
+    Entity target = level.getEntity(context.targetId());
+    if (target == null) {
+      return targetEntityUnavailable("The targeted entity is no longer available.");
+    }
+    BlockPos position = target.blockPosition();
+    if (!level.getChunkSource().hasChunk(position.getX() >> 4, position.getZ() >> 4)) {
+      return targetEntityUnavailable("The targeted entity's chunk is no longer loaded.");
+    }
+    if (!isWithinEntityTargetDistance(
+        target.getBoundingBox(), player.getEyePosition(), context.maximumDistance())) {
+      return targetEntityUnavailable("The targeted entity is no longer within interaction range.");
+    }
+    double distance = Math.sqrt(target.distanceToSqr(player));
+    EntityInfo snapshot = entityEnrichers.enrich(target, mapper.entity(target, distance));
+    return ToolResult.success(Optional.of(snapshot));
+  }
+
+  static boolean isValidEntityTarget(
+      HitResult hitResult, Vec3 eyePosition, double maximumDistance) {
+    if (!(hitResult instanceof EntityHitResult)
+        || hitResult.getType() != HitResult.Type.ENTITY
+        || eyePosition == null
+        || !Double.isFinite(maximumDistance)
+        || maximumDistance < 0) {
+      return false;
+    }
+    return hitResult.getLocation().distanceToSqr(eyePosition) <= maximumDistance * maximumDistance;
+  }
+
+  static boolean isWithinEntityTargetDistance(
+      AABB targetBounds, Vec3 eyePosition, double maximumDistance) {
+    return targetBounds != null
+        && eyePosition != null
+        && Double.isFinite(maximumDistance)
+        && maximumDistance >= 0
+        && targetBounds.distanceToSqr(eyePosition) <= maximumDistance * maximumDistance;
+  }
+
+  private static ToolResult<Optional<EntityInfo>> targetEntityUnavailable(String message) {
+    return ToolResult.failure(ToolError.of(ToolErrorCode.NOT_AVAILABLE, message, true));
   }
 
   private ToolResult<WorldContext> captureWorld(String operation) {
@@ -531,4 +629,11 @@ public final class MinecraftWorldProvider implements WorldProvider {
       MinecraftServer server, ResourceKey<Level> dimension, Position playerPosition) {}
 
   private record WorldInfoContext(MinecraftServer server, UUID playerId) {}
+
+  private record TargetEntityContext(
+      MinecraftServer server,
+      ResourceKey<Level> dimension,
+      UUID playerId,
+      UUID targetId,
+      double maximumDistance) {}
 }

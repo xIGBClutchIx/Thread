@@ -8,7 +8,7 @@ Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fab
 
 ## What it exposes
 
-Nineteen `minecraft.*` tools cover:
+Twenty `minecraft.*` tools cover:
 
 - session status and game versions;
 - player health, hunger, experience, position, dimension, and game mode;
@@ -16,8 +16,9 @@ Nineteen `minecraft.*` tools cover:
   local light, moon phase, and native biome climate values;
 - live vanilla advancement lists and detailed criterion progress;
 - inventory, held items, and armor;
-- the targeted block plus bounded nearby container discovery and inspection;
-- bounded nearby loaded entities;
+- the targeted block or entity plus bounded nearby container discovery and inspection;
+- bounded nearby loaded entities, with conditional living metadata such as equipment, active
+  effects, age, tame ownership, and villager profession;
 - live recipe lookup, registry search, and unified live item search across the player and nearby
   loaded containers;
 - direct craftability, missing ingredients, and bounded recursive crafting plans;

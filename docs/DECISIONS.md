@@ -85,6 +85,20 @@ dimension; it is `null` across dimensions. Minecraft 26.2 does not expose biome 
 clean public API, so Thread does not reflect into private climate data or invent a downfall value.
 The tool never loads chunks, predicts weather, or changes time/weather/world state.
 
+## Target entities reuse the bounded entity contract
+
+`minecraft.get_target_entity` accepts no search arguments and inspects only Minecraft's current
+client `EntityHitResult`. The client thread captures the exact entity/player identities and
+dimension; the integrated-server thread resolves that same entity from already-loaded state and
+rechecks normal interaction reach under a fixed six-block ceiling. Thread does not replace a lost
+target with a nearby scan.
+
+Both target and nearby tools reuse `EntityInfo` and the existing entity enricher registry. The
+shared shape now includes non-empty equipment slots, at most 64 stable-ID-ordered active effects,
+reliable vanilla age, tame/loaded-owner name, and villager profession/level metadata. Unsupported
+fields stay null or empty, owner UUIDs and raw NBT/components remain absent, and all reads are
+single-player-only and non-mutating.
+
 ## Nearby containers are bounded context and explicit crafting input
 
 `minecraft.get_nearby_containers` scans only already-loaded chunks within a hard 16-block ceiling

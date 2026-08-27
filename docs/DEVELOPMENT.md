@@ -66,6 +66,8 @@ Important regression areas include:
 - world/environment identity, spawn-distance semantics, difficulty/hardcore, day/night and weather
   transitions, light/moon/climate fields, deterministic serialization, and loaded-world rejection;
 - rich item/block/entity conversion and query caps;
+- actual-look target-entity identity, interaction-distance limits, conditional living metadata,
+  deterministic serialization, no-target behavior, and menu/multiplayer rejection;
 - vanilla advancement visibility gating, completed/partial criterion progress, hierarchy and
   timestamps, filtering/search, deterministic ordering, truncation, and session rejection;
 - nearby loaded-container ordering, occupancy summaries, full single-position inspection,
@@ -119,15 +121,16 @@ but is not the release proof.
 
 Each normal test launches a temporary client with a final dedicated or universal Thread JAR and a
 separately packaged proof integration/game-test mod. All three loaders compile the same
-loader-neutral parity fixture from `common/src/gametest/java`. It verifies the exact nineteen-tool catalog, config,
+loader-neutral parity fixture from `common/src/gametest/java`. It verifies the exact twenty-tool catalog, config,
 loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
 recipes and crafting, external integration activation, and controlled gameplay rejection at the
 menu.
 
 Launch control remains loader-specific because the APIs are genuinely different: Fabric uses the
 Fabric client game-test context, while NeoForge and Forge use bounded event-driven state machines.
-Fabric also retains richer deterministic payload assertions for inventory, equipment, target blocks, and
-entities; those are provider regression coverage, not a different loader contract.
+Fabric also retains richer deterministic payload assertions for inventory, equipment, target
+blocks, nearby entities, and actual-look target entities with hostile, non-living, tame-owner, and
+villager variants; those are provider regression coverage, not a different loader contract.
 
 The restart test launches that packaged client again from the same instance and proves an existing
 configuration is reloaded, including a changed MCP port. The disabled tests use separate fresh
@@ -173,11 +176,11 @@ Use the release JAR, not a development run, for the final human check:
 
 1. Put the universal release JAR and its loader requirements in a clean Minecraft 26.2 instance.
 2. Launch to the menu and confirm `http://127.0.0.1:25580/mcp` is listening.
-3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm nineteen
+3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm twenty
    read-only `minecraft.*` tools.
 4. Call `minecraft.get_status` in the menu; it must return a controlled unsupported/no-world state.
 5. Load an integrated single-player world and call status, player, world info, inventory, equipment,
-   target, nearby-entity, nearby-container, container-inspection, unified live item search, vanilla
+   target block, target entity, nearby-entity, nearby-container, container-inspection, unified live item search, vanilla
    advancement list/detail, recipe, crafting, registry search, and capability tools.
 6. Confirm tools return detached bounded data, recipes reflect the live world, container searches
    skip unloaded chunks, and no call mutates the game. Confirm crafting with omitted or explicit

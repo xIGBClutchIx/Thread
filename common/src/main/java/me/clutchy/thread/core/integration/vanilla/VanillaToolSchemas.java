@@ -7,6 +7,7 @@ import me.clutchy.thread.core.model.advancement.AdvancementListQuery;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
+import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.serialization.JsonSchema;
 import me.clutchy.thread.core.service.item.ItemFinder;
@@ -126,7 +127,28 @@ final class VanillaToolSchemas {
           property("living", bool()),
           property("health", nullable(number(0.0, null))),
           property("maxHealth", nullable(number(0.0, null))),
-          property("classification", nullableEnumString("HOSTILE", "PASSIVE", "NEUTRAL")));
+          property("classification", nullableEnumString("HOSTILE", "PASSIVE", "NEUTRAL")),
+          property("equipment", boundedArray(EQUIPMENT_SLOT, 0, 6)),
+          property(
+              "activeEffects",
+              boundedArray(
+                  object(
+                      property("effectId", registryId()),
+                      property("displayName", string(1, 256, null)),
+                      property("amplifier", integer(0, 255)),
+                      property("durationTicks", nullable(integer(0, null))),
+                      property("infinite", bool()),
+                      property("ambient", bool()),
+                      property("visible", bool()),
+                      property("showIcon", bool())),
+                  0,
+                  EntityInfo.MAX_ACTIVE_EFFECTS)),
+          property("activeEffectsTruncated", bool()),
+          property("age", nullableEnumString("BABY", "ADULT")),
+          property("tamed", nullable(bool())),
+          property("ownerName", nullable(string(1, 256, null))),
+          property("villagerProfession", nullable(registryId())),
+          property("villagerLevel", nullable(integer(1, 5))));
   private static final JsonObject RECIPE_INGREDIENT =
       object(
           property("itemIds", array(registryId())),
@@ -340,6 +362,7 @@ final class VanillaToolSchemas {
       schema(object(property("advancementId", registryId())));
   static final JsonSchema ADVANCEMENT_INFO = schema(ADVANCEMENT_DETAILS);
   static final JsonSchema TARGET_BLOCK = schema(BLOCK_INFO);
+  static final JsonSchema TARGET_ENTITY = schema(ENTITY_INFO);
   static final JsonSchema NEARBY_CONTAINER_QUERY =
       schema(object(property("radius", number(0.0, null)), property("limit", integer(1, null))));
   static final JsonSchema NEARBY_CONTAINER_RESULT =

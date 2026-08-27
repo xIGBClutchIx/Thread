@@ -21,9 +21,11 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 
 /** End-to-end proof of native gameplay reads and the external-mod integration bridge. */
 @SuppressWarnings("UnstableApiUsage")
@@ -96,10 +98,28 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer.getServer().runCommand("give @a minecraft:oak_log 1");
       singleplayer.getServer().runCommand("give @a minecraft:dirt 1");
       singleplayer.getServer().runCommand("give @a minecraft:coal 2");
-      singleplayer.getServer().runCommand("summon minecraft:minecart 2 100 0");
+      singleplayer.getServer().runCommand("summon minecraft:minecart -2 100 0");
       singleplayer
           .getServer()
-          .runCommand("summon minecraft:zombie 4 100 0 {NoAI:1b,Silent:1b,Invulnerable:1b}");
+          .runCommand(
+              "summon minecraft:zombie 3 100 0 "
+                  + "{NoAI:1b,Silent:1b,Invulnerable:1b,IsBaby:1b,"
+                  + "CustomName:'Thread Target'}");
+      singleplayer
+          .getServer()
+          .runCommand(
+              "item replace entity @e[type=minecraft:zombie,limit=1,sort=nearest] "
+                  + "weapon.mainhand with minecraft:iron_sword");
+      singleplayer
+          .getServer()
+          .runCommand(
+              "item replace entity @e[type=minecraft:zombie,limit=1,sort=nearest] "
+                  + "armor.head with minecraft:iron_helmet");
+      singleplayer
+          .getServer()
+          .runCommand(
+              "effect give @e[type=minecraft:zombie,limit=1,sort=nearest] "
+                  + "minecraft:speed 60 1 true");
       singleplayer.getServer().runCommand("time set day");
       singleplayer.getServer().runCommand("weather clear");
       // Waiting for the command's observable client state keeps this packaged test deterministic
@@ -390,6 +410,8 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       assertTrue(!minecart.get("living").getAsBoolean(), "non-living entity marker");
       assertTrue(minecart.get("health").isJsonNull(), "non-living health absence");
 
+      verifyTargetEntityInspection(context, singleplayer, tools, mcp);
+
       JsonObject containerArguments = new JsonObject();
       containerArguments.addProperty("radius", 16);
       containerArguments.addProperty("limit", 8);
@@ -601,7 +623,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
       JsonObject mcpCapabilities =
           mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
-      assertEquals(19, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+      assertEquals(20, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
       assertEquals(
           2, mcpCapabilities.getAsJsonArray("integrations").size(), "MCP integration count");
       assertTrue(
@@ -670,6 +692,94 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         "native recursive final recipe");
     assertTrue(plan.getAsJsonArray("missingMaterials").isEmpty(), "native plan raw shortages");
     assertTrue(plan.getAsJsonArray("issues").isEmpty(), "native plan safety limits");
+  }
+
+  private static void verifyTargetEntityInspection(
+      ClientGameTestContext context,
+      TestSingleplayerContext singleplayer,
+      ToolRegistry tools,
+      McpHttpServer mcp) {
+    singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 -90 20");
+    context.waitFor(client -> targetsEntity(client, "minecraft:zombie"));
+
+    JsonObject zombie =
+        mcpTool(context, mcp.endpoint(), 52, "minecraft.get_target_entity", new JsonObject());
+    assertEquals("minecraft:zombie", zombie.get("entityType").getAsString(), "target entity ID");
+    assertEquals("Zombie", zombie.get("displayName").getAsString(), "target display name");
+    assertEquals("Thread Target", zombie.get("customName").getAsString(), "target custom name");
+    assertTrue(zombie.get("living").getAsBoolean(), "target living marker");
+    assertTrue(zombie.get("health").getAsDouble() > 0, "target health");
+    assertTrue(
+        zombie.get("maxHealth").getAsDouble() >= zombie.get("health").getAsDouble(),
+        "target max health");
+    assertEquals("HOSTILE", zombie.get("classification").getAsString(), "target classification");
+    assertEquals("BABY", zombie.get("age").getAsString(), "target baby state");
+    assertEquals(
+        "minecraft:iron_sword",
+        entityEquipmentItem(zombie, "MAIN_HAND").get("itemId").getAsString(),
+        "target main-hand equipment");
+    assertEquals(
+        "minecraft:iron_helmet",
+        entityEquipmentItem(zombie, "HEAD").get("itemId").getAsString(),
+        "target armor equipment");
+    JsonObject speed = statusEffect(zombie, "minecraft:speed");
+    assertEquals(1, speed.get("amplifier").getAsInt(), "target effect amplifier");
+    assertTrue(speed.get("durationTicks").getAsInt() > 0, "target effect duration");
+    assertTrue(!zombie.get("activeEffectsTruncated").getAsBoolean(), "target effect completeness");
+    assertTrue(zombie.get("distance").getAsDouble() <= 6, "target distance bound");
+
+    singleplayer.getServer().runCommand("kill @e[type=minecraft:zombie]");
+    singleplayer.getServer().runCommand("tp @a 0.5 100 0.5 90 25");
+    context.waitFor(client -> targetsEntity(client, "minecraft:minecart"));
+    JsonObject minecart = invokeSuccessfully(context, tools, "minecraft.get_target_entity", "{}");
+    assertTrue(!minecart.get("living").getAsBoolean(), "non-living target marker");
+    assertTrue(minecart.get("health").isJsonNull(), "non-living target health absence");
+    assertTrue(minecart.getAsJsonArray("equipment").isEmpty(), "non-living target equipment");
+    assertTrue(minecart.getAsJsonArray("activeEffects").isEmpty(), "non-living target effects");
+    assertTrue(minecart.get("age").isJsonNull(), "non-living target age absence");
+
+    singleplayer.getServer().runCommand("kill @e[type=minecraft:minecart]");
+    singleplayer
+        .getServer()
+        .runCommand("summon minecraft:wolf -2 100 0 " + "{NoAI:1b,Silent:1b,Invulnerable:1b}");
+    singleplayer
+        .getServer()
+        .runCommand(
+            "data modify entity @e[type=minecraft:wolf,limit=1,sort=nearest] "
+                + "Owner set from entity @a[limit=1] UUID");
+    context.waitFor(client -> targetsEntity(client, "minecraft:wolf"));
+    JsonObject wolf = invokeSuccessfully(context, tools, "minecraft.get_target_entity", "{}");
+    assertEquals("NEUTRAL", wolf.get("classification").getAsString(), "tame target classification");
+    assertEquals("ADULT", wolf.get("age").getAsString(), "tame target adult state");
+    assertTrue(wolf.get("tamed").getAsBoolean(), "tame target state");
+    assertTrue(!wolf.get("ownerName").getAsString().isBlank(), "tame target owner name");
+
+    singleplayer.getServer().runCommand("kill @e[type=minecraft:wolf]");
+    singleplayer
+        .getServer()
+        .runCommand(
+            "summon minecraft:villager -2 100 0 "
+                + "{NoAI:1b,Silent:1b,Invulnerable:1b,VillagerData:"
+                + "{type:\"minecraft:plains\",profession:\"minecraft:librarian\",level:3}}");
+    context.waitFor(client -> targetsEntity(client, "minecraft:villager"));
+    JsonObject villager = invokeSuccessfully(context, tools, "minecraft.get_target_entity", "{}");
+    assertEquals(
+        "PASSIVE", villager.get("classification").getAsString(), "villager classification");
+    assertEquals(
+        "minecraft:librarian",
+        villager.get("villagerProfession").getAsString(),
+        "villager profession");
+    assertEquals(3, villager.get("villagerLevel").getAsInt(), "villager level");
+
+    singleplayer.getServer().runCommand("kill @e[type=minecraft:villager]");
+    context.waitFor(client -> !(client.hitResult instanceof EntityHitResult));
+    ToolResult<JsonElement> noTarget = invoke(context, tools, "minecraft.get_target_entity", "{}");
+    assertTrue(!noTarget.successful(), "no-target entity error");
+    assertEquals("NOT_FOUND", noTarget.error().code().name(), "no-target entity code");
+    assertEquals(
+        "The player is not currently targeting a valid entity.",
+        noTarget.error().message(),
+        "no-target entity message");
   }
 
   private static void verifyWorldEnvironmentTransitions(
@@ -791,6 +901,14 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         && blockHit.getBlockPos().equals(new BlockPos(0, 101, 3));
   }
 
+  private static boolean targetsEntity(Minecraft client, String entityType) {
+    return client.hitResult instanceof EntityHitResult entityHit
+        && BuiltInRegistries.ENTITY_TYPE
+            .getKey(entityHit.getEntity().getType())
+            .toString()
+            .equals(entityType);
+  }
+
   private static JsonObject equipmentSlot(JsonObject equipment, String slot) {
     return equipment.getAsJsonArray("slots").asList().stream()
         .map(JsonElement::getAsJsonObject)
@@ -801,6 +919,23 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
   private static JsonObject equipmentItem(JsonObject equipment, String slot) {
     return equipmentSlot(equipment, slot).getAsJsonObject("item");
+  }
+
+  private static JsonObject entityEquipmentItem(JsonObject entity, String slot) {
+    return entity.getAsJsonArray("equipment").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("slot").getAsString().equals(slot))
+        .findFirst()
+        .orElseThrow()
+        .getAsJsonObject("item");
+  }
+
+  private static JsonObject statusEffect(JsonObject entity, String effectId) {
+    return entity.getAsJsonArray("activeEffects").asList().stream()
+        .map(JsonElement::getAsJsonObject)
+        .filter(candidate -> candidate.get("effectId").getAsString().equals(effectId))
+        .findFirst()
+        .orElseThrow();
   }
 
   private static JsonObject blockEntityItem(JsonObject blockEntity, String slot) {

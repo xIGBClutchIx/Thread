@@ -53,7 +53,9 @@ project toolchain.
   difficulty/hardcore, day/time, daylight, weather, local light, moon phase, and native biome
   climate values
 - block currently targeted by the player
-- nearby loaded entities within a bounded radius
+- entity currently targeted by the player's normal client crosshair, resolved from authoritative
+  loaded server state with bounded living metadata
+- nearby loaded entities within a bounded radius, using the same entity shape
 - nearby container discovery and individual loaded-container inspection within a stricter bounded
   radius, including common vanilla storage and processing block entities
 - live native recipe lookup, including datapack and installed-mod changes
@@ -136,6 +138,7 @@ From a clean install, an MCP client can discover Thread and correctly answer eac
 14. "Which vanilla advancements have I completed, and what criteria remain for one of them?"
 15. "What biome and dimension am I in, how far am I from world spawn, and what are the current
     time, weather, light, difficulty, and hardcore state?"
+16. "What entity am I looking at, what is it carrying, and what useful vanilla state does it have?"
 
 For #9, Thread performs a deterministic comparison and reports each recipe variant independently
 with required, allocated, missing, and live-source counts. For #10, Thread recursively plans

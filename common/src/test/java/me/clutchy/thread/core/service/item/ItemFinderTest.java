@@ -27,6 +27,7 @@ import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
@@ -226,6 +227,11 @@ class ItemFinderTest {
       }
 
       @Override
+      public ToolResult<Optional<EntityInfo>> targetEntity() {
+        throw new AssertionError("target entity was not expected");
+      }
+
+      @Override
       public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
         throw new AssertionError("nearby entities were not expected");
       }
@@ -255,6 +261,11 @@ class ItemFinderTest {
     return new WorldProvider() {
       @Override
       public ToolResult<WorldInfo> worldInfo() {
+        return ToolResult.failure(error);
+      }
+
+      @Override
+      public ToolResult<Optional<EntityInfo>> targetEntity() {
         return ToolResult.failure(error);
       }
 
