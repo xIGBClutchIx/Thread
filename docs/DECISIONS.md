@@ -85,6 +85,20 @@ dimension; it is `null` across dimensions. Minecraft 26.2 does not expose biome 
 clean public API, so Thread does not reflect into private climate data or invent a downfall value.
 The tool never loads chunks, predicts weather, or changes time/weather/world state.
 
+## Player context is focused and server-authoritative
+
+`minecraft.get_player` captures the integrated server plus local player identity behind the shared
+session guard, then resolves the matching `ServerPlayer` and maps one detached snapshot on the
+server thread. This avoids mixing delayed client mirrors with authoritative vitals, effects,
+movement, vehicle, respawn, game-mode, and hardcore state.
+
+The response groups armor, air, movement, and conditions rather than exposing raw attributes or
+internal player data. Active effects reuse `StatusEffectInfo`, sort by registry ID, and stop at 64.
+Vehicle data is only a compact type/name summary, and player-specific respawn is explicitly null when
+Minecraft will fall back to world spawn. Position/dimension and hardcore intentionally overlap
+`minecraft.get_world_info` to keep both snapshots usable independently; full equipment stacks remain
+exclusive to `minecraft.get_equipment`.
+
 ## Target entities reuse the bounded entity contract
 
 `minecraft.get_target_entity` accepts no search arguments and inspects only Minecraft's current

@@ -238,11 +238,64 @@ Example result:
   "experienceProgress": 0.42,
   "position": {"x": 152.2, "y": 67.0, "z": -381.7},
   "dimension": "minecraft:overworld",
-  "gameMode": "survival"
+  "gameMode": "survival",
+  "hardcore": false,
+  "armor": {"value": 10, "toughness": 2.0},
+  "air": {"current": 280, "maximum": 300},
+  "activeEffects": [
+    {
+      "effectId": "minecraft:speed",
+      "displayName": "Speed",
+      "amplifier": 1,
+      "durationTicks": 1200,
+      "infinite": false,
+      "ambient": false,
+      "visible": true,
+      "showIcon": true
+    }
+  ],
+  "activeEffectsTruncated": false,
+  "movement": {
+    "sprinting": true,
+    "swimming": false,
+    "crouching": false,
+    "flying": false,
+    "onGround": true,
+    "fallDistance": 0.0
+  },
+  "conditions": {
+    "sleeping": false,
+    "onFire": false,
+    "freezing": false,
+    "fullyFrozen": false
+  },
+  "selectedHotbarSlot": 2,
+  "attackCooldown": 1.0,
+  "vehicle": null,
+  "respawn": {
+    "dimension": "minecraft:overworld",
+    "position": {"x": 100, "y": 64, "z": -200},
+    "forced": false
+  }
 }
 ```
 
-Do not include identity/account identifiers unless a future use case explicitly requires them.
+The provider reads one authoritative integrated-server player snapshot after the centralized session
+guard. `gameMode` is one of `survival`, `creative`, `adventure`, or `spectator`; `hardcore` is the
+save's independent native flag and intentionally overlaps `minecraft.get_world_info`. Position and
+dimension also overlap world context so both tools remain self-contained.
+
+`activeEffects` uses the shared status-effect shape, sorts by canonical registry ID, contains at most
+64 entries, and reports omission through `activeEffectsTruncated`. Air may become negative during
+drowning. `flying` is the player's current abilities flight flag, not Elytra use. `attackCooldown` is
+Minecraft's current attack-strength scale from 0 through 1.
+
+`vehicle` is null when the player is not riding and otherwise exposes only type/display/custom name.
+`respawn` is the player's configured respawn point and is null when Minecraft will fall back to world
+spawn. Its `forced` field preserves Minecraft's native forced-spawn setting. Detailed armor/hand item
+stacks remain in `minecraft.get_equipment`; this response exposes only aggregate armor values. Do not
+include identity/account identifiers, raw attributes, arbitrary NBT/components, or a full vehicle
+entity dump unless a future use case explicitly requires them.
 
 ## `minecraft.get_world_info`
 

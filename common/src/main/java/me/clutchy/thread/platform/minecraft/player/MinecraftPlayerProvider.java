@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.model.player.EquipmentPosition;
@@ -14,6 +15,8 @@ import me.clutchy.thread.core.model.player.InventorySlotInfo;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
 import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.world.BlockInfo;
+import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.StatusEffectInfo;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -29,7 +32,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.level.Level;
@@ -67,7 +73,17 @@ public final class MinecraftPlayerProvider implements PlayerProvider {
 
   @Override
   public ToolResult<PlayerStatus> status() {
-    return MinecraftProviderSupport.read(clientThread, "player.status", this::readStatus);
+    ToolResult<PlayerStatusContext> captured =
+        MinecraftProviderSupport.read(
+            clientThread, "player.status.capture", this::captureStatusContext);
+    if (!captured.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(captured.error()));
+    }
+    PlayerStatusContext context = Objects.requireNonNull(captured.value());
+    GameThreadExecutor serverThread =
+        MinecraftThreadExecutor.forServer(context.server(), gameThreadTimeout);
+    return MinecraftProviderSupport.read(
+        serverThread, "player.status.read", () -> readStatus(context));
   }
 
   @Override
@@ -99,13 +115,29 @@ public final class MinecraftPlayerProvider implements PlayerProvider {
         serverThread, "player.target_block.inspect", () -> inspectTargetBlock(context));
   }
 
-  private ToolResult<PlayerStatus> readStatus() {
+  private ToolResult<PlayerStatusContext> captureStatusContext() {
     Optional<ToolError> unavailable = sessionGuard.gameplayUnavailable(client);
     if (unavailable.isPresent()) {
       return ToolResult.failure(unavailable.orElseThrow());
     }
-    LocalPlayer player = client.player;
+    return ToolResult.success(
+        new PlayerStatusContext(
+            Objects.requireNonNull(client.getSingleplayerServer()), client.player.getUUID()));
+  }
+
+  private ToolResult<PlayerStatus> readStatus(PlayerStatusContext context) {
+    ServerPlayer player = context.server().getPlayerList().getPlayer(context.playerId());
+    if (player == null) {
+      return ToolResult.failure(
+          ToolError.of(
+              ToolErrorCode.PLAYER_NOT_AVAILABLE,
+              "The local player is no longer available.",
+              true));
+    }
     FoodData food = player.getFoodData();
+    List<StatusEffectInfo> activeEffects = mapper.activeEffects(player);
+    Entity vehicle = player.getVehicle();
+    ServerPlayer.RespawnConfig respawnConfig = player.getRespawnConfig();
     return ToolResult.success(
         new PlayerStatus(
             player.getHealth(),
@@ -116,7 +148,37 @@ public final class MinecraftPlayerProvider implements PlayerProvider {
             player.experienceProgress,
             mapper.position(player),
             player.level().dimension().identifier().toString(),
-            player.gameMode().getName()));
+            player.gameMode().getName(),
+            player.level().getLevelData().isHardcore(),
+            new PlayerStatus.Armor(
+                player.getArmorValue(), player.getAttributeValue(Attributes.ARMOR_TOUGHNESS)),
+            new PlayerStatus.Air(player.getAirSupply(), player.getMaxAirSupply()),
+            activeEffects.stream().limit(PlayerStatus.MAX_ACTIVE_EFFECTS).toList(),
+            activeEffects.size() > PlayerStatus.MAX_ACTIVE_EFFECTS,
+            new PlayerStatus.Movement(
+                player.isSprinting(),
+                player.isSwimming(),
+                player.isCrouching(),
+                player.getAbilities().flying,
+                player.onGround(),
+                player.fallDistance),
+            new PlayerStatus.Conditions(
+                player.isSleeping(),
+                player.isOnFire(),
+                player.isFreezing(),
+                player.isFullyFrozen()),
+            player.getInventory().getSelectedSlot(),
+            Math.max(0D, Math.min(1D, player.getAttackStrengthScale(0F))),
+            vehicle == null ? null : mapper.vehicle(vehicle),
+            respawnConfig == null
+                ? null
+                : new PlayerStatus.Respawn(
+                    respawnConfig.respawnData().dimension().identifier().toString(),
+                    new BlockPosition(
+                        respawnConfig.respawnData().pos().getX(),
+                        respawnConfig.respawnData().pos().getY(),
+                        respawnConfig.respawnData().pos().getZ()),
+                    respawnConfig.forced())));
   }
 
   private ToolResult<InventorySnapshot> readInventory() {
@@ -210,4 +272,6 @@ public final class MinecraftPlayerProvider implements PlayerProvider {
 
   private record TargetBlockContext(
       MinecraftServer server, ResourceKey<Level> dimension, BlockPos position, double distance) {}
+
+  private record PlayerStatusContext(MinecraftServer server, UUID playerId) {}
 }

@@ -153,10 +153,10 @@ shared session guard and reject menus, loading states, missing players, and mult
 exposing game state.
 
 Client-owned reads run on the Minecraft client thread. Integrated-server-owned reads, including
-live recipes, advancement progress, world/environment context, block entities, and nearby container
-scans, run on the integrated-server thread. Advancement reads first capture the client advancement
-tree on the client thread so only entries Minecraft has exposed as visible/known are eligible, then map their
-authoritative server-player progress into detached DTOs. Dispatch has a configured deadline;
+player status, live recipes, advancement progress, world/environment context, block entities, and
+nearby container scans, run on the integrated-server thread. Advancement reads first capture the
+client advancement tree on the client thread so only entries Minecraft has exposed as visible/known
+are eligible, then map their authoritative server-player progress into detached DTOs. Dispatch has a configured deadline;
 timeout and lifecycle rejection become structured retryable errors. A request may fail safely if
 the world unloads while it is waiting.
 
@@ -183,6 +183,12 @@ environment tools. It resolves the authoritative integrated-server player and al
 chunk before reading dimension, biome, global spawn, difficulty/hardcore, clocks, weather, light,
 moon phase, and native biome climate values. Cross-dimension spawn distance is explicitly absent,
 and the provider never loads a chunk or mutates time/weather to complete the snapshot.
+
+`minecraft.get_player` similarly resolves the authoritative integrated-server player before mapping
+one bounded `PlayerStatus`. It reuses `StatusEffectInfo` and compact world model types, groups related
+armor, air, movement, and condition values, and avoids raw attributes, NBT, identity, or full vehicle
+entity dumps. Position/dimension and hardcore intentionally overlap world context, while detailed
+equipment stays in `minecraft.get_equipment`.
 
 `CraftingService` uses maximum-flow allocation so overlapping alternatives cannot spend the same
 item twice. `CraftingPlanner` uses one item/surplus ledger, active-path cycle detection,

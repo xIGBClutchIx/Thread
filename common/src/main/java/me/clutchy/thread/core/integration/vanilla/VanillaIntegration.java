@@ -163,9 +163,10 @@ public final class VanillaIntegration implements ThreadIntegration {
   private GameTool<EmptyInput, PlayerStatus> getPlayer() {
     return tool(
         "minecraft.get_player",
-        "Returns the local player's live health, hunger, experience, position, dimension, and "
-            + "game mode. Use this only when the answer depends on current supported single-player "
-            + "state.",
+        "Returns the local player's authoritative live vitals, armor, air, effects, movement and "
+            + "condition flags, hotbar/cooldown state, position, dimension, game mode, and "
+            + "hardcore state, plus conditional vehicle and respawn context. Use this when an "
+            + "answer depends on the current supported single-player state.",
         emptyInputCodec(),
         JsonCodec.of(PlayerStatus.class, VanillaToolSchemas.PLAYER_STATUS),
         ToolCapabilities.supportedSingleplayer(),

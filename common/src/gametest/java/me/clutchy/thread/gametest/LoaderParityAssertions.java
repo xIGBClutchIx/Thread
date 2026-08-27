@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import me.clutchy.thread.config.ThreadConfig;
@@ -211,7 +212,7 @@ public final class LoaderParityAssertions {
     assertEquals("SINGLEPLAYER", status.get("state").getAsString(), "single-player state");
     assertTrue(status.get("supported").getAsBoolean(), "single-player support");
     JsonObject player = invoke(tools, "minecraft.get_player", "{}");
-    assertEquals("minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
+    verifyPlayerStatus(player);
     JsonObject worldInfo = invoke(tools, "minecraft.get_world_info", "{}");
     verifyWorldInfo(worldInfo, player);
     verifyOptionalTargetEntity(invokeResult(tools, "minecraft.get_target_entity", "{}"));
@@ -367,7 +368,7 @@ public final class LoaderParityAssertions {
         "SINGLEPLAYER",
         mcpTool(endpoint, 20, "minecraft.get_status", new JsonObject()).get("state").getAsString(),
         "MCP world status");
-    mcpTool(endpoint, 21, "minecraft.get_player", new JsonObject());
+    verifyPlayerStatus(mcpTool(endpoint, 21, "minecraft.get_player", new JsonObject()));
     JsonObject recipeArguments = new JsonObject();
     recipeArguments.addProperty("itemId", "minecraft:command_block");
     assertEquals(
@@ -616,6 +617,61 @@ public final class LoaderParityAssertions {
     assertTrue(!world.get("moonPhase").getAsString().isBlank(), "moon phase");
     assertTrue(Double.isFinite(world.get("biomeTemperature").getAsDouble()), "biome temperature");
     assertTrue(world.get("biomeHasPrecipitation").isJsonPrimitive(), "biome precipitation flag");
+  }
+
+  private static void verifyPlayerStatus(JsonObject player) {
+    assertEquals("minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
+    assertTrue(
+        Set.of("survival", "creative", "adventure", "spectator")
+            .contains(player.get("gameMode").getAsString()),
+        "player game mode");
+    assertTrue(player.get("hardcore").isJsonPrimitive(), "player hardcore flag");
+    assertTrue(player.get("health").getAsDouble() >= 0, "player health");
+    assertTrue(
+        player.get("health").getAsDouble() <= player.get("maxHealth").getAsDouble(),
+        "player health bound");
+    JsonObject armor = player.getAsJsonObject("armor");
+    assertTrue(armor.get("value").getAsInt() >= 0, "player armor value");
+    assertTrue(armor.get("toughness").getAsDouble() >= 0, "player armor toughness");
+    JsonObject air = player.getAsJsonObject("air");
+    assertTrue(air.get("maximum").getAsInt() > 0, "player maximum air");
+    assertTrue(player.getAsJsonArray("activeEffects").size() <= 64, "player active-effect bound");
+    String previousEffectId = null;
+    for (JsonElement element : player.getAsJsonArray("activeEffects")) {
+      JsonObject effect = element.getAsJsonObject();
+      String effectId = effect.get("effectId").getAsString();
+      if (previousEffectId != null) {
+        assertTrue(previousEffectId.compareTo(effectId) <= 0, "player active-effect ordering");
+      }
+      assertTrue(effect.has("durationTicks"), "player effect duration absence is explicit");
+      previousEffectId = effectId;
+    }
+    assertTrue(player.get("activeEffectsTruncated").isJsonPrimitive(), "effect truncation flag");
+    JsonObject movement = player.getAsJsonObject("movement");
+    for (String field : List.of("sprinting", "swimming", "crouching", "flying", "onGround")) {
+      assertTrue(movement.get(field).isJsonPrimitive(), "player movement field " + field);
+    }
+    assertTrue(movement.get("fallDistance").getAsDouble() >= 0, "player fall distance");
+    JsonObject conditions = player.getAsJsonObject("conditions");
+    for (String field : List.of("sleeping", "onFire", "freezing", "fullyFrozen")) {
+      assertTrue(conditions.get(field).isJsonPrimitive(), "player condition field " + field);
+    }
+    int selectedSlot = player.get("selectedHotbarSlot").getAsInt();
+    assertTrue(selectedSlot >= 0 && selectedSlot <= 8, "selected hotbar slot");
+    double attackCooldown = player.get("attackCooldown").getAsDouble();
+    assertTrue(attackCooldown >= 0 && attackCooldown <= 1, "attack cooldown range");
+    if (!player.get("vehicle").isJsonNull()) {
+      JsonObject vehicle = player.getAsJsonObject("vehicle");
+      assertTrue(vehicle.get("entityType").getAsString().contains(":"), "vehicle identity");
+      assertTrue(!vehicle.get("displayName").getAsString().isBlank(), "vehicle display name");
+      assertTrue(vehicle.has("customName"), "vehicle custom-name absence is explicit");
+    }
+    if (!player.get("respawn").isJsonNull()) {
+      JsonObject respawn = player.getAsJsonObject("respawn");
+      assertTrue(respawn.get("dimension").getAsString().contains(":"), "respawn dimension");
+      assertTrue(respawn.get("position").isJsonObject(), "respawn position");
+      assertTrue(respawn.get("forced").isJsonPrimitive(), "respawn forced flag");
+    }
   }
 
   private static void verifyOptionalTargetEntity(ToolResult<JsonElement> result) {

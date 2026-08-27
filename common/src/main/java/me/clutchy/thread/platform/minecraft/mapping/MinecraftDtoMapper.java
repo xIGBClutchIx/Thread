@@ -9,6 +9,7 @@ import me.clutchy.thread.core.model.item.ItemEnchantmentInfo;
 import me.clutchy.thread.core.model.item.ItemStackInfo;
 import me.clutchy.thread.core.model.player.EquipmentPosition;
 import me.clutchy.thread.core.model.player.EquipmentSlotInfo;
+import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
@@ -75,6 +76,14 @@ public final class MinecraftDtoMapper {
   /** Converts an entity's current continuous position. */
   public Position position(Entity entity) {
     return new Position(entity.getX(), entity.getY(), entity.getZ());
+  }
+
+  /** Converts one direct vehicle without expanding it into a full entity inspection payload. */
+  public PlayerStatus.Vehicle vehicle(Entity entity) {
+    return new PlayerStatus.Vehicle(
+        BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString(),
+        plainText(entity.getType().getDescription()),
+        entity.getCustomName() == null ? null : plainText(entity.getCustomName()));
   }
 
   /** Converts a loaded block and optional selected block-entity state into a detached snapshot. */
@@ -157,7 +166,8 @@ public final class MinecraftDtoMapper {
     return stack.isEmpty() ? null : new EquipmentSlotInfo(position, itemStack(stack));
   }
 
-  private static List<StatusEffectInfo> activeEffects(LivingEntity entity) {
+  /** Converts active effects into stable registry-ID order for shared entity/player payloads. */
+  public List<StatusEffectInfo> activeEffects(LivingEntity entity) {
     return entity.getActiveEffects().stream()
         .filter(effect -> effect.getEffect().unwrapKey().isPresent())
         .sorted(

@@ -23,6 +23,7 @@ import me.clutchy.thread.core.model.player.EquipmentSlotInfo;
 import me.clutchy.thread.core.model.player.EquipmentSnapshot;
 import me.clutchy.thread.core.model.player.InventorySlotInfo;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
@@ -172,6 +173,32 @@ class CoreModelTest {
   }
 
   @Test
+  void playerStatusKeepsRichStateBoundedAndDeterministic() {
+    StatusEffectInfo speed =
+        new StatusEffectInfo("minecraft:speed", "Speed", 1, 200, false, false, true, true);
+    StatusEffectInfo regeneration =
+        new StatusEffectInfo(
+            "minecraft:regeneration", "Regeneration", 0, 100, false, false, true, true);
+
+    PlayerStatus status = playerStatus(List.of(speed, regeneration), 2, 0.75);
+
+    assertEquals(
+        List.of("minecraft:regeneration", "minecraft:speed"),
+        status.activeEffects().stream().map(StatusEffectInfo::effectId).toList());
+    assertTrue(status.hardcore());
+    assertEquals(10, status.armor().value());
+    assertEquals(300, status.air().maximum());
+    assertEquals("minecraft:minecart", status.vehicle().entityType());
+    assertEquals(new BlockPosition(10, 64, 20), status.respawn().position());
+    assertThrows(
+        IllegalArgumentException.class, () -> playerStatus(List.of(speed, speed), 2, 0.75));
+    assertThrows(IllegalArgumentException.class, () -> playerStatus(List.of(), 9, 0.75));
+    assertThrows(IllegalArgumentException.class, () -> playerStatus(List.of(), 2, 1.01));
+    assertThrows(IllegalArgumentException.class, () -> new PlayerStatus.Armor(-1, 0));
+    assertThrows(IllegalArgumentException.class, () -> new PlayerStatus.Air(0, 0));
+  }
+
+  @Test
   void blockEntitySnapshotsEnforceThePayloadItemCap() {
     ItemStackInfo stone = item("minecraft:stone", "Stone", 1, 64);
     List<BlockEntityItemInfo> items =
@@ -292,6 +319,31 @@ class CoreModelTest {
 
   private static ItemStackInfo item(String itemId, String displayName, int count, int maxCount) {
     return new ItemStackInfo(itemId, displayName, null, count, maxCount, null, List.of(), null);
+  }
+
+  private static PlayerStatus playerStatus(
+      List<StatusEffectInfo> activeEffects, int selectedHotbarSlot, double attackCooldown) {
+    return new PlayerStatus(
+        18,
+        20,
+        14,
+        3.5,
+        21,
+        0.42,
+        new Position(1, 64, 2),
+        "minecraft:overworld",
+        "survival",
+        true,
+        new PlayerStatus.Armor(10, 2),
+        new PlayerStatus.Air(280, 300),
+        activeEffects,
+        false,
+        new PlayerStatus.Movement(true, false, true, false, false, 3.25),
+        new PlayerStatus.Conditions(false, true, false, false),
+        selectedHotbarSlot,
+        attackCooldown,
+        new PlayerStatus.Vehicle("minecraft:minecart", "Minecart", null),
+        new PlayerStatus.Respawn("minecraft:overworld", new BlockPosition(10, 64, 20), false));
   }
 
   private static EquipmentSnapshot equipmentWithMainHand(ItemStackInfo mainHand) {

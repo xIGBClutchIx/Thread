@@ -19,8 +19,11 @@ public record InventorySnapshot(int selectedHotbarSlot, List<InventorySlotInfo> 
   /** Number of main inventory positions exposed by the V1 player inventory contract. */
   public static final int MAIN_SLOT_COUNT = 36;
 
+  /** Number of selectable hotbar positions. */
+  public static final int HOTBAR_SLOT_COUNT = 9;
+
   public InventorySnapshot {
-    if (selectedHotbarSlot < 0 || selectedHotbarSlot > 8) {
+    if (selectedHotbarSlot < 0 || selectedHotbarSlot >= HOTBAR_SLOT_COUNT) {
       throw new IllegalArgumentException("selectedHotbarSlot must be between 0 and 8");
     }
     slots =

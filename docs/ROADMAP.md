@@ -23,9 +23,9 @@ bounded DTOs, and preserve native fallback behavior. Do not add an integration t
 
 ## Better player context
 
-Add a tool only when it answers a distinct question better than the existing twenty tools; avoid
-large background snapshots or generic world scanning. Prefer focused, conditional metadata over
-expanding every response into a large entity or world dump.
+Keep `minecraft.get_player` focused after its V1 enrichment. Add another tool only when it answers a
+distinct question better than the existing twenty tools; avoid large background snapshots or generic
+world scanning. Prefer focused, conditional metadata over raw attributes, NBT, or full entity dumps.
 
 ## Future product phases
 

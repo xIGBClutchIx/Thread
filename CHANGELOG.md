@@ -39,6 +39,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Changed
 
+- Expanded `minecraft.get_player` with authoritative armor/air, bounded active effects, movement and
+  condition flags, selected hotbar/attack cooldown, game mode/hardcore, and conditional vehicle and
+  respawn context while retaining a focused read-only payload.
 - Consolidated loader-neutral config, startup, MCP, logging, and shutdown behavior in the shared
   runtime, with one packaged parity contract exercised by Fabric, NeoForge, and Forge.
 - Split the project into `:common`, `:fabric`, `:neoforge`, and `:forge`, moved loader-neutral Minecraft

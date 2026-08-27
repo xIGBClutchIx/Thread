@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -22,6 +23,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.BlockHitResult;
@@ -98,7 +100,11 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer.getServer().runCommand("give @a minecraft:oak_log 1");
       singleplayer.getServer().runCommand("give @a minecraft:dirt 1");
       singleplayer.getServer().runCommand("give @a minecraft:coal 2");
-      singleplayer.getServer().runCommand("summon minecraft:minecart -2 100 0");
+      singleplayer.getServer().runCommand("effect give @a minecraft:speed 60 1 true");
+      singleplayer.getServer().runCommand("spawnpoint @a 1 100 1");
+      singleplayer
+          .getServer()
+          .runCommand("summon minecraft:minecart -2 100 0 {CustomName:'Thread Ride'}");
       singleplayer
           .getServer()
           .runCommand(
@@ -162,6 +168,8 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       JsonObject player = invokeSuccessfully(context, tools, "minecraft.get_player", "{}");
       assertEquals(
           "minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
+      verifyRichPlayerStatus(player);
+      verifyPlayerStateTransitions(context, singleplayer, tools);
 
       JsonObject recipes =
           invokeSuccessfully(
@@ -692,6 +700,98 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         "native recursive final recipe");
     assertTrue(plan.getAsJsonArray("missingMaterials").isEmpty(), "native plan raw shortages");
     assertTrue(plan.getAsJsonArray("issues").isEmpty(), "native plan safety limits");
+  }
+
+  private static void verifyRichPlayerStatus(JsonObject player) {
+    assertEquals("survival", player.get("gameMode").getAsString(), "player game mode");
+    assertTrue(!player.get("hardcore").getAsBoolean(), "non-hardcore test world");
+    assertTrue(player.getAsJsonObject("armor").get("value").getAsInt() > 0, "equipped armor value");
+    assertTrue(
+        player.getAsJsonObject("armor").get("toughness").getAsDouble() > 0,
+        "equipped armor toughness");
+    assertEquals(300, player.getAsJsonObject("air").get("current").getAsInt(), "current air");
+    assertEquals(300, player.getAsJsonObject("air").get("maximum").getAsInt(), "maximum air");
+    JsonObject speed = statusEffect(player, "minecraft:speed");
+    assertEquals(1, speed.get("amplifier").getAsInt(), "player speed amplifier");
+    assertTrue(speed.get("durationTicks").getAsInt() > 0, "player effect duration");
+    assertTrue(!player.get("activeEffectsTruncated").getAsBoolean(), "player effects fit bound");
+    assertEquals(0, player.get("selectedHotbarSlot").getAsInt(), "selected hotbar slot");
+    assertTrue(
+        player.get("attackCooldown").getAsDouble() >= 0
+            && player.get("attackCooldown").getAsDouble() <= 1,
+        "player attack cooldown");
+    assertTrue(player.get("vehicle").isJsonNull(), "initial vehicle absence");
+    JsonObject respawn = player.getAsJsonObject("respawn");
+    assertEquals(
+        "minecraft:overworld", respawn.get("dimension").getAsString(), "respawn dimension");
+    assertEquals(1, respawn.getAsJsonObject("position").get("x").getAsInt(), "respawn x");
+    assertEquals(100, respawn.getAsJsonObject("position").get("y").getAsInt(), "respawn y");
+    assertEquals(1, respawn.getAsJsonObject("position").get("z").getAsInt(), "respawn z");
+    assertTrue(respawn.get("forced").getAsBoolean(), "forced respawn point");
+  }
+
+  private static void verifyPlayerStateTransitions(
+      ClientGameTestContext context, TestSingleplayerContext singleplayer, ToolRegistry tools) {
+    singleplayer.getServer().runCommand("time set night");
+    runOnServerAndWait(
+        context,
+        singleplayer,
+        server -> {
+          var player = server.getPlayerList().getPlayers().getFirst();
+          player.setSprinting(true);
+          player.getAbilities().flying = true;
+          player.onUpdateAbilities();
+        });
+    JsonObject transientState = invokeSuccessfully(context, tools, "minecraft.get_player", "{}");
+    JsonObject movement = transientState.getAsJsonObject("movement");
+    JsonObject conditions = transientState.getAsJsonObject("conditions");
+    assertTrue(movement.get("sprinting").getAsBoolean(), "sprinting state");
+    assertTrue(movement.get("flying").getAsBoolean(), "flying state");
+    assertTrue(!conditions.get("sleeping").getAsBoolean(), "awake state");
+    assertTrue(!conditions.get("onFire").getAsBoolean(), "normal fire state");
+    assertTrue(!conditions.get("fullyFrozen").getAsBoolean(), "normal frozen state");
+
+    runOnServerAndWait(
+        context,
+        singleplayer,
+        server -> {
+          var player = server.getPlayerList().getPlayers().getFirst();
+          player.setSprinting(false);
+          player.getAbilities().flying = false;
+          player.onUpdateAbilities();
+        });
+    singleplayer
+        .getServer()
+        .runCommand("ride @a[limit=1] mount @e[type=minecraft:minecart,limit=1,sort=nearest]");
+    context.waitFor(client -> client.player != null && client.player.getVehicle() != null);
+    JsonObject riding = invokeSuccessfully(context, tools, "minecraft.get_player", "{}");
+    JsonObject vehicle = riding.getAsJsonObject("vehicle");
+    assertEquals("minecraft:minecart", vehicle.get("entityType").getAsString(), "vehicle type");
+    assertEquals("Thread Ride", vehicle.get("customName").getAsString(), "vehicle custom name");
+    singleplayer.getServer().runCommand("ride @a[limit=1] dismount");
+    context.waitFor(client -> client.player != null && client.player.getVehicle() == null);
+    singleplayer.getServer().runCommand("tp @a[limit=1] 0.5 100 0.5 0 0");
+    context.waitFor(FabricProviderClientGameTest::targetsKnownFurnace);
+  }
+
+  private static void runOnServerAndWait(
+      ClientGameTestContext context,
+      TestSingleplayerContext singleplayer,
+      Consumer<MinecraftServer> action) {
+    CompletableFuture<Void> completed = new CompletableFuture<>();
+    singleplayer
+        .getServer()
+        .runOnServer(
+            server -> {
+              try {
+                action.accept(server);
+                completed.complete(null);
+              } catch (RuntimeException exception) {
+                completed.completeExceptionally(exception);
+              }
+            });
+    context.waitFor(client -> completed.isDone());
+    completed.join();
   }
 
   private static void verifyTargetEntityInspection(

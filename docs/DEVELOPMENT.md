@@ -63,6 +63,8 @@ Important regression areas include:
 
 - success/error schema validation and deterministic discovery;
 - all session states and multiplayer rejection;
+- authoritative player vitals, game mode/hardcore, armor/air, bounded effects, movement and
+  conditions, hotbar/cooldown, optional vehicle/respawn context, and deterministic serialization;
 - world/environment identity, spawn-distance semantics, difficulty/hardcore, day/night and weather
   transitions, light/moon/climate fields, deterministic serialization, and loaded-world rejection;
 - rich item/block/entity conversion and query caps;
@@ -128,9 +130,10 @@ menu.
 
 Launch control remains loader-specific because the APIs are genuinely different: Fabric uses the
 Fabric client game-test context, while NeoForge and Forge use bounded event-driven state machines.
-Fabric also retains richer deterministic payload assertions for inventory, equipment, target
-blocks, nearby entities, and actual-look target entities with hostile, non-living, tame-owner, and
-villager variants; those are provider regression coverage, not a different loader contract.
+Fabric also retains richer deterministic payload assertions for player-state transitions, inventory,
+equipment, target blocks, nearby entities, and actual-look target entities with hostile,
+non-living, tame-owner, and villager variants; those are provider regression coverage, not a
+different loader contract.
 
 The restart test launches that packaged client again from the same instance and proves an existing
 configuration is reloaded, including a changed MCP port. The disabled tests use separate fresh

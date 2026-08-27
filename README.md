@@ -11,7 +11,8 @@ Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fab
 Twenty `minecraft.*` tools cover:
 
 - session status and game versions;
-- player health, hunger, experience, position, dimension, and game mode;
+- authoritative player vitals, armor/air, effects, movement and condition flags, hotbar/cooldown,
+  position, game mode/hardcore, and conditional vehicle/respawn context;
 - compact live world context including biome, spawn distance, difficulty/hardcore, time, weather,
   local light, moon phase, and native biome climate values;
 - live vanilla advancement lists and detailed criterion progress;

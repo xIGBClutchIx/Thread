@@ -6,6 +6,7 @@ import me.clutchy.thread.core.model.advancement.AdvancementInfo;
 import me.clutchy.thread.core.model.advancement.AdvancementListQuery;
 import me.clutchy.thread.core.model.item.find.FoundItemSourceType;
 import me.clutchy.thread.core.model.player.InventorySnapshot;
+import me.clutchy.thread.core.model.player.PlayerStatus;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
@@ -58,6 +59,44 @@ final class VanillaToolSchemas {
       object(
           property("slot", enumString("MAIN_HAND", "OFF_HAND", "HEAD", "CHEST", "LEGS", "FEET")),
           property("item", nullable(ITEM_STACK)));
+  private static final JsonObject STATUS_EFFECT =
+      object(
+          property("effectId", registryId()),
+          property("displayName", string(1, 256, null)),
+          property("amplifier", integer(0, 255)),
+          property("durationTicks", nullable(integer(0, null))),
+          property("infinite", bool()),
+          property("ambient", bool()),
+          property("visible", bool()),
+          property("showIcon", bool()));
+  private static final JsonObject PLAYER_ARMOR =
+      object(property("value", integer(0, null)), property("toughness", number(0.0, null)));
+  private static final JsonObject PLAYER_AIR =
+      object(property("current", integer()), property("maximum", integer(1, null)));
+  private static final JsonObject PLAYER_MOVEMENT =
+      object(
+          property("sprinting", bool()),
+          property("swimming", bool()),
+          property("crouching", bool()),
+          property("flying", bool()),
+          property("onGround", bool()),
+          property("fallDistance", number(0.0, null)));
+  private static final JsonObject PLAYER_CONDITIONS =
+      object(
+          property("sleeping", bool()),
+          property("onFire", bool()),
+          property("freezing", bool()),
+          property("fullyFrozen", bool()));
+  private static final JsonObject PLAYER_VEHICLE =
+      object(
+          property("entityType", registryId()),
+          property("displayName", string(1, 256, null)),
+          property("customName", nullable(string(1, 256, null))));
+  private static final JsonObject PLAYER_RESPAWN =
+      object(
+          property("dimension", registryId()),
+          property("position", BLOCK_POSITION),
+          property("forced", bool()));
   private static final JsonObject BLOCK_ENTITY_ITEM =
       object(property("slot", string(1, 64, null)), property("item", ITEM_STACK));
   private static final JsonObject BLOCK_ENTITY_INFO =
@@ -129,20 +168,7 @@ final class VanillaToolSchemas {
           property("maxHealth", nullable(number(0.0, null))),
           property("classification", nullableEnumString("HOSTILE", "PASSIVE", "NEUTRAL")),
           property("equipment", boundedArray(EQUIPMENT_SLOT, 0, 6)),
-          property(
-              "activeEffects",
-              boundedArray(
-                  object(
-                      property("effectId", registryId()),
-                      property("displayName", string(1, 256, null)),
-                      property("amplifier", integer(0, 255)),
-                      property("durationTicks", nullable(integer(0, null))),
-                      property("infinite", bool()),
-                      property("ambient", bool()),
-                      property("visible", bool()),
-                      property("showIcon", bool())),
-                  0,
-                  EntityInfo.MAX_ACTIVE_EFFECTS)),
+          property("activeEffects", boundedArray(STATUS_EFFECT, 0, EntityInfo.MAX_ACTIVE_EFFECTS)),
           property("activeEffectsTruncated", bool()),
           property("age", nullableEnumString("BABY", "ADULT")),
           property("tamed", nullable(bool())),
@@ -329,11 +355,23 @@ final class VanillaToolSchemas {
               property("experienceProgress", number(0.0, 1.0)),
               property("position", POSITION),
               property("dimension", registryId()),
-              property("gameMode", string(1, 64, null))));
+              property("gameMode", enumString("survival", "creative", "adventure", "spectator")),
+              property("hardcore", bool()),
+              property("armor", PLAYER_ARMOR),
+              property("air", PLAYER_AIR),
+              property(
+                  "activeEffects", boundedArray(STATUS_EFFECT, 0, PlayerStatus.MAX_ACTIVE_EFFECTS)),
+              property("activeEffectsTruncated", bool()),
+              property("movement", PLAYER_MOVEMENT),
+              property("conditions", PLAYER_CONDITIONS),
+              property("selectedHotbarSlot", integer(0, InventorySnapshot.HOTBAR_SLOT_COUNT - 1)),
+              property("attackCooldown", number(0.0, 1.0)),
+              property("vehicle", nullable(PLAYER_VEHICLE)),
+              property("respawn", nullable(PLAYER_RESPAWN))));
   static final JsonSchema INVENTORY =
       schema(
           object(
-              property("selectedHotbarSlot", integer(0, 8)),
+              property("selectedHotbarSlot", integer(0, InventorySnapshot.HOTBAR_SLOT_COUNT - 1)),
               property(
                   "slots", boundedArray(INVENTORY_SLOT, 0, InventorySnapshot.MAIN_SLOT_COUNT))));
   static final JsonSchema EQUIPMENT =

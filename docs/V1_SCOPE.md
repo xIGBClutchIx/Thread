@@ -43,7 +43,8 @@ project toolchain.
 
 - runtime/session status, including menu vs loaded world
 - game/version information
-- player status
+- authoritative player vitals, armor/air, active effects, movement and condition flags, selected
+  hotbar/cooldown state, game mode/hardcore, and conditional vehicle/respawn context
 - player inventory
 - equipped items
 - live vanilla advancements known to the player, including criterion progress, completion state,

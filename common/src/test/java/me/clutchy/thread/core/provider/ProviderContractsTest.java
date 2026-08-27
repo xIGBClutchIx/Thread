@@ -165,7 +165,18 @@ class ProviderContractsTest {
               0.5,
               new Position(1.5, 64, -2.5),
               "minecraft:overworld",
-              "survival"));
+              "survival",
+              false,
+              new PlayerStatus.Armor(0, 0),
+              new PlayerStatus.Air(300, 300),
+              List.of(),
+              false,
+              new PlayerStatus.Movement(false, false, false, false, true, 0),
+              new PlayerStatus.Conditions(false, false, false, false),
+              0,
+              1,
+              null,
+              null));
     }
 
     @Override

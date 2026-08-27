@@ -127,6 +127,30 @@ class VanillaIntegrationTest {
     JsonObject player = invoke(catalog.tools(), "minecraft.get_player", "{}");
     assertEquals("minecraft:overworld", player.get("dimension").getAsString());
     assertEquals(18, player.get("health").getAsDouble());
+    assertEquals(
+        "{\"health\":18.0,\"maxHealth\":20.0,\"food\":14,\"saturation\":3.5,"
+            + "\"experienceLevel\":21,\"experienceProgress\":0.42,"
+            + "\"position\":{\"x\":152.2,\"y\":67.0,\"z\":-381.7},"
+            + "\"dimension\":\"minecraft:overworld\",\"gameMode\":\"survival\","
+            + "\"hardcore\":true,"
+            + "\"armor\":{\"value\":10,\"toughness\":2.0},"
+            + "\"air\":{\"current\":280,\"maximum\":300},"
+            + "\"activeEffects\":[{\"effectId\":\"minecraft:regeneration\","
+            + "\"displayName\":\"Regeneration\",\"amplifier\":0,\"durationTicks\":200,"
+            + "\"infinite\":false,\"ambient\":false,\"visible\":true,\"showIcon\":true},"
+            + "{\"effectId\":\"minecraft:speed\",\"displayName\":\"Speed\","
+            + "\"amplifier\":1,\"durationTicks\":1200,\"infinite\":false,"
+            + "\"ambient\":false,\"visible\":true,\"showIcon\":true}],"
+            + "\"activeEffectsTruncated\":false,\"movement\":{\"sprinting\":true,"
+            + "\"swimming\":false,\"crouching\":true,\"flying\":false,"
+            + "\"onGround\":false,\"fallDistance\":3.25},\"conditions\":{"
+            + "\"sleeping\":true,\"onFire\":true,\"freezing\":true,"
+            + "\"fullyFrozen\":true},\"selectedHotbarSlot\":2,"
+            + "\"attackCooldown\":0.75,\"vehicle\":{\"entityType\":\"minecraft:minecart\","
+            + "\"displayName\":\"Minecart\",\"customName\":\"Commute\"},\"respawn\":{"
+            + "\"dimension\":\"minecraft:overworld\",\"position\":{\"x\":100,\"y\":64,"
+            + "\"z\":-200},\"forced\":false}}",
+        player.toString());
 
     JsonObject worldInfo = invoke(catalog.tools(), "minecraft.get_world_info", "{}");
     assertEquals(
@@ -888,7 +912,23 @@ class VanillaIntegrationTest {
               0.42,
               new Position(152.2, 67, -381.7),
               "minecraft:overworld",
-              "survival"));
+              "survival",
+              true,
+              new PlayerStatus.Armor(10, 2),
+              new PlayerStatus.Air(280, 300),
+              List.of(
+                  new StatusEffectInfo(
+                      "minecraft:speed", "Speed", 1, 1_200, false, false, true, true),
+                  new StatusEffectInfo(
+                      "minecraft:regeneration", "Regeneration", 0, 200, false, false, true, true)),
+              false,
+              new PlayerStatus.Movement(true, false, true, false, false, 3.25),
+              new PlayerStatus.Conditions(true, true, true, true),
+              2,
+              0.75,
+              new PlayerStatus.Vehicle("minecraft:minecart", "Minecart", "Commute"),
+              new PlayerStatus.Respawn(
+                  "minecraft:overworld", new BlockPosition(100, 64, -200), false)));
     }
 
     @Override
