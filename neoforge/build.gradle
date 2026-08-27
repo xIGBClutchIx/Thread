@@ -2,6 +2,8 @@ plugins {
     id 'net.neoforged.moddev'
 }
 
+apply from: rootProject.file('gradle/client-test-options.gradle')
+
 base {
     archivesName = 'thread-neoforge'
 }
@@ -34,7 +36,7 @@ def writePackagedClientConfig = { File runDirectory ->
     // NeoForge's warning screen requires manual acknowledgement and would prevent the self-driving
     // packaged proof from reaching the title screen. Warnings remain enabled for normal users.
     configFile.setText('showLoadWarnings = false\n', 'UTF-8')
-    new File(runDirectory, 'options.txt').setText('onboardAccessibility:false\n', 'UTF-8')
+    project.ext.writeMutedClientTestOptions(runDirectory)
 }
 
 neoForge {

@@ -12,6 +12,9 @@ def productionRunDirectory = rootProject.layout.buildDirectory.dir('run/producti
 tasks.register('prepareFreshProductionClientGameTest', Delete) {
     mustRunAfter rootProject.tasks.named('clean')
     delete productionRunDirectory
+    doLast {
+        project.ext.writeMutedClientTestOptions(productionRunDirectory.get().asFile)
+    }
 }
 
 tasks.register(
@@ -60,6 +63,7 @@ tasks.register('prepareMcpDisabledClientGameTest') {
     outputs.upToDateWhen { false }
     doLast {
         disabledRunDirectory.get().asFile.deleteDir()
+        project.ext.writeMutedClientTestOptions(disabledRunDirectory.get().asFile)
         def configFile = disabledRunDirectory.get().file('config/thread.json').asFile
         configFile.parentFile.mkdirs()
         configFile.setText(
@@ -87,6 +91,9 @@ def universalRunDirectory = rootProject.layout.buildDirectory.dir(
 tasks.register('prepareFreshUniversalProductionClientGameTest', Delete) {
     mustRunAfter rootProject.tasks.named('clean')
     delete universalRunDirectory
+    doLast {
+        project.ext.writeMutedClientTestOptions(universalRunDirectory.get().asFile)
+    }
 }
 
 tasks.register(
@@ -141,6 +148,7 @@ tasks.register('prepareUniversalMcpDisabledClientGameTest') {
     outputs.upToDateWhen { false }
     doLast {
         universalDisabledRunDirectory.get().asFile.deleteDir()
+        project.ext.writeMutedClientTestOptions(universalDisabledRunDirectory.get().asFile)
         def configFile = universalDisabledRunDirectory.get().file('config/thread.json').asFile
         configFile.parentFile.mkdirs()
         configFile.setText(

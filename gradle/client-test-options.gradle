@@ -1,0 +1,11 @@
+// Client proofs need a real window and OpenGL context, but their isolated instances should not
+// steal fullscreen focus, pause when focus changes, or emit audio during local verification.
+ext.writeMutedClientTestOptions = { File runDirectory ->
+    runDirectory.mkdirs()
+    new File(runDirectory, 'options.txt').setText(
+            'onboardAccessibility:false\n' +
+                    'fullscreen:false\n' +
+                    'pauseOnLostFocus:false\n' +
+                    'soundCategory_master:0.0\n',
+            'UTF-8')
+}

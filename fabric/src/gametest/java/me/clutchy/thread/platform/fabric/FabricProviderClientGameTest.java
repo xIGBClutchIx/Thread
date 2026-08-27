@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import me.clutchy.thread.core.tool.ToolRegistry;
 import me.clutchy.thread.core.tool.ToolResult;
+import me.clutchy.thread.gametest.ClientTestWindow;
 import me.clutchy.thread.gametest.ExternalProofIntegration;
 import me.clutchy.thread.gametest.LoaderParityAssertions;
 import me.clutchy.thread.runtime.ThreadRuntime;
@@ -39,6 +40,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
   @Override
   public void runTest(ClientGameTestContext context) {
+    context.runOnClient(ClientTestWindow::minimize);
     ThreadFabricClient entrypoint =
         FabricLoader.getInstance()
             .getEntrypointContainers("client", ClientModInitializer.class)

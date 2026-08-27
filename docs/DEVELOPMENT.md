@@ -135,6 +135,13 @@ equipment, target blocks, nearby entities, and actual-look target entities with 
 non-living, tame-owner, and villager variants; those are provider regression coverage, not a
 different loader contract.
 
+These proofs remain graphical client launches because they exercise Minecraft's real client,
+integrated server, and OpenGL-backed lifecycle; setting Java's headless flag would not provide the
+same coverage. Their test-only harness minimizes the window as soon as its client callback is
+available. Every development, dedicated, and universal client-test run also seeds an isolated
+`options.txt` with master audio muted, fullscreen disabled, and pause-on-focus-loss disabled before
+Minecraft starts. Normal user options are never read or changed.
+
 The restart test launches that packaged client again from the same instance and proves an existing
 configuration is reloaded, including a changed MCP port. The disabled tests use separate fresh
 instances and prove Thread initializes without a listener. None of these tasks

@@ -2,6 +2,8 @@ plugins {
     id 'net.fabricmc.fabric-loom'
 }
 
+apply from: rootProject.file('gradle/client-test-options.gradle')
+
 base {
     archivesName = 'thread-fabric'
 }
@@ -76,6 +78,13 @@ tasks.named('compileTestJava') {
 
 tasks.named('compileGametestJava') {
     dependsOn tasks.named('clientClasses')
+}
+
+def clientGameTestRunDirectory = layout.buildDirectory.dir('run/clientGameTest')
+tasks.named('runClientGameTest') {
+    doFirst {
+        project.ext.writeMutedClientTestOptions(clientGameTestRunDirectory.get().asFile)
+    }
 }
 
 // Applied scripts do not inherit Loom plugin classes on their compilation classpath.

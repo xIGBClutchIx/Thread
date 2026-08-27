@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
+import me.clutchy.thread.gametest.ClientTestWindow;
 import me.clutchy.thread.gametest.ExternalProofIntegration;
 import me.clutchy.thread.gametest.LoaderParityAssertions;
 import me.clutchy.thread.platform.forge.ThreadForgeClient;
@@ -37,6 +38,7 @@ public final class ForgeProviderClientGameTest {
   private Stage stage = Stage.WAITING_FOR_MENU;
   private CompletableFuture<Void> proof;
   private int elapsedTicks;
+  private boolean windowMinimized;
 
   public ForgeProviderClientGameTest(FMLJavaModLoadingContext ignoredContext) {
     TickEvent.ClientTickEvent.Post.BUS.addListener(this::onClientTick);
@@ -45,6 +47,10 @@ public final class ForgeProviderClientGameTest {
   private void onClientTick(TickEvent.ClientTickEvent.Post event) {
     Minecraft client = Minecraft.getInstance();
     try {
+      if (!windowMinimized) {
+        ClientTestWindow.minimize(client);
+        windowMinimized = true;
+      }
       if (++elapsedTicks > TIMEOUT_TICKS) {
         throw new AssertionError("packaged client proof timed out in " + stage);
       }
