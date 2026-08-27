@@ -38,56 +38,64 @@ jobs:
               run: ./gradlew --no-daemon clean spotlessCheck check build releaseBundle
 
             - name: Test packaged Fabric mod with MCP enabled
-              run: ./gradlew --no-daemon runRestartProductionClientGameTest
+              run: |
+                  ./gradlew --no-daemon :loaders:fabric:26.2:runRestartProductionClientGameTest
+                  ./gradlew --no-daemon :loaders:fabric:26.1.2:runRestartProductionClientGameTest
 
             - name: Test packaged Fabric mod with MCP disabled
-              run: ./gradlew --no-daemon runMcpDisabledProductionClientGameTest
+              run: |
+                  ./gradlew --no-daemon :loaders:fabric:26.2:runMcpDisabledProductionClientGameTest
+                  ./gradlew --no-daemon :loaders:fabric:26.1.2:runMcpDisabledProductionClientGameTest
 
             - name: Test packaged NeoForge mod with MCP enabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyNeoForgeRestartProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.2:verifyNeoForgeRestartProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.1.2:verifyNeoForgeRestartProductionClientGameTest
 
             - name: Test packaged NeoForge mod with MCP disabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyNeoForgeMcpDisabledProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.2:verifyNeoForgeMcpDisabledProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.1.2:verifyNeoForgeMcpDisabledProductionClientGameTest
 
             - name: Test packaged Forge mod with MCP enabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyForgeRestartProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.2:verifyForgeRestartProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.1.2:verifyForgeRestartProductionClientGameTest
 
             - name: Test packaged Forge mod with MCP disabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyForgeMcpDisabledProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.2:verifyForgeMcpDisabledProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.1.2:verifyForgeMcpDisabledProductionClientGameTest
 
             - name: Test universal mod on Fabric with MCP enabled
-              run: ./gradlew --no-daemon verifyUniversalFabricRestartProductionClientGameTest
+              run: |
+                  ./gradlew --no-daemon :loaders:fabric:26.2:runUniversalRestartProductionClientGameTest
+                  ./gradlew --no-daemon :loaders:fabric:26.1.2:runUniversalRestartProductionClientGameTest
 
             - name: Test universal mod on Fabric with MCP disabled
-              run: ./gradlew --no-daemon verifyUniversalFabricMcpDisabledProductionClientGameTest
+              run: |
+                  ./gradlew --no-daemon :loaders:fabric:26.2:runUniversalMcpDisabledProductionClientGameTest
+                  ./gradlew --no-daemon :loaders:fabric:26.1.2:runUniversalMcpDisabledProductionClientGameTest
 
             - name: Test universal mod on NeoForge with MCP enabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyUniversalNeoForgeRestartProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.2:verifyUniversalNeoForgeRestartProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.1.2:verifyUniversalNeoForgeRestartProductionClientGameTest
 
             - name: Test universal mod on NeoForge with MCP disabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.2:verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:neoforge:26.1.2:verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
 
             - name: Test universal mod on Forge with MCP enabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyUniversalForgeRestartProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.2:verifyUniversalForgeRestartProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.1.2:verifyUniversalForgeRestartProductionClientGameTest
 
             - name: Test universal mod on Forge with MCP disabled
-              run: >-
-                  xvfb-run -a ./gradlew --no-daemon
-                  verifyUniversalForgeMcpDisabledProductionClientGameTest
+              run: |
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.2:verifyUniversalForgeMcpDisabledProductionClientGameTest
+                  xvfb-run -a ./gradlew --no-daemon :loaders:forge:26.1.2:verifyUniversalForgeMcpDisabledProductionClientGameTest
 
             - name: Upload failure reports
               if: failure()
@@ -97,11 +105,14 @@ jobs:
                   path: |
                       build/reports/
                       common/build/reports/
-                      minecraft-26.2/build/reports/
-                      fabric/build/reports/
-                      neoforge/build/reports/
-                      forge/build/reports/
-                      universal/build/reports/
+                      minecraft/26.1.2/build/reports/
+                      minecraft/26.2/build/reports/
+                      loaders/fabric/26.1.2/build/reports/
+                      loaders/fabric/26.2/build/reports/
+                      loaders/neoforge/26.1.2/build/reports/
+                      loaders/neoforge/26.2/build/reports/
+                      loaders/forge/26.1.2/build/reports/
+                      loaders/forge/26.2/build/reports/
                       build/run/**/logs/
                       build/run/**/crash-reports/
                   if-no-files-found: ignore

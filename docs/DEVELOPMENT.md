@@ -5,13 +5,14 @@ releases.
 
 ## Module workflow
 
-Thread is built across two independent adapter axes. `:common` owns version-neutral core,
-configuration, MCP, and runtime/tool orchestration. `:minecraft-26.2` owns Minecraft access,
-mapping, logical-thread dispatch, focused provider implementations, and version capability
-declarations without importing a loader API. Thin `:fabric`, `:neoforge`, and `:forge` adapters own
-loader API access, lifecycle events, metadata, config paths, and integration discovery. They invoke
-`Minecraft262Runtime.start`, which composes the version implementation with `ThreadRuntime`. The
-source-free `:universal` module packages these existing outputs and owns no runtime logic.
+Thread is built across independent Minecraft-version and loader axes. `:common` owns
+version-neutral core, configuration, MCP, and runtime/tool orchestration. `minecraft/shared`
+contains Minecraft-facing sources that compile independently in `:minecraft:26.1.2` and
+`:minecraft:26.2`; only real API/capability bindings remain in the version directories. Thin
+`:loaders:<loader>:<version>` projects compile one loader's shared source tree against exactly one
+Minecraft lane. Each invokes the lane-compiled `MinecraftRuntime`, which composes the selected
+version implementation with `ThreadRuntime`. Root universal packaging tasks combine matching
+outputs and own no runtime logic.
 
 Root Gradle tasks aggregate all modules and remain the normal contributor interface. See
 [Build](BUILD.md) for module-specific commands and outputs.
@@ -23,8 +24,11 @@ Root Gradle tasks aggregate all modules and remain the normal contributor interf
 - Keep Minecraft-version, loader, core, and MCP dependencies inside their documented module
   boundaries.
 - Apply both portability rules literally: version-neutral code stays in `:common`; code that uses
-  Minecraft 26.2 stays in `:minecraft-26.2`; code that calls a loader API stays in that loader's
-  adapter.
+  a Minecraft API stays under `minecraft`; identical compile-time-compatible code belongs in
+  `minecraft/shared`, while genuine API differences stay in the matching version directory. Code
+  that calls a loader API stays in that loader's shared thin adapter source tree.
+- Adding a Minecraft version should normally add a matrix entry and a version binding without
+  changing `common/src/main`.
 - Prefer small immutable DTOs, explicit wiring, explicit schemas, and machine-readable errors.
 - Keep every game query bounded and every gameplay path behind the single-player guard.
 - Do not add a dependency when the JDK or Minecraft-provided runtime already supplies the narrow
@@ -57,10 +61,10 @@ change pass; narrow a noisy rule only when the code has a documented legitimate 
 
 ### Unit and architecture tests
 
-The root `test` task runs `:common:test`, `:minecraft-26.2:test`, `:fabric:test`,
-`:neoforge:test`, and `:forge:test`. They cover core services, schemas, registries, configuration,
-integration activation/isolation, Minecraft 26.2 conversion/support, loader-specific
-discovery/version handling, and the real loopback MCP HTTP server without launching Minecraft.
+The root `test` task runs common, both Minecraft modules, and both versions of all three loader
+projects. They cover core services, schemas, registries, configuration, integration
+activation/isolation, version-specific conversion/support, loader discovery/version handling, and
+the real loopback MCP HTTP server without launching Minecraft.
 Fake providers should prove core behavior whenever live Minecraft is unnecessary.
 
 Important regression areas include:
@@ -92,10 +96,11 @@ Important regression areas include:
   same-port restart;
 - package/import and release-artifact boundaries.
 - common-to-version-to-loader module direction, cross-loader isolation, the absence of Minecraft
-  dependencies in common, and the absence of Fabric/NeoForge/Forge dependencies in the version
-  module or shared packaged parity fixture;
+  dependencies in common, the absence of Fabric/NeoForge/Forge dependencies in Minecraft source or
+  the shared packaged parity fixture, version-lane isolation, and no version literals in shared
+  production Java;
 - full/unsupported/optional-field version capability states and the exact twenty-one fully
-  supported tools declared by Minecraft 26.2.
+  supported tools declared independently by Minecraft 26.1.2 and 26.2.
 
 Run focused unit coverage with:
 
@@ -106,7 +111,7 @@ Run focused unit coverage with:
 ### Development client game test
 
 ```powershell
-.\gradlew.bat runClientGameTest
+.\gradlew.bat :loaders:fabric:26.2:runClientGameTest
 ```
 
 This uses the development classpath for interactive diagnosis. It is useful during provider work
@@ -114,26 +119,20 @@ but is not the release proof.
 
 ### Packaged-client tests
 
-```powershell
-.\gradlew.bat runProductionClientGameTest
-.\gradlew.bat runRestartProductionClientGameTest
-.\gradlew.bat runMcpDisabledProductionClientGameTest
-.\gradlew.bat verifyNeoForgeProductionClientGameTest
-.\gradlew.bat verifyNeoForgeRestartProductionClientGameTest
-.\gradlew.bat verifyNeoForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat verifyForgeProductionClientGameTest
-.\gradlew.bat verifyForgeRestartProductionClientGameTest
-.\gradlew.bat verifyForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat verifyUniversalFabricRestartProductionClientGameTest
-.\gradlew.bat verifyUniversalFabricMcpDisabledProductionClientGameTest
-.\gradlew.bat verifyUniversalNeoForgeRestartProductionClientGameTest
-.\gradlew.bat verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat verifyUniversalForgeRestartProductionClientGameTest
-.\gradlew.bat verifyUniversalForgeMcpDisabledProductionClientGameTest
-```
+Every version-specific loader project exposes the same normal, restart, and MCP-disabled tasks:
 
-Each normal test launches a temporary client with a final dedicated or universal Thread JAR and a
-separately packaged proof integration/game-test mod. All three loaders compile the same
+| Project | Dedicated tasks | Universal tasks |
+| --- | --- | --- |
+| `:loaders:fabric:<version>` | `runProductionClientGameTest`, `runRestartProductionClientGameTest`, `runMcpDisabledProductionClientGameTest` | same names prefixed with `runUniversal` |
+| `:loaders:neoforge:<version>` | `verifyNeoForgeProductionClientGameTest`, `verifyNeoForgeRestartProductionClientGameTest`, `verifyNeoForgeMcpDisabledProductionClientGameTest` | same names with `UniversalNeoForge` |
+| `:loaders:forge:<version>` | `verifyForgeProductionClientGameTest`, `verifyForgeRestartProductionClientGameTest`, `verifyForgeMcpDisabledProductionClientGameTest` | same names with `UniversalForge` |
+
+Always use a project-qualified task, for example
+`.\gradlew.bat :loaders:fabric:26.1.2:runRestartProductionClientGameTest`. Keep each packaged task
+in its own Gradle invocation.
+
+Each normal test launches a temporary client with a final, version-specific dedicated or universal
+Thread JAR and a separately packaged proof integration/game-test mod. All projects compile the same
 loader-neutral parity fixture from `common/src/gametest/java`. It verifies the exact twenty-one-tool catalog, config,
 loader identity, menu/world/menu status, MCP initialization and discovery, every tool path, native
 recipes and crafting, external integration activation, and controlled gameplay rejection at the
@@ -165,20 +164,11 @@ Before committing a V1-complete change, run the release-equivalent gate from the
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
   verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
-.\gradlew.bat --no-daemon --console=plain runRestartProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain runMcpDisabledProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyNeoForgeRestartProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyNeoForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyForgeRestartProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyUniversalFabricRestartProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyUniversalFabricMcpDisabledProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyUniversalNeoForgeRestartProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyUniversalNeoForgeMcpDisabledProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyUniversalForgeRestartProductionClientGameTest
-.\gradlew.bat --no-daemon --console=plain verifyUniversalForgeMcpDisabledProductionClientGameTest
-git diff --check
 ```
+
+Then run the normal, restart, and MCP-disabled tasks from the table above for dedicated and
+universal artifacts in all six loader projects, one invocation at a time, and finish with
+`git diff --check`. CI and the release workflow enumerate the same two-version matrix.
 
 Keep each packaged task in its own Gradle invocation. Loader launch tasks use real client processes
 and must not overlap on the shared MCP port or test-instance preparation.
@@ -187,15 +177,16 @@ Change the release tag argument when `mod_version` changes. Release versions and
 `MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH`, respectively. `verifyReleaseArtifact` rejects test
 classes, source files, and bundled third-party integrations while checking common contracts,
 shared runtime/provider classes, dedicated loader purity, universal loader coverage, and metadata.
-`releaseBundle` writes the universal and three dedicated JARs plus SHA-256 files to
-`build/release/`. See
+`releaseBundle` writes two version-labeled universal JARs and six dedicated JARs plus SHA-256 files
+to `build/release/`. See
 [Release](RELEASE.md) for the publishing checklist.
 
 ## Manual MCP smoke test
 
 Use the release JAR, not a development run, for the final human check:
 
-1. Put the universal release JAR and its loader requirements in a clean Minecraft 26.2 instance.
+1. Put the matching universal release JAR and loader requirements in a clean Minecraft 26.1.2 or
+   26.2 instance. Repeat this smoke test for both versions before release.
 2. Launch to the menu and confirm `http://127.0.0.1:25580/mcp` is listening.
 3. Connect a real MCP client, complete `initialize` followed by `tools/list`, and confirm twenty-one
    read-only `minecraft.*` tools.

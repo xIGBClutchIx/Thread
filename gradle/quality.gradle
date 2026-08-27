@@ -1,7 +1,16 @@
+def threadJavaTargets = ['common/src/**/*.java', 'minecraft/shared/src/**/*.java']
+threadJavaTargets.addAll(
+        rootProject.ext.threadBuildMatrix.versions.keySet().collect {
+            minecraftVersion -> "minecraft/${minecraftVersion}/src/**/*.java".toString()
+        })
+threadJavaTargets.addAll(
+        rootProject.ext.threadBuildMatrix.loaders.collect {
+            loader -> "loaders/${loader}/src/**/*.java".toString()
+        })
+
 spotless {
     java {
-        target 'common/src/**/*.java', 'minecraft-26.2/src/**/*.java',
-                'fabric/src/**/*.java', 'neoforge/src/**/*.java', 'forge/src/**/*.java'
+        target(*threadJavaTargets)
         googleJavaFormat(project.google_java_format_version)
         removeUnusedImports()
         forbidWildcardImports()
@@ -12,25 +21,25 @@ spotless {
     format 'repositoryFiles', {
         target '*.gradle', 'gradle/**/*.gradle', '*.properties', '*.md', '*.json', '*.yml',
                 '*.yaml', '.github/**/*.yml', '.github/**/*.yaml', 'common/**/*.gradle',
-                'minecraft-26.2/**/*.gradle', 'fabric/**/*.gradle', 'neoforge/**/*.gradle',
-                'forge/**/*.gradle', 'universal/**/*.gradle',
-                'config/**/*.xml', 'docs/**/*.md',
-                'common/src/**/*.json', 'minecraft-26.2/src/**/*.json',
-                'fabric/src/**/*.json', 'neoforge/src/**/*.json', 'forge/src/**/*.json',
-                'neoforge/src/**/*.toml', 'forge/src/**/*.toml'
+                'minecraft/**/*.gradle', 'loaders/**/*.gradle',
+                'config/**/*.xml', 'docs/**/*.md', 'common/src/**/*.json',
+                'minecraft/**/*.json', 'loaders/**/*.json', 'loaders/**/*.toml'
         targetExclude '.gradle/**', '**/build/**', 'run/**'
         trimTrailingWhitespace()
         endWithNewline()
     }
 }
 
-subprojects {
+def threadModuleProjects = rootProject.ext.threadModulePaths.collect { project(it) }
+def threadJavaVersion = rootProject.ext.threadBuildMatrix.javaVersion
+
+configure(threadModuleProjects) {
     apply plugin: 'java-library'
     apply plugin: 'checkstyle'
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(25)
+            languageVersion = JavaLanguageVersion.of(threadJavaVersion)
         }
         withSourcesJar()
     }
@@ -42,7 +51,7 @@ subprojects {
     }
 
     tasks.withType(JavaCompile).configureEach {
-        options.release = 25
+        options.release = threadJavaVersion
         options.encoding = 'UTF-8'
         options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
     }
@@ -85,15 +94,15 @@ subprojects {
 }
 
 tasks.named('clean') {
-    dependsOn subprojects.collect { it.tasks.named('clean') }
+    dependsOn threadModuleProjects.collect { it.tasks.named('clean') }
 }
 
 tasks.named('check') {
     dependsOn tasks.named('spotlessCheck')
-    dependsOn subprojects.collect { it.tasks.named('check') }
+    dependsOn threadModuleProjects.collect { it.tasks.named('check') }
 }
 
 tasks.named('build') {
     dependsOn tasks.named('spotlessCheck')
-    dependsOn subprojects.collect { it.tasks.named('build') }
+    dependsOn threadModuleProjects.collect { it.tasks.named('build') }
 }

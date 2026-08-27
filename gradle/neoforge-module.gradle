@@ -1,0 +1,351 @@
+apply from: rootProject.file('gradle/client-test-options.gradle')
+
+def selectedVersion = project.ext.threadVersion
+def versionConfig = rootProject.ext.threadBuildMatrix.versions[selectedVersion]
+if (versionConfig == null) {
+    throw new GradleException("Unsupported NeoForge version project: ${project.path}")
+}
+group = "${rootProject.group}.loader.neoforge"
+ext.threadMinecraftVersion = selectedVersion
+ext.threadNeoForgeVersion = versionConfig.neoForge
+ext.threadMinecraftProjectPath = ":minecraft:${selectedVersion}"
+ext.threadArchiveBaseName = "thread-neoforge-${selectedVersion}"
+ext.threadUniversalJarTask = rootProject.ext.threadUniversalJarTasks[selectedVersion]
+
+base {
+    archivesName = project.ext.threadArchiveBaseName
+}
+
+def loaderSourceDirectory = rootProject.file('loaders/neoforge')
+sourceSets {
+    main {
+        java.setSrcDirs([new File(loaderSourceDirectory, 'src/main/java')])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/main/resources')])
+    }
+    test {
+        java.setSrcDirs([new File(loaderSourceDirectory, 'src/test/java')])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/test/resources')])
+    }
+    gametest {
+        java.setSrcDirs([
+                new File(loaderSourceDirectory, 'src/gametest/java'),
+                rootProject.file("minecraft/${selectedVersion}/src/gametest/java"),
+                rootProject.file('common/src/gametest/java')
+        ])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/gametest/resources')])
+    }
+}
+
+configurations {
+    gametestImplementation.extendsFrom implementation
+    gametestRuntimeOnly.extendsFrom runtimeOnly
+}
+
+def minecraftVersion = project.ext.threadMinecraftVersion
+def runPrefix = "run/minecraft-${minecraftVersion}/neoforge"
+def reportPrefix = "reports/minecraft-${minecraftVersion}/neoforge-packaged-tests"
+def normalRunDirectory = rootProject.layout.buildDirectory.dir(
+        "${runPrefix}ProductionClientGameTest")
+def disabledRunDirectory = rootProject.layout.buildDirectory.dir(
+        "${runPrefix}McpDisabledClientGameTest")
+def reportDirectory = rootProject.layout.buildDirectory.dir(reportPrefix)
+def universalJarTask = project.ext.threadUniversalJarTask
+def universalJar = universalJarTask.flatMap { it.archiveFile }
+def universalRunDirectory = rootProject.layout.buildDirectory.dir(
+        "${runPrefix}UniversalProductionClientGameTest")
+def universalDisabledRunDirectory = rootProject.layout.buildDirectory.dir(
+        "${runPrefix}UniversalMcpDisabledClientGameTest")
+def universalReportDirectory = rootProject.layout.buildDirectory.dir(
+        "reports/minecraft-${minecraftVersion}/universal-neoforge-packaged-tests")
+def writePackagedClientConfig = { File runDirectory ->
+    def configFile = new File(runDirectory, 'config/neoforge-client.toml')
+    configFile.parentFile.mkdirs()
+    // NeoForge's warning screen requires manual acknowledgement and would prevent the self-driving
+    // packaged proof from reaching the title screen. Warnings remain enabled for normal users.
+    configFile.setText('showLoadWarnings = false\n', 'UTF-8')
+    project.ext.writeMutedClientTestOptions(runDirectory)
+}
+def resetRunDirectory = { File runDirectory ->
+    if (runDirectory.exists() && !runDirectory.deleteDir()) {
+        throw new GradleException("Could not reset packaged-client directory: ${runDirectory}")
+    }
+}
+
+neoForge {
+    version = project.ext.threadNeoForgeVersion
+
+    runs {
+        client {
+            client()
+            gameDirectory = rootProject.layout.buildDirectory.dir(
+                    "${runPrefix}Client").get().asFile
+        }
+        neoForgeProductionClientGameTest {
+            client()
+            disableIdeRun()
+            gameDirectory = normalRunDirectory.get().asFile
+            loadedMods = []
+            jvmArgument "-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"
+            jvmArgument "-Dthread.gametest.report=${reportDirectory.get().file('normal.txt').asFile}"
+        }
+        neoForgeRestartProductionClientGameTest {
+            client()
+            disableIdeRun()
+            gameDirectory = normalRunDirectory.get().asFile
+            loadedMods = []
+            jvmArgument "-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"
+            jvmArgument "-Dthread.gametest.expectedMcpPort=25581"
+            jvmArgument "-Dthread.gametest.report=${reportDirectory.get().file('restart.txt').asFile}"
+        }
+        neoForgeMcpDisabledProductionClientGameTest {
+            client()
+            disableIdeRun()
+            gameDirectory = disabledRunDirectory.get().asFile
+            loadedMods = []
+            jvmArgument "-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"
+            jvmArgument '-Dthread.gametest.expectMcpDisabled=true'
+            jvmArgument "-Dthread.gametest.report=${reportDirectory.get().file('disabled.txt').asFile}"
+        }
+        universalNeoForgeProductionClientGameTest {
+            client()
+            disableIdeRun()
+            gameDirectory = universalRunDirectory.get().asFile
+            loadedMods = []
+            jvmArgument "-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"
+            jvmArgument "-Dthread.gametest.report=${universalReportDirectory.get().file('normal.txt').asFile}"
+        }
+        universalNeoForgeRestartProductionClientGameTest {
+            client()
+            disableIdeRun()
+            gameDirectory = universalRunDirectory.get().asFile
+            loadedMods = []
+            jvmArgument "-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"
+            jvmArgument "-Dthread.gametest.expectedMcpPort=25581"
+            jvmArgument "-Dthread.gametest.report=${universalReportDirectory.get().file('restart.txt').asFile}"
+        }
+        universalNeoForgeMcpDisabledProductionClientGameTest {
+            client()
+            disableIdeRun()
+            gameDirectory = universalDisabledRunDirectory.get().asFile
+            loadedMods = []
+            jvmArgument "-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"
+            jvmArgument '-Dthread.gametest.expectMcpDisabled=true'
+            jvmArgument "-Dthread.gametest.report=${universalReportDirectory.get().file('disabled.txt').asFile}"
+        }
+    }
+
+    mods {
+        thread {
+            sourceSet sourceSets.main
+        }
+        threadNeoForgeGametest {
+            sourceSet sourceSets.gametest
+        }
+    }
+}
+
+neoForge.addModdingDependenciesTo(sourceSets.gametest)
+neoForge.addModdingDependenciesTo(sourceSets.test)
+
+dependencies {
+    implementation project(':common')
+    implementation project(project.ext.threadMinecraftProjectPath)
+    gametestImplementation project(':common')
+    gametestImplementation project(project.ext.threadMinecraftProjectPath)
+    gametestImplementation sourceSets.main.output
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraftVersion', minecraftVersion
+    inputs.property 'neoForgeVersion', project.ext.threadNeoForgeVersion
+
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand(
+                version: project.version,
+                minecraftVersion: minecraftVersion,
+                neoForgeVersion: project.ext.threadNeoForgeVersion)
+    }
+}
+
+tasks.named('jar') {
+    dependsOn ':common:classes', "${project.ext.threadMinecraftProjectPath}:classes"
+    from project(':common').sourceSets.main.output
+    from project(project.ext.threadMinecraftProjectPath).sourceSets.main.output
+}
+
+tasks.named('sourcesJar') {
+    from project(':common').sourceSets.main.allSource
+    from project(project.ext.threadMinecraftProjectPath).sourceSets.main.allSource
+}
+
+def gametestJar = tasks.register('gametestJar', Jar) {
+    group = 'build'
+    description = 'Packages the isolated NeoForge client game-test harness.'
+    dependsOn tasks.named('gametestClasses')
+    archiveClassifier = 'gametest'
+    from sourceSets.gametest.output
+}
+
+tasks.register('prepareFreshNeoForgeProductionClientGameTest') {
+    group = 'verification'
+    dependsOn tasks.named('jar'), gametestJar
+    outputs.upToDateWhen { false }
+    doLast {
+        def runDirectory = normalRunDirectory.get().asFile
+        resetRunDirectory(runDirectory)
+        def modsDirectory = new File(runDirectory, 'mods')
+        modsDirectory.mkdirs()
+        copy {
+            from tasks.named('jar', Jar).flatMap { it.archiveFile }
+            from gametestJar.flatMap { it.archiveFile }
+            into modsDirectory
+        }
+        writePackagedClientConfig(runDirectory)
+    }
+}
+
+tasks.register('prepareRestartNeoForgeProductionClientGameTest') {
+    group = 'verification'
+    dependsOn tasks.named('runNeoForgeProductionClientGameTest')
+    outputs.upToDateWhen { false }
+    doLast {
+        def configFile = normalRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText('{\n  "schemaVersion": 1,\n  "mcpPort": 25581\n}\n', 'UTF-8')
+    }
+}
+
+tasks.register('prepareNeoForgeMcpDisabledClientGameTest') {
+    group = 'verification'
+    dependsOn tasks.named('jar'), gametestJar
+    outputs.upToDateWhen { false }
+    doLast {
+        def runDirectory = disabledRunDirectory.get().asFile
+        resetRunDirectory(runDirectory)
+        def modsDirectory = new File(runDirectory, 'mods')
+        modsDirectory.mkdirs()
+        copy {
+            from tasks.named('jar', Jar).flatMap { it.archiveFile }
+            from gametestJar.flatMap { it.archiveFile }
+            into modsDirectory
+        }
+        writePackagedClientConfig(runDirectory)
+        def configFile = new File(runDirectory, 'config/thread.json')
+        configFile.parentFile.mkdirs()
+        configFile.setText('{\n  "schemaVersion": 1,\n  "mcpEnabled": false\n}\n', 'UTF-8')
+    }
+}
+
+tasks.named('runNeoForgeProductionClientGameTest') {
+    dependsOn tasks.named('prepareFreshNeoForgeProductionClientGameTest')
+}
+
+tasks.named('runNeoForgeRestartProductionClientGameTest') {
+    dependsOn tasks.named('prepareRestartNeoForgeProductionClientGameTest')
+}
+
+tasks.named('runNeoForgeMcpDisabledProductionClientGameTest') {
+    dependsOn tasks.named('prepareNeoForgeMcpDisabledClientGameTest')
+}
+
+tasks.register('prepareFreshUniversalNeoForgeProductionClientGameTest') {
+    group = 'verification'
+    dependsOn universalJarTask, gametestJar
+    outputs.upToDateWhen { false }
+    doLast {
+        def runDirectory = universalRunDirectory.get().asFile
+        resetRunDirectory(runDirectory)
+        def modsDirectory = new File(runDirectory, 'mods')
+        modsDirectory.mkdirs()
+        copy {
+            from universalJar
+            from gametestJar.flatMap { it.archiveFile }
+            into modsDirectory
+        }
+        writePackagedClientConfig(runDirectory)
+    }
+}
+
+tasks.register('prepareUniversalRestartNeoForgeProductionClientGameTest') {
+    group = 'verification'
+    dependsOn tasks.named('runUniversalNeoForgeProductionClientGameTest')
+    outputs.upToDateWhen { false }
+    doLast {
+        def configFile = universalRunDirectory.get().file('config/thread.json').asFile
+        configFile.parentFile.mkdirs()
+        configFile.setText('{\n  "schemaVersion": 1,\n  "mcpPort": 25581\n}\n', 'UTF-8')
+    }
+}
+
+tasks.register('prepareUniversalNeoForgeMcpDisabledClientGameTest') {
+    group = 'verification'
+    dependsOn universalJarTask, gametestJar
+    outputs.upToDateWhen { false }
+    doLast {
+        def runDirectory = universalDisabledRunDirectory.get().asFile
+        resetRunDirectory(runDirectory)
+        def modsDirectory = new File(runDirectory, 'mods')
+        modsDirectory.mkdirs()
+        copy {
+            from universalJar
+            from gametestJar.flatMap { it.archiveFile }
+            into modsDirectory
+        }
+        writePackagedClientConfig(runDirectory)
+        def configFile = new File(runDirectory, 'config/thread.json')
+        configFile.parentFile.mkdirs()
+        configFile.setText('{\n  "schemaVersion": 1,\n  "mcpEnabled": false\n}\n', 'UTF-8')
+    }
+}
+
+tasks.named('runUniversalNeoForgeProductionClientGameTest') {
+    dependsOn tasks.named('prepareFreshUniversalNeoForgeProductionClientGameTest')
+}
+
+tasks.named('runUniversalNeoForgeRestartProductionClientGameTest') {
+    dependsOn tasks.named('prepareUniversalRestartNeoForgeProductionClientGameTest')
+}
+
+tasks.named('runUniversalNeoForgeMcpDisabledProductionClientGameTest') {
+    dependsOn tasks.named('prepareUniversalNeoForgeMcpDisabledClientGameTest')
+}
+
+[
+        verifyNeoForgeProductionClientGameTest: ['runNeoForgeProductionClientGameTest', 'normal.txt'],
+        verifyNeoForgeRestartProductionClientGameTest: ['runNeoForgeRestartProductionClientGameTest', 'restart.txt'],
+        verifyNeoForgeMcpDisabledProductionClientGameTest: ['runNeoForgeMcpDisabledProductionClientGameTest', 'disabled.txt']
+].each { taskName, details ->
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Validates the ${details[1]} packaged-client report."
+        dependsOn tasks.named(details[0])
+        doLast {
+            def report = reportDirectory.get().file(details[1]).asFile
+            if (!report.isFile() || !report.getText('UTF-8').startsWith('PASSED')) {
+                throw new GradleException("NeoForge packaged-client proof failed: ${report}")
+            }
+        }
+    }
+}
+
+[
+        verifyUniversalNeoForgeProductionClientGameTest:
+                ['runUniversalNeoForgeProductionClientGameTest', 'normal.txt'],
+        verifyUniversalNeoForgeRestartProductionClientGameTest:
+                ['runUniversalNeoForgeRestartProductionClientGameTest', 'restart.txt'],
+        verifyUniversalNeoForgeMcpDisabledProductionClientGameTest:
+                ['runUniversalNeoForgeMcpDisabledProductionClientGameTest', 'disabled.txt']
+].each { taskName, details ->
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Validates the universal ${details[1]} NeoForge packaged-client report."
+        dependsOn tasks.named(details[0])
+        doLast {
+            def report = universalReportDirectory.get().file(details[1]).asFile
+            if (!report.isFile() || !report.getText('UTF-8').startsWith('PASSED')) {
+                throw new GradleException("Universal NeoForge packaged-client proof failed: ${report}")
+            }
+        }
+    }
+}

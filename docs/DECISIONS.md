@@ -11,61 +11,79 @@ not the core API.
 
 ## V1 is deliberately narrow
 
-V1 is Java 25, Fabric/NeoForge/Forge client, Minecraft 26.2, single-player, read-only, bounded, and loopback-only.
+V1 is Java 25, Fabric/NeoForge/Forge client, Minecraft 26.1.2 and 26.2, single-player,
+read-only, bounded, and loopback-only.
 Gameplay tools reject multiplayer before exposing state. `minecraft.get_status`,
 `minecraft.get_game_info`, and the local-only `minecraft.get_client_options` remain available from
 every client state.
 
-Thread does not implement remote access, authentication, actions, dedicated-server behavior, or a
-second Minecraft version in V1. The code has a real version boundary, but 26.2 is the only current
-implementation.
+Thread does not implement remote access, authentication, actions, or dedicated-server behavior.
+Minecraft versions are separate compile-time lanes; no runtime version selection or cross-version
+JAR is supported.
 
 ## Minecraft-version and loader adapters are separate axes
 
 `:common` owns version-neutral core, configuration, MCP, runtime/tool orchestration, focused
 provider contracts, DTOs, crafting, item search, serialization, and integrations. It has no
-`net.minecraft` dependency. `:minecraft-26.2` owns Minecraft access, mapping, threading, provider
-implementations, Minecraft-edge integration contracts, and version capability declarations. It
-depends on common but no loader. `:fabric`, `:neoforge`, and `:forge` own only their entrypoint,
-Loader API, lifecycle, config path, version predicate, and integration-discovery wiring.
+`net.minecraft` dependency. `minecraft/shared` owns Minecraft-facing code that compiles unchanged
+inside both `:minecraft:26.1.2` and `:minecraft:26.2`; it is not a runtime artifact. Genuine API and
+capability identity differences remain in the matching version directory. Each version project
+depends on common but no loader. The Fabric, NeoForge, and Forge source trees under `loaders/` own
+only their entrypoint, Loader API, lifecycle, config path, version predicate, and
+integration-discovery wiring; nested Gradle projects compile them against one version lane.
 
-All three entrypoints resolve those loader-specific values and call `Minecraft262Runtime.start`.
-The version module assembles the existing focused providers, then enters `ThreadRuntime` through a
-small provider-factory contract. Configuration fallback, capability filtering, reflective
+All entrypoints resolve those loader-specific values and call the lane-compiled `MinecraftRuntime`.
+Shared Minecraft assembly enters `ThreadRuntime` through a small
+provider-factory contract. Configuration fallback, capability filtering, reflective
 integration activation, MCP bind handling, startup diagnostics, and resource close behavior are one
 shared lifecycle rather than parallel loader implementations.
 
-`:universal` is a packaging-only module. It combines common, Minecraft 26.2, and all three loader
-source-set outputs directly, keeps dedicated JARs canonical and independently installable, and adds
-no portability framework or cross-loader dependency. Unexpected duplicate entries fail the build;
-the one known loader-branded `pack.mcmeta` collision is replaced by a neutral universal descriptor.
+Universal JARs are root packaging tasks, not per-version source projects. Each combines common,
+exactly one Minecraft implementation, and the three matching loader outputs from the central build
+matrix. Dedicated JARs remain canonical and independently installable. Unexpected duplicate entries
+fail the build; the one known loader-branded `pack.mcmeta` collision is replaced by a neutral
+universal descriptor.
 
 Core DTOs, providers, registries, and services contain no Minecraft, loader, MCP, raw NBT, generic
-component map, or optional-mod type. The Minecraft 26.2 adapter converts live game objects into
+component map, or optional-mod type. Each Minecraft adapter converts live game objects into
 detached DTOs. MCP maps only the tool registry. Common has neither Minecraft nor loader imports or
 runtime dependencies.
 
 Thread does not use Architectury or a custom platform/version god object, and it does not wrap every
 Minecraft class. `RuntimeProviders` is only a composition bundle over the existing focused
 interfaces. Config-directory and lifecycle abstractions remain absent because thin loader
-entrypoints resolve those values once. Future Minecraft versions receive separate modules and
-implementations rather than runtime `if (minecraftVersion)` branches.
+entrypoints resolve those values once. Adding a Minecraft version should normally require a matrix
+entry and version binding, not a change to `common/src/main`. Future versions receive separate
+compile-time projects rather than runtime `if (minecraftVersion)` branches.
 
 Each version supplies `VersionCapabilities` keyed by stable tool ID. Support is fully supported,
 unsupported, or supported with explicitly named optional fields unavailable. Missing map entries
 are unsupported and never enter discovery or capabilities. Partial support is legal only when the
 existing Thread contract marks those fields optional; providers return ordinary absence rather
 than fabricated values. Core consumes this map and provider contracts without comparing version
-strings. Minecraft 26.2 explicitly declares all twenty-one tools fully supported.
+strings. Minecraft 26.1.2 and 26.2 each explicitly declare all twenty-one tools fully supported.
 
 Java type documentation belongs on public types and architecture documentation belongs under
 `docs/`; `package-info.java` is not used.
 
 ## Versions and dependencies are pinned
 
-The V1 baseline is Minecraft 26.2, Java 25, Fabric Loader 0.19.3, Fabric API 0.154.0+26.2, NeoForge
-26.2.0.62, Forge 65.1.2, Loom 1.17.19, ModDevGradle 2.0.144, ForgeGradle 7.0.35, Gradle 9.5.1, Spotless 8.10.0,
+The V1 baselines are Minecraft 26.1.2 with Fabric API 0.154.0+26.1.2, NeoForge
+26.1.2.41-beta, and Forge 64.0.12; and Minecraft 26.2 with Fabric API 0.154.0+26.2, NeoForge
+26.2.0.62, and Forge 65.1.2. Both use Java 25 and Fabric Loader 0.19.3. Shared build pins are Loom
+1.17.19, ModDevGradle 2.0.144, ForgeGradle 7.0.35, Gradle 9.5.1, Spotless 8.10.0,
 google-java-format 1.36.0, Checkstyle 14.0.0, and JUnit 6.1.2.
+
+`gradle/version-matrix.gradle` is the single source of truth for Java, Minecraft, Fabric
+Loader/API, NeoForge, Forge, and supported loader-combination metadata. Settings, module
+conventions, universal packaging, release validation, and release bundling consume that ordered
+matrix instead of maintaining parallel version constants.
+
+Minecraft 26.1.2 exposes the multiplayer predicate differently from 26.2. Its small session binding uses the
+public inverse `!Minecraft.isSingleplayer()` after confirming a loaded world, preserving rejection
+of LAN-published integrated sessions without reflection or runtime version branching. This is the
+only current production API difference; test-only screen access also stays version-bound. Tool
+contracts and capability states are equal.
 
 Minecraft supplies Gson 2.14.0. Thread uses it behind explicit Thread-owned JSON schemas rather
 than bundling another JSON library or generating schemas through reflection.
@@ -109,8 +127,9 @@ The snapshot uses canonical dimension/biome IDs, the active language's biome tra
 exists, the global respawn data, level difficulty/hardcore and game time, the overworld clock,
 native weather/light/moon attributes, and biome base temperature/precipitation capability. Spawn
 distance is straight-line block distance to the spawn block center only when both positions share a
-dimension; it is `null` across dimensions. Minecraft 26.2 does not expose biome downfall through a
-clean public API, so Thread does not reflect into private climate data or invent a downfall value.
+dimension; it is `null` across dimensions. Neither current Minecraft adapter exposes biome downfall
+through a clean public API, so Thread does not reflect into private climate data or invent a
+downfall value.
 The tool never loads chunks, predicts weather, or changes time/weather/world state.
 
 ## Player context is focused and server-authoritative
@@ -233,6 +252,7 @@ a real temporary single-player world; restart proves persisted configuration rel
 startup proves tools initialize without MCP. All three loader proof mods compile one shared parity
 fixture for the exact catalog, config, lifecycle, MCP, recipes/crafting, and integration contract;
 only their launch mechanics remain separate. Artifact inspection keeps dedicated JARs loader-pure,
-requires common, Minecraft 26.2, and all loader adapters in the universal JAR, rejects duplicates,
+requires common, exactly one Minecraft implementation, and matching loader adapters in each
+universal JAR, rejects cross-version classes and duplicates,
 and scans compiled shared classes for eager loader-specific references. A release is not validated
 by compilation alone.

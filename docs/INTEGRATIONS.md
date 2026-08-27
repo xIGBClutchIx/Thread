@@ -31,10 +31,11 @@ selected Minecraft object:
 - `MinecraftBlockEnricher`;
 - `MinecraftEntityEnricher`.
 
-Those interfaces deliberately live under `platform.minecraft` in `:minecraft-26.2`, outside core.
-They can be reused by any client loader for that Minecraft version because they depend on Minecraft
-rather than Fabric, NeoForge, or Forge, but they are not plain-Java core API or cross-version
-promises. They may accept Minecraft inputs on the owning logical thread; contributions must return
+Those interfaces deliberately live under `platform.minecraft` in the `minecraft` source tree,
+outside core. They can be reused by any client loader for that exact Minecraft version because they
+depend on Minecraft rather than Fabric, NeoForge, or Forge, but they are not plain-Java core API or
+cross-version promises. An integration must compile against the matching version artifact. The
+interfaces may accept Minecraft inputs on the owning logical thread; contributions must return
 detached Thread DTOs and remain bounded/read-only. Optional-mod objects, raw NBT, and component maps
 must never be returned. Their stable extension IDs use the `minecraft.*` namespace.
 

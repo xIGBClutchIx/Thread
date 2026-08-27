@@ -1,9 +1,20 @@
 // Client proofs need a real window and OpenGL context, but their isolated instances should not
 // steal fullscreen focus, pause when focus changes, or emit audio during local verification.
 ext.writeMutedClientTestOptions = { File runDirectory ->
+    def versionPrefix = [
+            // 26.1.2 otherwise migrates the sparse fixture as ancient and restores defaults.
+            '26.1.2': 'version:4790\n',
+            // 26.2 preserves explicit sparse values only through its legacy-options fixer path.
+            '26.2'  : ''
+    ][project.ext.threadMinecraftVersion]
+    if (versionPrefix == null) {
+        throw new GradleException(
+                "Missing client-test options fixture for ${project.ext.threadMinecraftVersion}")
+    }
     runDirectory.mkdirs()
     new File(runDirectory, 'options.txt').setText(
-            'onboardAccessibility:false\n' +
+            versionPrefix +
+                    'onboardAccessibility:false\n' +
                     'fullscreen:false\n' +
                     'pauseOnLostFocus:false\n' +
                     'soundCategory_master:0.0\n',

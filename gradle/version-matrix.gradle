@@ -1,0 +1,29 @@
+// This is the single source of truth for supported Minecraft/loader combinations. Keep this file
+// declarative so settings, module conventions, packaging, release checks, and docs tooling can all
+// consume the same ordered matrix without runtime version selection.
+ext.threadBuildMatrix = [
+        javaVersion: 25,
+        loaders    : ['fabric', 'neoforge', 'forge'],
+        versions   : [
+                '26.1.2': [
+                        taskSuffix      : 'Minecraft2612',
+                        fabricLoader    : '0.19.3',
+                        fabricApi       : '0.154.0+26.1.2',
+                        neoForge        : '26.1.2.41-beta',
+                        forge           : '26.1.2-64.0.12',
+                        capabilityEntry :
+                                'me/clutchy/thread/minecraft/v26_1_2/' +
+                                        'Minecraft2612Capabilities.class'
+                ],
+                '26.2'  : [
+                        taskSuffix      : 'Minecraft262',
+                        fabricLoader    : '0.19.3',
+                        fabricApi       : '0.154.0+26.2',
+                        neoForge        : '26.2.0.62',
+                        forge           : '26.2-65.1.2',
+                        capabilityEntry :
+                                'me/clutchy/thread/minecraft/v26_2/' +
+                                        'Minecraft262Capabilities.class'
+                ]
+        ]
+]

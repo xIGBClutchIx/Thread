@@ -6,6 +6,10 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Minecraft 26.1.2 support as an isolated version adapter with matching Fabric 0.19.3 plus
+  Fabric API 0.154.0+26.1.2, NeoForge 26.1.2.41-beta, Forge 64.0.12, and universal artifacts.
+  Minecraft 26.2 remains a separate compile-time lane with the same twenty-one-tool capability
+  contract; no release JAR spans Minecraft versions.
 - Read-only local client settings through `minecraft.get_client_options`, with section filtering,
   bounded opt-in keybinds and conflicts, deterministic output, and safe availability in menus,
   single-player, and multiplayer without gameplay-state access.
@@ -26,9 +30,10 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 - Safe nearby loaded-container discovery and individual inspection across common vanilla storage
   and machines, with compact summaries, full bounded inventory snapshots, selected furnace/brewing
   state, and no chunk loading or crafting changes.
-- A recommended `thread-universal-<version>.jar` that packages common output and all three thin
-  loader adapters directly, with duplicate detection and the same packaged parity proofs on
-  Fabric, NeoForge, and Forge. Dedicated loader JARs remain available.
+- Recommended `thread-universal-<minecraft>-<version>.jar` artifacts that package common output,
+  exactly one Minecraft adapter, and all three matching thin loader adapters, with duplicate and
+  cross-version detection plus the same packaged parity proofs on Fabric, NeoForge, and Forge.
+  Dedicated loader JARs remain available for each Minecraft version.
 - Forge 65.1.2 support with a thin loader adapter, Java-service integration discovery, a separate
   release JAR, and the same real packaged-client lifecycle/MCP/recipe proofs as the other loaders.
 - NeoForge 26.2 support with a thin loader adapter, Java-service integration discovery, a separate
@@ -50,12 +55,13 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
   respawn context while retaining a focused read-only payload.
 - Consolidated loader-neutral config, startup, MCP, logging, and shutdown behavior in the shared
   runtime, with one packaged parity contract exercised by Fabric, NeoForge, and Forge.
-- Split the project into `:common`, `:fabric`, `:neoforge`, and `:forge`, moved loader-neutral Minecraft
-  providers and runtime assembly into common, and kept all loader adapters limited to
-  loader/lifecycle/discovery wiring.
+- Reorganized the build into `common/`, shared plus version-bound `minecraft/`, nested `loaders/`,
+  and centralized Gradle conventions. Identical Minecraft provider/runtime code now compiles from
+  one shared source set, real API differences remain version-bound, loader adapters stay thin, and
+  universal JARs are matrix-driven packaging outputs rather than per-version source projects.
 - Renamed Minecraft-facing integration extension contracts from Fabric-specific names/IDs to
   loader-neutral `Minecraft*` contracts and `minecraft.*` extension IDs.
-- Restored the Minecraft 26.2 Fabric API minimum to the native `0.154.0+26.2` baseline.
+- Pinned each Fabric lane to its native API baseline: `0.154.0+26.1.2` or `0.154.0+26.2`.
 - Made recipe-source precedence deterministic: the first usable optional provider wins per item,
   while Minecraft's live recipe manager remains the guarded base and fallback.
 - Defined **Thread Integrations** as future separately distributed optional mods/packages rather

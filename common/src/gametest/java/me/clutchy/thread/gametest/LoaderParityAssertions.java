@@ -30,6 +30,10 @@ public final class LoaderParityAssertions {
   /** System property used by disabled-listener runs. */
   public static final String EXPECT_MCP_DISABLED = "thread.gametest.expectMcpDisabled";
 
+  /** System property selecting the exact Minecraft version expected from a packaged artifact. */
+  public static final String EXPECTED_MINECRAFT_VERSION =
+      "thread.gametest.expectedMinecraftVersion";
+
   private static final String PROTOCOL_VERSION = "2026-07-28";
   private static final Set<String> EXPECTED_TOOLS =
       Set.of(
@@ -87,7 +91,12 @@ public final class LoaderParityAssertions {
     assertEquals("MAIN_MENU", status.get("state").getAsString(), "menu status");
     JsonObject game = invoke(runtime.tools(), "minecraft.get_game_info", "{}");
     assertEquals(expectedLoaderId, game.get("loader").getAsString(), "loader identity");
-    assertEquals("26.2", game.get("minecraftVersion").getAsString(), "Minecraft version");
+    String expectedMinecraftVersion = System.getProperty(EXPECTED_MINECRAFT_VERSION);
+    assertTrue(
+        expectedMinecraftVersion != null && !expectedMinecraftVersion.isBlank(),
+        "expected Minecraft version is configured");
+    assertEquals(
+        expectedMinecraftVersion, game.get("minecraftVersion").getAsString(), "Minecraft version");
     assertTrue(!game.get("loaderVersion").getAsString().isBlank(), "loader version");
 
     assertTrue(runtime.mcpRunning(), "MCP listener running");

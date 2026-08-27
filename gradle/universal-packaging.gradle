@@ -1,0 +1,39 @@
+def universalJarTasks = [:]
+
+threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
+    def minecraftProjectPath = ":minecraft:${minecraftVersion}"
+    def fabricProjectPath = ":loaders:fabric:${minecraftVersion}"
+    def neoForgeProjectPath = ":loaders:neoforge:${minecraftVersion}"
+    def forgeProjectPath = ":loaders:forge:${minecraftVersion}"
+
+    def universalJar = tasks.register("universalJar${versionConfig.taskSuffix}", Jar) {
+        group = 'build'
+        description = "Packages the universal Minecraft ${minecraftVersion} artifact."
+        archiveBaseName = "thread-universal-${minecraftVersion}"
+        destinationDirectory = layout.buildDirectory.dir('libs')
+        duplicatesStrategy = DuplicatesStrategy.FAIL
+        includeEmptyDirs = false
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+
+        dependsOn ':common:classes', "${minecraftProjectPath}:classes",
+                "${fabricProjectPath}:clientClasses", "${neoForgeProjectPath}:classes",
+                "${forgeProjectPath}:classes"
+
+        // Resolve source-set outputs lazily because the version projects configure after the root.
+        from { project(':common').sourceSets.main.output }
+        from { project(minecraftProjectPath).sourceSets.main.output }
+        from { project(fabricProjectPath).sourceSets.main.output }
+        from { project(fabricProjectPath).sourceSets.client.output }
+        from { project(neoForgeProjectPath).sourceSets.main.output }
+        from({ project(forgeProjectPath).sourceSets.main.output }) {
+            // Forge's descriptor is loader-branded; the universal artifact owns the neutral copy.
+            exclude 'pack.mcmeta'
+        }
+        from rootProject.file('gradle/universal/pack.mcmeta')
+    }
+
+    universalJarTasks[minecraftVersion] = universalJar
+}
+
+ext.threadUniversalJarTasks = universalJarTasks.asImmutable()

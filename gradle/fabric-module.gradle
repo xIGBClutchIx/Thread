@@ -1,0 +1,118 @@
+apply from: rootProject.file('gradle/client-test-options.gradle')
+
+def minecraftVersion = project.ext.threadVersion
+def versionConfig = rootProject.ext.threadBuildMatrix.versions[minecraftVersion]
+if (versionConfig == null) {
+    throw new GradleException("Unsupported Fabric version project: ${project.path}")
+}
+
+group = "${rootProject.group}.loader.fabric"
+ext.threadMinecraftVersion = minecraftVersion
+ext.threadUniversalJarTask = rootProject.ext.threadUniversalJarTasks[minecraftVersion]
+
+base {
+    archivesName = "thread-fabric-${minecraftVersion}"
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        thread {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'thread-gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+    }
+}
+
+def loaderSourceDirectory = rootProject.file('loaders/fabric')
+sourceSets {
+    main {
+        java.setSrcDirs([new File(loaderSourceDirectory, 'src/main/java')])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/main/resources')])
+    }
+    client {
+        java.setSrcDirs([new File(loaderSourceDirectory, 'src/client/java')])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/client/resources')])
+    }
+    test {
+        java.setSrcDirs([new File(loaderSourceDirectory, 'src/test/java')])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/test/resources')])
+        compileClasspath += sourceSets.client.output
+        runtimeClasspath += sourceSets.client.output
+    }
+    gametest {
+        java.setSrcDirs([
+                new File(loaderSourceDirectory, 'src/gametest/java'),
+                rootProject.file('common/src/gametest/java')
+        ])
+        resources.setSrcDirs([new File(loaderSourceDirectory, 'src/gametest/resources')])
+        compileClasspath += sourceSets.client.output
+        runtimeClasspath += sourceSets.client.output
+    }
+}
+
+def minecraftProjectPath = ":minecraft:${minecraftVersion}"
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    implementation project(':common')
+    implementation project(minecraftProjectPath)
+    implementation "net.fabricmc:fabric-loader:${versionConfig.fabricLoader}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${versionConfig.fabricApi}"
+    productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${versionConfig.fabricApi}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraftVersion', minecraftVersion
+    inputs.property 'loaderVersion', versionConfig.fabricLoader
+    inputs.property 'fabricApiVersion', versionConfig.fabricApi
+    inputs.property 'javaVersion', rootProject.ext.threadBuildMatrix.javaVersion
+
+    filesMatching('fabric.mod.json') {
+        expand(
+                version: project.version,
+                minecraftVersion: minecraftVersion,
+                loaderVersion: versionConfig.fabricLoader,
+                fabricApiVersion: versionConfig.fabricApi,
+                javaVersion: rootProject.ext.threadBuildMatrix.javaVersion)
+    }
+}
+
+tasks.named('jar') {
+    dependsOn ':common:classes', "${minecraftProjectPath}:classes"
+    from project(':common').sourceSets.main.output
+    from project(minecraftProjectPath).sourceSets.main.output
+}
+
+tasks.named('sourcesJar') {
+    from project(':common').sourceSets.main.allSource
+    from project(minecraftProjectPath).sourceSets.main.allSource
+}
+
+tasks.named('compileTestJava') {
+    dependsOn tasks.named('clientClasses')
+}
+
+tasks.named('compileGametestJava') {
+    dependsOn tasks.named('clientClasses')
+}
+
+def clientGameTestRunDirectory = layout.buildDirectory.dir('run/clientGameTest')
+tasks.named('runClientGameTest') {
+    jvmArgs = jvmArgs + ["-Dthread.gametest.expectedMinecraftVersion=${minecraftVersion}"]
+    doFirst {
+        project.ext.writeMutedClientTestOptions(clientGameTestRunDirectory.get().asFile)
+    }
+}
+
+apply from: rootProject.file('gradle/packaged-tests.gradle')

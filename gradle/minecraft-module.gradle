@@ -1,0 +1,21 @@
+def minecraftVersion = project.ext.threadVersion
+def versionConfig = rootProject.ext.threadBuildMatrix.versions[minecraftVersion]
+if (versionConfig == null) {
+    throw new GradleException("Unsupported Minecraft version project: ${project.path}")
+}
+
+group = "${rootProject.group}.minecraft"
+
+base {
+    archivesName = "thread-minecraft-${minecraftVersion}"
+}
+
+sourceSets {
+    main.java.srcDir rootProject.file('minecraft/shared/src/main/java')
+    test.java.srcDir rootProject.file('minecraft/shared/src/test/java')
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    implementation project(':common')
+}

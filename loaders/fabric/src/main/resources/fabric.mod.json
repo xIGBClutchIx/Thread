@@ -1,0 +1,22 @@
+{
+    "schemaVersion": 1,
+    "id": "thread",
+    "version": "${version}",
+    "name": "Thread",
+    "description": "Read-only Minecraft context for MCP-capable AI clients.",
+    "authors": [
+        "xigbclutchix"
+    ],
+    "environment": "client",
+    "entrypoints": {
+        "client": [
+            "me.clutchy.thread.platform.fabric.ThreadFabricClient"
+        ]
+    },
+    "depends": {
+        "fabricloader": ">=${loaderVersion}",
+        "minecraft": "=${minecraftVersion}",
+        "java": ">=${javaVersion}",
+        "fabric-api": ">=${fabricApiVersion}"
+    }
+}

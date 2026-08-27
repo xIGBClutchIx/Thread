@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[${forgeLoaderMajor},)"
+license="All Rights Reserved"
+clientSideOnly=true
+
+[[mods]]
+modId="thread"
+version="${version}"
+displayName="Thread"
+authors="xigbclutchix"
+description='''
+Read-only Minecraft context for MCP-capable AI clients.
+'''
+
+[[dependencies.thread]]
+modId="forge"
+mandatory=true
+versionRange="[${forgeVersion},)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.thread]]
+modId="minecraft"
+mandatory=true
+versionRange="[${minecraftVersion}]"
+ordering="NONE"
+side="CLIENT"

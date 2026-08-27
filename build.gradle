@@ -18,95 +18,22 @@ allprojects {
     }
 }
 
+apply from: 'gradle/version-matrix.gradle'
+
+ext.threadModulePaths = [':common']
+threadBuildMatrix.versions.keySet().each { minecraftVersion ->
+    threadModulePaths.add(":minecraft:${minecraftVersion}")
+    threadBuildMatrix.loaders.each { loader ->
+        threadModulePaths.add(":loaders:${loader}:${minecraftVersion}")
+    }
+}
+
+apply from: 'gradle/universal-packaging.gradle'
 apply from: 'gradle/quality.gradle'
 apply from: 'gradle/release.gradle'
 
 tasks.register('test') {
     group = 'verification'
     description = 'Runs unit tests in every Thread module.'
-    dependsOn ':common:test', ':minecraft-26.2:test', ':fabric:test', ':neoforge:test', ':forge:test'
-}
-
-[
-        'runUniversalProductionClientGameTest',
-        'runUniversalRestartProductionClientGameTest',
-        'runUniversalMcpDisabledProductionClientGameTest'
-].each { taskName ->
-    tasks.register("verifyUniversalFabric${taskName - 'runUniversal'}") {
-        group = 'verification'
-        dependsOn ":fabric:${taskName}"
-    }
-}
-
-[
-        'verifyUniversalNeoForgeProductionClientGameTest',
-        'verifyUniversalNeoForgeRestartProductionClientGameTest',
-        'verifyUniversalNeoForgeMcpDisabledProductionClientGameTest'
-].each { taskName ->
-    tasks.register(taskName) {
-        group = 'verification'
-        dependsOn ":neoforge:${taskName}"
-    }
-}
-
-[
-        'verifyUniversalForgeProductionClientGameTest',
-        'verifyUniversalForgeRestartProductionClientGameTest',
-        'verifyUniversalForgeMcpDisabledProductionClientGameTest'
-].each { taskName ->
-    tasks.register(taskName) {
-        group = 'verification'
-        dependsOn ":forge:${taskName}"
-    }
-}
-
-tasks.register('runClientGameTest') {
-    group = 'verification'
-    description = 'Runs the Fabric development client game test.'
-    dependsOn ':fabric:runClientGameTest'
-}
-
-tasks.register('runNeoForgeClient') {
-    group = 'verification'
-    description = 'Runs the NeoForge development client.'
-    dependsOn ':neoforge:runClient'
-}
-
-tasks.register('runForgeClient') {
-    group = 'verification'
-    description = 'Runs the Forge development client.'
-    dependsOn ':forge:runClient'
-}
-
-[
-        'runProductionClientGameTest',
-        'runRestartProductionClientGameTest',
-        'runMcpDisabledProductionClientGameTest'
-].each { taskName ->
-    tasks.register(taskName) {
-        group = 'verification'
-        dependsOn ":fabric:${taskName}"
-    }
-}
-
-[
-        'verifyForgeProductionClientGameTest',
-        'verifyForgeRestartProductionClientGameTest',
-        'verifyForgeMcpDisabledProductionClientGameTest'
-].each { taskName ->
-    tasks.register(taskName) {
-        group = 'verification'
-        dependsOn ":forge:${taskName}"
-    }
-}
-
-[
-        'verifyNeoForgeProductionClientGameTest',
-        'verifyNeoForgeRestartProductionClientGameTest',
-        'verifyNeoForgeMcpDisabledProductionClientGameTest'
-].each { taskName ->
-    tasks.register(taskName) {
-        group = 'verification'
-        dependsOn ":neoforge:${taskName}"
-    }
+    dependsOn threadModulePaths.collect { "${it}:test" }
 }

@@ -530,7 +530,8 @@ not predict future weather or claim precipitation is visibly reaching a player u
 `localLightLevel` is Minecraft's combined local raw brightness from 0 through 15 at the player's
 block position. `moonPhase` is Minecraft's native lower-case phase value.
 `biomeTemperature` is the biome's exposed base temperature, and `biomeHasPrecipitation` reports
-whether that biome supports precipitation. Minecraft 26.2 does not expose downfall through a clean
+whether that biome supports precipitation. The current 26.1.2 and 26.2 adapters do not expose
+downfall through a clean
 public API, so Thread does not reflect into private climate data or fabricate a downfall value.
 
 The provider resolves the authoritative integrated-server player, checks that the local chunk is

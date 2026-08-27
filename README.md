@@ -3,8 +3,9 @@
 Thread is a read-only Minecraft context server for AI clients. It exposes structured facts from a
 running single-player world through MCP without embedding an AI model or automating gameplay.
 
-Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fabric API
-0.154.0+26.2, NeoForge 26.2.0.62, or Forge 65.1.2. V1 is single-player-only and bound to loopback.
+Thread 0.1.0 targets Minecraft 26.1.2 and 26.2 on Java 25. Each Minecraft version has its own
+Fabric, NeoForge, Forge, and universal artifact; no JAR spans Minecraft versions. V1 is
+single-player-only and bound to loopback.
 
 ## What it exposes
 
@@ -40,12 +41,18 @@ with an explicit `PLAYER_AND_NEARBY` scope when a client wants eligible loaded c
 
 ## Install
 
-1. Install Minecraft 26.2 with Java 25 using Fabric Loader 0.19.3 and Fabric API 0.154.0+26.2,
-   NeoForge 26.2.0.62, or Forge 65.1.2.
-2. Put `thread-universal-0.1.0.jar` in your instance's `mods` folder. It is the recommended download
-   and works on all three supported loaders. Dedicated `thread-fabric-0.1.0.jar`,
-   `thread-neoforge-0.1.0.jar`, and `thread-forge-0.1.0.jar` builds remain available for modpacks,
-   compatibility testing, and troubleshooting. Install exactly one Thread JAR.
+1. Install Java 25 and choose one supported Minecraft/loader combination:
+
+   | Minecraft | Fabric | NeoForge | Forge |
+   | --- | --- | --- | --- |
+   | 26.1.2 | Loader 0.19.3 + Fabric API 0.154.0+26.1.2 | 26.1.2.41-beta | 64.0.12 |
+   | 26.2 | Loader 0.19.3 + Fabric API 0.154.0+26.2 | 26.2.0.62 | 65.1.2 |
+
+2. Put the matching `thread-universal-<minecraft>-0.1.0.jar` in the instance's `mods` folder. It
+   works on all three loaders for that exact Minecraft version. Matching dedicated
+   `thread-fabric-<minecraft>-0.1.0.jar`, `thread-neoforge-<minecraft>-0.1.0.jar`, and
+   `thread-forge-<minecraft>-0.1.0.jar` builds remain available for modpacks and troubleshooting.
+   Install exactly one Thread JAR.
 3. Launch Minecraft. Thread starts its MCP server automatically.
 
 ## Connect an MCP client
@@ -136,10 +143,11 @@ session.
 
 ## Development
 
-The Gradle build separates version-neutral `:common` code from the loader-neutral
-`:minecraft-26.2` implementation, then adds thin `:fabric`, `:neoforge`, and `:forge` adapters plus
-a packaging-only `:universal` module. Releases contain the recommended universal JAR plus all three
-dedicated loader JARs.
+The Gradle build separates version-neutral `:common` code, shared Minecraft-facing sources, small
+`:minecraft:26.1.2` and `:minecraft:26.2` API bindings, and nested Fabric/NeoForge/Forge projects.
+Each version lane compiles the same justified shared sources against exactly one Minecraft version,
+then a root packaging task produces its universal JAR. Releases contain two independent
+four-artifact matrices.
 
 Use the Gradle Wrapper. The normal local gate is:
 
