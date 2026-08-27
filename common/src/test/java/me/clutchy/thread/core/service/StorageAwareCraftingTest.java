@@ -35,6 +35,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.RecipeProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
@@ -341,6 +342,11 @@ class StorageAwareCraftingTest {
     private CountingWorld(boolean truncated, List<BlockInfo> containers) {
       this.truncated = truncated;
       this.containers = containers;
+    }
+
+    @Override
+    public ToolResult<WorldInfo> worldInfo() {
+      throw new AssertionError("world info was not expected");
     }
 
     @Override

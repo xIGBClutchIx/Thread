@@ -7,6 +7,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 
 /**
@@ -15,6 +16,9 @@ import me.clutchy.thread.core.tool.ToolResult;
  * <p>Implementations must not force-load chunks and must honor the supplied query bounds.
  */
 public interface WorldProvider {
+  /** Returns a detached snapshot of the player's current world and local environment. */
+  ToolResult<WorldInfo> worldInfo();
+
   /**
    * Returns detached nearby entity identity, position, health, and reliable behavior context from
    * already-loaded state, bounded by the supplied radius and limit.

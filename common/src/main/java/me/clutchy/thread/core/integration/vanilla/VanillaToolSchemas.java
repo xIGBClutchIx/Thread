@@ -263,6 +263,39 @@ final class VanillaToolSchemas {
               property("loader", string(1, 64, null)),
               property("loaderVersion", string(1, 128, null)),
               property("threadVersion", string(1, 128, null))));
+  static final JsonSchema WORLD_INFO =
+      schema(
+          object(
+              property("dimensionId", registryId()),
+              property("biomeId", registryId()),
+              property("biomeName", nullable(string(1, 256, null))),
+              property("playerPosition", POSITION),
+              property("worldSpawnDimensionId", registryId()),
+              property("worldSpawnPosition", BLOCK_POSITION),
+              property("distanceFromSpawn", nullable(number(0.0, null))),
+              property("difficulty", enumString("peaceful", "easy", "normal", "hard")),
+              property("hardcore", bool()),
+              property("gameTimeTicks", integer(0, null)),
+              property("dayTimeTicks", integer()),
+              property("worldDay", integer()),
+              property("timeOfDayTicks", integer(0, 23_999)),
+              property("daylightState", enumString("DAY", "NIGHT", "FIXED")),
+              property("raining", bool()),
+              property("thundering", bool()),
+              property("localLightLevel", integer(0, 15)),
+              property(
+                  "moonPhase",
+                  enumString(
+                      "full_moon",
+                      "waning_gibbous",
+                      "third_quarter",
+                      "waning_crescent",
+                      "new_moon",
+                      "waxing_crescent",
+                      "first_quarter",
+                      "waxing_gibbous")),
+              property("biomeTemperature", number()),
+              property("biomeHasPrecipitation", bool())));
   static final JsonSchema PLAYER_STATUS =
       schema(
           object(

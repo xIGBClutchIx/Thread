@@ -48,6 +48,7 @@ public final class LoaderParityAssertions {
           "minecraft.get_recipe",
           "minecraft.get_status",
           "minecraft.get_target_block",
+          "minecraft.get_world_info",
           "minecraft.inspect_container",
           "minecraft.search_items");
 
@@ -165,6 +166,12 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "menu live item search rejection");
+    assertToolError(
+        mcpToolResult(endpoint, 12, "minecraft.get_world_info", new JsonObject()),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "menu world-info rejection");
     JsonObject expandedCrafting = new JsonObject();
     expandedCrafting.addProperty("itemId", "minecraft:command_block");
     expandedCrafting.addProperty("scope", "PLAYER_AND_NEARBY");
@@ -198,6 +205,8 @@ public final class LoaderParityAssertions {
     assertTrue(status.get("supported").getAsBoolean(), "single-player support");
     JsonObject player = invoke(tools, "minecraft.get_player", "{}");
     assertEquals("minecraft:overworld", player.get("dimension").getAsString(), "player dimension");
+    JsonObject worldInfo = invoke(tools, "minecraft.get_world_info", "{}");
+    verifyWorldInfo(worldInfo, player);
     invoke(tools, "minecraft.get_inventory", "{}");
     assertEquals(
         6,
@@ -404,6 +413,7 @@ public final class LoaderParityAssertions {
       verifyAdvancementDetail(
           mcpTool(endpoint, 29, "minecraft.get_advancement", advancementArguments), advancementId);
     }
+    verifyWorldInfo(mcpTool(endpoint, 37, "minecraft.get_world_info", new JsonObject()), player);
   }
 
   /** Verifies clean world detachment while the loader-owned client remains running. */
@@ -442,6 +452,13 @@ public final class LoaderParityAssertions {
         "No Minecraft world is currently available.",
         true,
         "return-to-menu live item search rejection");
+    assertToolError(
+        mcpToolResult(
+            runtime.mcpServer().endpoint(), 37, "minecraft.get_world_info", new JsonObject()),
+        "WORLD_NOT_AVAILABLE",
+        "No Minecraft world is currently available.",
+        true,
+        "return-to-menu world-info rejection");
     JsonObject expandedCrafting = new JsonObject();
     expandedCrafting.addProperty("itemId", "minecraft:command_block");
     expandedCrafting.addProperty("scope", "PLAYER_AND_NEARBY");
@@ -541,6 +558,47 @@ public final class LoaderParityAssertions {
     } else {
       assertTrue(advancement.get("completedAt").isJsonNull(), "incomplete completion timestamp");
     }
+  }
+
+  private static void verifyWorldInfo(JsonObject world, JsonObject player) {
+    assertEquals("minecraft:overworld", world.get("dimensionId").getAsString(), "world dimension");
+    assertTrue(world.get("biomeId").getAsString().contains(":"), "biome registry identity");
+    assertTrue(world.has("biomeName"), "biome name absence is explicit");
+    JsonObject clientPosition = player.getAsJsonObject("position");
+    JsonObject serverPosition = world.getAsJsonObject("playerPosition");
+    double positionDeltaSquared =
+        Math.pow(clientPosition.get("x").getAsDouble() - serverPosition.get("x").getAsDouble(), 2)
+            + Math.pow(
+                clientPosition.get("y").getAsDouble() - serverPosition.get("y").getAsDouble(), 2)
+            + Math.pow(
+                clientPosition.get("z").getAsDouble() - serverPosition.get("z").getAsDouble(), 2);
+    assertTrue(positionDeltaSquared <= 1, "server/client player position agreement");
+    assertEquals(
+        "minecraft:overworld",
+        world.get("worldSpawnDimensionId").getAsString(),
+        "world spawn dimension");
+    assertTrue(!world.get("distanceFromSpawn").isJsonNull(), "same-dimension spawn distance");
+    assertTrue(world.get("distanceFromSpawn").getAsDouble() >= 0, "spawn distance range");
+    assertTrue(
+        Set.of("peaceful", "easy", "normal", "hard")
+            .contains(world.get("difficulty").getAsString()),
+        "world difficulty");
+    assertTrue(world.get("hardcore").isJsonPrimitive(), "hardcore flag");
+    long dayTime = world.get("dayTimeTicks").getAsLong();
+    assertEquals(Math.floorDiv(dayTime, 24_000), world.get("worldDay").getAsLong(), "world day");
+    assertEquals(
+        Math.floorMod(dayTime, 24_000), world.get("timeOfDayTicks").getAsInt(), "time within day");
+    assertTrue(
+        Set.of("DAY", "NIGHT", "FIXED").contains(world.get("daylightState").getAsString()),
+        "daylight state");
+    assertTrue(
+        !world.get("thundering").getAsBoolean() || world.get("raining").getAsBoolean(),
+        "thunder implies rain");
+    int light = world.get("localLightLevel").getAsInt();
+    assertTrue(light >= 0 && light <= 15, "local light range");
+    assertTrue(!world.get("moonPhase").getAsString().isBlank(), "moon phase");
+    assertTrue(Double.isFinite(world.get("biomeTemperature").getAsDouble()), "biome temperature");
+    assertTrue(world.get("biomeHasPrecipitation").isJsonPrimitive(), "biome precipitation flag");
   }
 
   /** Invokes a tool and returns its object result, failing on a controlled tool error. */

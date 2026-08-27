@@ -36,6 +36,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.AdvancementProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
@@ -116,6 +117,7 @@ public final class VanillaIntegration implements ThreadIntegration {
     register(context, getStatus());
     register(context, getGameInfo());
     register(context, getPlayer());
+    register(context, getWorldInfo());
     register(context, getAdvancements());
     register(context, getAdvancement());
     register(context, getInventory());
@@ -166,6 +168,20 @@ public final class VanillaIntegration implements ThreadIntegration {
         JsonCodec.of(PlayerStatus.class, VanillaToolSchemas.PLAYER_STATUS),
         ToolCapabilities.supportedSingleplayer(),
         ignored -> player.status());
+  }
+
+  private GameTool<EmptyInput, WorldInfo> getWorldInfo() {
+    return tool(
+        "minecraft.get_world_info",
+        "Returns a compact live snapshot of the supported single-player world around the local "
+            + "player: dimension and biome, position and global spawn distance, difficulty, "
+            + "day/time, daylight, weather, local light, moon phase, and native biome climate "
+            + "values. Use this for current surroundings without changing time, weather, chunks, "
+            + "or any world state.",
+        emptyInputCodec(),
+        JsonCodec.of(WorldInfo.class, VanillaToolSchemas.WORLD_INFO),
+        ToolCapabilities.supportedSingleplayer(),
+        ignored -> world.worldInfo());
   }
 
   private GameTool<EmptyInput, InventorySnapshot> getInventory() {

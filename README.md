@@ -8,10 +8,12 @@ Thread 0.1.0 targets Minecraft 26.2 and Java 25 on Fabric Loader 0.19.3 with Fab
 
 ## What it exposes
 
-Eighteen `minecraft.*` tools cover:
+Nineteen `minecraft.*` tools cover:
 
 - session status and game versions;
 - player health, hunger, experience, position, dimension, and game mode;
+- compact live world context including biome, spawn distance, difficulty/hardcore, time, weather,
+  local light, moon phase, and native biome climate values;
 - live vanilla advancement lists and detailed criterion progress;
 - inventory, held items, and armor;
 - the targeted block plus bounded nearby container discovery and inspection;

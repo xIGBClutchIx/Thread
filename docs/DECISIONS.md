@@ -70,6 +70,21 @@ from the matching integrated-server player and returned as detached criteria, re
 hierarchy, display metadata, and timestamps. The provider is advancement-specific: Thread does not
 define a generic progression or quest framework, and base Thread does not claim FTB Quests support.
 
+## World context is one authoritative snapshot
+
+`minecraft.get_world_info` stays one focused `WorldProvider` operation rather than splitting biome,
+time, weather, light, and spawn into overlapping tools. The client thread performs the centralized
+single-player guard and captures the integrated server plus local player identity; the server
+thread then resolves that player and reads one already-loaded local chunk.
+
+The snapshot uses canonical dimension/biome IDs, the active language's biome translation when one
+exists, the global respawn data, level difficulty/hardcore and game time, the overworld clock,
+native weather/light/moon attributes, and biome base temperature/precipitation capability. Spawn
+distance is straight-line block distance to the spawn block center only when both positions share a
+dimension; it is `null` across dimensions. Minecraft 26.2 does not expose biome downfall through a
+clean public API, so Thread does not reflect into private climate data or invent a downfall value.
+The tool never loads chunks, predicts weather, or changes time/weather/world state.
+
 ## Nearby containers are bounded context and explicit crafting input
 
 `minecraft.get_nearby_containers` scans only already-loaded chunks within a hard 16-block ceiling

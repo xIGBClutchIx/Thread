@@ -17,6 +17,7 @@ import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.DaylightState;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
@@ -28,6 +29,16 @@ import org.junit.jupiter.api.Test;
 
 class MinecraftWorldProviderTest {
   private static final MinecraftProviderLimits LIMITS = MinecraftProviderLimits.defaults();
+
+  @Test
+  void classifiesDayNightTransitionsAndFixedTimeDimensionsDeterministically() {
+    assertEquals(DaylightState.DAY, MinecraftWorldProvider.daylightState(false, 0));
+    assertEquals(DaylightState.DAY, MinecraftWorldProvider.daylightState(false, 12_999));
+    assertEquals(DaylightState.NIGHT, MinecraftWorldProvider.daylightState(false, 13_000));
+    assertEquals(DaylightState.NIGHT, MinecraftWorldProvider.daylightState(false, 22_999));
+    assertEquals(DaylightState.DAY, MinecraftWorldProvider.daylightState(false, 23_000));
+    assertEquals(DaylightState.FIXED, MinecraftWorldProvider.daylightState(true, 6_000));
+  }
 
   @Test
   void enforcesRadiusAndResultCapsBeforeGameThreadDispatch() {

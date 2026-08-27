@@ -49,6 +49,7 @@ import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.DaylightState;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
@@ -58,6 +59,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.AdvancementProvider;
 import me.clutchy.thread.core.provider.GameProvider;
 import me.clutchy.thread.core.provider.PlayerProvider;
@@ -89,6 +91,7 @@ class VanillaIntegrationTest {
           "minecraft.get_recipe",
           "minecraft.get_status",
           "minecraft.get_target_block",
+          "minecraft.get_world_info",
           "minecraft.inspect_container",
           "minecraft.search_items");
 
@@ -121,6 +124,20 @@ class VanillaIntegrationTest {
     JsonObject player = invoke(catalog.tools(), "minecraft.get_player", "{}");
     assertEquals("minecraft:overworld", player.get("dimension").getAsString());
     assertEquals(18, player.get("health").getAsDouble());
+
+    JsonObject worldInfo = invoke(catalog.tools(), "minecraft.get_world_info", "{}");
+    assertEquals(
+        "{\"dimensionId\":\"minecraft:overworld\",\"biomeId\":\"minecraft:plains\","
+            + "\"biomeName\":\"Plains\",\"playerPosition\":{\"x\":0.5,\"y\":64.5,"
+            + "\"z\":0.5},\"worldSpawnDimensionId\":\"minecraft:overworld\","
+            + "\"worldSpawnPosition\":{\"x\":0,\"y\":64,\"z\":0},"
+            + "\"distanceFromSpawn\":0.0,\"difficulty\":\"normal\","
+            + "\"hardcore\":false,"
+            + "\"gameTimeTicks\":1234,\"dayTimeTicks\":6000,\"worldDay\":0,"
+            + "\"timeOfDayTicks\":6000,\"daylightState\":\"DAY\",\"raining\":false,"
+            + "\"thundering\":false,\"localLightLevel\":15,\"moonPhase\":\"full_moon\","
+            + "\"biomeTemperature\":0.8,\"biomeHasPrecipitation\":true}",
+        worldInfo.toString());
 
     JsonObject advancements = invoke(catalog.tools(), "minecraft.get_advancements", "{}");
     assertEquals("ALL", advancements.get("filter").getAsString());
@@ -335,7 +352,7 @@ class VanillaIntegrationTest {
             .get("minecraftVersion")
             .getAsString());
     assertEquals(
-        18, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
+        19, strings(invoke(catalog.tools(), "minecraft.get_capabilities", "{}"), "tools").size());
     assertEquals(
         "minecraft:diamond_pickaxe",
         first(
@@ -464,6 +481,8 @@ class VanillaIntegrationTest {
             new FakeRecipeProvider(),
             ignored -> true);
     assertToolFailure(
+        noWorld.tools(), "minecraft.get_world_info", "{}", ToolErrorCode.WORLD_NOT_AVAILABLE);
+    assertToolFailure(
         noWorld.tools(),
         "minecraft.get_nearby_containers",
         "{\"radius\":8,\"limit\":8}",
@@ -481,6 +500,8 @@ class VanillaIntegrationTest {
             new UnavailableWorldProvider(ToolErrorCode.UNSUPPORTED),
             new FakeRecipeProvider(),
             ignored -> true);
+    assertToolFailure(
+        multiplayer.tools(), "minecraft.get_world_info", "{}", ToolErrorCode.UNSUPPORTED);
     assertToolFailure(
         multiplayer.tools(),
         "minecraft.inspect_container",
@@ -581,7 +602,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(19, strings(capabilities, "tools").size());
+    assertEquals(20, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -639,7 +660,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(18, strings(capabilities, "tools").size());
+    assertEquals(19, strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -1024,6 +1045,32 @@ class VanillaIntegrationTest {
 
   private static final class FakeWorldProvider implements WorldProvider {
     @Override
+    public ToolResult<WorldInfo> worldInfo() {
+      return ToolResult.success(
+          new WorldInfo(
+              "minecraft:overworld",
+              "minecraft:plains",
+              "Plains",
+              new Position(0.5, 64.5, 0.5),
+              "minecraft:overworld",
+              new BlockPosition(0, 64, 0),
+              0.0,
+              "normal",
+              false,
+              1_234,
+              6_000,
+              0,
+              6_000,
+              DaylightState.DAY,
+              false,
+              false,
+              15,
+              "full_moon",
+              0.8,
+              true));
+    }
+
+    @Override
     public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
       return ToolResult.success(
           new NearbyEntityResult(
@@ -1107,6 +1154,11 @@ class VanillaIntegrationTest {
 
     private UnavailableWorldProvider(ToolErrorCode code) {
       error = ToolError.of(code, "Unavailable for test.", true);
+    }
+
+    @Override
+    public ToolResult<WorldInfo> worldInfo() {
+      return ToolResult.failure(error);
     }
 
     @Override

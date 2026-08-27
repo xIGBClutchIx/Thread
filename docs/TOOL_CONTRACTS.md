@@ -244,6 +244,69 @@ Example result:
 
 Do not include identity/account identifiers unless a future use case explicitly requires them.
 
+## `minecraft.get_world_info`
+
+Purpose: return one compact structured snapshot of the supported single-player world and local
+environment around the player.
+
+Input: none.
+
+Example result:
+
+```json
+{
+  "dimensionId": "minecraft:overworld",
+  "biomeId": "minecraft:plains",
+  "biomeName": "Plains",
+  "playerPosition": {"x": 152.2, "y": 67.0, "z": -381.7},
+  "worldSpawnDimensionId": "minecraft:overworld",
+  "worldSpawnPosition": {"x": 0, "y": 64, "z": 0},
+  "distanceFromSpawn": 411.2,
+  "difficulty": "normal",
+  "hardcore": false,
+  "gameTimeTicks": 846200,
+  "dayTimeTicks": 301000,
+  "worldDay": 12,
+  "timeOfDayTicks": 13000,
+  "daylightState": "NIGHT",
+  "raining": false,
+  "thundering": false,
+  "localLightLevel": 4,
+  "moonPhase": "new_moon",
+  "biomeTemperature": 0.8,
+  "biomeHasPrecipitation": true
+}
+```
+
+Canonical IDs come from the live dimension and biome registries. `biomeName` is the current client
+language translation when one exists and is otherwise `null`; clients must use `biomeId` as the
+stable key. `playerPosition` intentionally overlaps `minecraft.get_player` so this snapshot remains
+self-contained.
+
+`worldSpawnPosition` is Minecraft's global world spawn, and `worldSpawnDimensionId` identifies its
+dimension. `distanceFromSpawn` is straight-line Euclidean distance in blocks from the player to the
+spawn block center. It is `null` when player and spawn are in different dimensions because those
+coordinates have no direct distance. Reading spawn never loads its chunk.
+
+`difficulty` is `peaceful`, `easy`, `normal`, or `hard`; `hardcore` is the save's independent native
+flag. `gameTimeTicks` is total current-level age. `dayTimeTicks` is the total overworld clock value
+affected by normal time progression, sleep, and time commands. `worldDay` is its zero-based
+24,000-tick day, while `timeOfDayTicks` is the value from 0 through 23,999 within that day.
+`daylightState` is `DAY` before tick 13,000 and from tick 23,000 onward, `NIGHT` otherwise, or
+`FIXED` in a fixed-time dimension.
+
+`raining` and `thundering` report Minecraft's current global weather state for the level; they do
+not predict future weather or claim precipitation is visibly reaching a player under cover.
+`localLightLevel` is Minecraft's combined local raw brightness from 0 through 15 at the player's
+block position. `moonPhase` is Minecraft's native lower-case phase value.
+`biomeTemperature` is the biome's exposed base temperature, and `biomeHasPrecipitation` reports
+whether that biome supports precipitation. Minecraft 26.2 does not expose downfall through a clean
+public API, so Thread does not reflect into private climate data or fabricate a downfall value.
+
+The provider resolves the authoritative integrated-server player, checks that the local chunk is
+already loaded, and performs no commands, mutation, prediction, or chunk loading. Menu/no-world and
+multiplayer calls are rejected by the centralized gameplay guard.
+
 ## Shared item shape
 
 Inventory, equipment, recipe results, and inspected block-entity contents use the same non-empty
@@ -1006,6 +1069,7 @@ Example result:
     "minecraft.get_status",
     "minecraft.get_game_info",
     "minecraft.get_player",
+    "minecraft.get_world_info",
     "minecraft.get_inventory"
   ],
   "integrations": [
@@ -1013,7 +1077,7 @@ Example result:
       "id": "vanilla",
       "version": "1",
       "metadata": [
-        {"key": "thread.tool_count", "value": "18"}
+        {"key": "thread.tool_count", "value": "19"}
       ]
     }
   ]
@@ -1031,7 +1095,7 @@ capabilities and their classes are not resolved before presence/compatibility ch
 
 The base artifact reports only the required `vanilla` integration. Future separately installed
 Thread Integrations packages may add their own stable IDs and bounded contribution metadata without
-changing the eighteen built-in `minecraft.*` tool contracts.
+changing the nineteen built-in `minecraft.*` tool contracts.
 
 ## Tool descriptions
 

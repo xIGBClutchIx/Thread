@@ -28,6 +28,7 @@ import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.DaylightState;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
@@ -37,6 +38,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +67,7 @@ class ProviderContractsTest {
             .orElseThrow()
             .item());
     assertEquals("minecraft:stone", player.targetBlock().value().orElseThrow().blockId());
+    assertEquals("minecraft:plains", world.worldInfo().value().biomeId());
     assertEquals(
         "minecraft:zombie",
         world
@@ -191,6 +194,32 @@ class ProviderContractsTest {
   }
 
   private static final class FakeWorldProvider implements WorldProvider {
+    @Override
+    public ToolResult<WorldInfo> worldInfo() {
+      return ToolResult.success(
+          new WorldInfo(
+              "minecraft:overworld",
+              "minecraft:plains",
+              "Plains",
+              new Position(0.5, 64.5, 0.5),
+              "minecraft:overworld",
+              new BlockPosition(0, 64, 0),
+              0.0,
+              "normal",
+              false,
+              1_234,
+              6_000,
+              0,
+              6_000,
+              DaylightState.DAY,
+              false,
+              false,
+              15,
+              "full_moon",
+              0.8,
+              true));
+    }
+
     @Override
     public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
       return ToolResult.success(

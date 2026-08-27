@@ -6,6 +6,9 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ### Added
 
+- Compact live world/environment context through `minecraft.get_world_info`, including dimension,
+  biome, player and global spawn positions, same-dimension spawn distance, difficulty and hardcore,
+  day/time, daylight, weather, local light, moon phase, and native biome climate values.
 - Read-only vanilla advancement awareness through `minecraft.get_advancements` and
   `minecraft.get_advancement`, with live integrated-server progress, visible/known client gating,
   criteria and timestamps, deterministic filters/search, and bounded results.

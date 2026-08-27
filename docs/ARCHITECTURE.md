@@ -45,8 +45,8 @@ loader types, MCP types, and optional-mod types do not cross this boundary.
 
 - client and integrated-server thread dispatch;
 - the single-player session guard and status mapping;
-- bounded game, player, vanilla-advancement, world, item, block, entity, loaded-container, and
-  live-recipe reads;
+- bounded game, player, vanilla-advancement, world/environment, item, block, entity,
+  loaded-container, and live-recipe reads;
 - conversion from Minecraft objects to detached Thread DTOs;
 - safe Minecraft-facing block/entity extension points and registries.
 
@@ -133,7 +133,7 @@ behavior.
 
 Packaged parity coverage requires each loader to prove:
 
-- the exact same eighteen-tool catalog and active vanilla integration;
+- the exact same nineteen-tool catalog and active vanilla integration;
 - correct loader identity plus menu, single-player, and return-to-menu status;
 - MCP-enabled, restarted-config, and MCP-disabled startup;
 - standard MCP initialization, discovery, tool listing, calls, and controlled menu rejection;
@@ -153,9 +153,9 @@ shared session guard and reject menus, loading states, missing players, and mult
 exposing game state.
 
 Client-owned reads run on the Minecraft client thread. Integrated-server-owned reads, including
-live recipes, advancement progress, block entities, and nearby container scans, run on the
-integrated-server thread. Advancement reads first capture the client advancement tree on the
-client thread so only entries Minecraft has exposed as visible/known are eligible, then map their
+live recipes, advancement progress, world/environment context, block entities, and nearby container
+scans, run on the integrated-server thread. Advancement reads first capture the client advancement
+tree on the client thread so only entries Minecraft has exposed as visible/known are eligible, then map their
 authoritative server-player progress into detached DTOs. Dispatch has a configured deadline;
 timeout and lifecycle rejection become structured retryable errors. A request may fail safely if
 the world unloads while it is waiting.
@@ -170,6 +170,12 @@ and validates serialized output before returning it to MCP.
 stable ID ordering, and result limits over a bounded `AdvancementProvider` snapshot. This is a
 dedicated vanilla advancement path, not a generic progression or quest API. A future FTB Quests
 integration should contribute its own tools unless proven stable shared concepts justify reuse.
+
+`minecraft.get_world_info` is one focused `WorldProvider` snapshot rather than a family of small
+environment tools. It resolves the authoritative integrated-server player and already-loaded local
+chunk before reading dimension, biome, global spawn, difficulty/hardcore, clocks, weather, light,
+moon phase, and native biome climate values. Cross-dimension spawn distance is explicitly absent,
+and the provider never loads a chunk or mutates time/weather to complete the snapshot.
 
 `CraftingService` uses maximum-flow allocation so overlapping alternatives cannot spend the same
 item twice. `CraftingPlanner` uses one item/surplus ledger, active-path cycle detection,

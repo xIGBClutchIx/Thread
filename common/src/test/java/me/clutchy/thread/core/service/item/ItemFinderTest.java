@@ -32,6 +32,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSnapshotResult;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.PlayerProvider;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -220,6 +221,11 @@ class ItemFinderTest {
   private static WorldProvider world(boolean truncated, List<BlockInfo> containers) {
     return new WorldProvider() {
       @Override
+      public ToolResult<WorldInfo> worldInfo() {
+        throw new AssertionError("world info was not expected");
+      }
+
+      @Override
       public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
         throw new AssertionError("nearby entities were not expected");
       }
@@ -247,6 +253,11 @@ class ItemFinderTest {
   private static WorldProvider failingWorld(ToolErrorCode code) {
     ToolError error = ToolError.of(code, "Unavailable for test.", true);
     return new WorldProvider() {
+      @Override
+      public ToolResult<WorldInfo> worldInfo() {
+        return ToolResult.failure(error);
+      }
+
       @Override
       public ToolResult<NearbyEntityResult> nearbyEntities(NearbyEntityQuery query) {
         return ToolResult.failure(error);

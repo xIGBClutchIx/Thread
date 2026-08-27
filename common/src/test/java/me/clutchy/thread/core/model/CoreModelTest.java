@@ -1,6 +1,7 @@
 package me.clutchy.thread.core.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,11 +27,13 @@ import me.clutchy.thread.core.model.recipe.RecipeIngredientInfo;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockEntityItemInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
+import me.clutchy.thread.core.model.world.DaylightState;
 import me.clutchy.thread.core.model.world.EntityClassification;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
 import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.tool.ToolResult;
 import org.junit.jupiter.api.Test;
 
@@ -236,6 +239,28 @@ class CoreModelTest {
         () -> new SessionStatus(SessionState.MAIN_MENU, false, false, false, null));
   }
 
+  @Test
+  void worldInfoKeepsWeatherSpawnAndTimeSemanticsExplicit() {
+    WorldInfo clear = worldInfo(false, false, "minecraft:overworld", "minecraft:overworld", 0.0);
+    WorldInfo rain = worldInfo(true, false, "minecraft:overworld", "minecraft:overworld", 0.0);
+    WorldInfo thunder = worldInfo(true, true, "minecraft:overworld", "minecraft:overworld", 0.0);
+    WorldInfo crossDimension =
+        worldInfo(false, false, "minecraft:the_nether", "minecraft:overworld", null);
+
+    assertFalse(clear.raining());
+    assertTrue(rain.raining());
+    assertTrue(thunder.thundering());
+    assertNull(crossDimension.distanceFromSpawn());
+    assertEquals(1, clear.worldDay());
+    assertEquals(1_000, clear.timeOfDayTicks());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> worldInfo(false, true, "minecraft:overworld", "minecraft:overworld", 0.0));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> worldInfo(false, false, "minecraft:the_nether", "minecraft:overworld", 12.0));
+  }
+
   private static ItemStackInfo item(String itemId, String displayName, int count, int maxCount) {
     return new ItemStackInfo(itemId, displayName, null, count, maxCount, null, List.of(), null);
   }
@@ -249,5 +274,34 @@ class CoreModelTest {
             new EquipmentSlotInfo(EquipmentPosition.CHEST, null),
             new EquipmentSlotInfo(EquipmentPosition.LEGS, null),
             new EquipmentSlotInfo(EquipmentPosition.FEET, null)));
+  }
+
+  private static WorldInfo worldInfo(
+      boolean raining,
+      boolean thundering,
+      String dimensionId,
+      String spawnDimensionId,
+      Double spawnDistance) {
+    return new WorldInfo(
+        dimensionId,
+        "minecraft:plains",
+        "Plains",
+        new Position(0.5, 64.5, 0.5),
+        spawnDimensionId,
+        new BlockPosition(0, 64, 0),
+        spawnDistance,
+        "normal",
+        false,
+        25_000,
+        25_000,
+        1,
+        1_000,
+        DaylightState.DAY,
+        raining,
+        thundering,
+        15,
+        "waning_gibbous",
+        0.8,
+        true);
   }
 }

@@ -89,10 +89,11 @@ The real local HTTP tests cover:
 - tool schemas, annotations, structured success/error mapping, disconnects, and shutdown.
 
 Packaged client tests repeat initialization against each actual loader-specific JAR. A shared
-loader-neutral parity fixture verifies the exact catalog, exercises all eighteen tool paths across
+loader-neutral parity fixture verifies the exact catalog, exercises all nineteen tool paths across
 the menu/world/menu lifecycle, and proves default/explicit crafting scopes through MCP on Fabric,
 NeoForge, and Forge. The richer Fabric fixture also proves a nearby-only ingredient, its container
-allocation, and recursive-plan provenance against a real loaded world.
+allocation, recursive-plan provenance, and live day/night plus clear/rain/thunder transitions for
+`minecraft.get_world_info` against a real loaded world.
 
 ## Deliberately absent MCP features
 

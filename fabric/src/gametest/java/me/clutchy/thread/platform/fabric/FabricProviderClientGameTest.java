@@ -100,6 +100,8 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
       singleplayer
           .getServer()
           .runCommand("summon minecraft:zombie 4 100 0 {NoAI:1b,Silent:1b,Invulnerable:1b}");
+      singleplayer.getServer().runCommand("time set day");
+      singleplayer.getServer().runCommand("weather clear");
       // Waiting for the command's observable client state keeps this packaged test deterministic
       // without depending on a game-test packet-drain convenience API.
       context.waitFor(
@@ -119,6 +121,8 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
             LoaderParityAssertions.verifyWorld(runtime, true);
             return null;
           });
+
+      verifyWorldEnvironmentTransitions(context, singleplayer, tools);
 
       assertTrue(
           invokeSuccessfully(context, tools, "minecraft.get_status", "{}")
@@ -597,7 +601,7 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
 
       JsonObject mcpCapabilities =
           mcpTool(context, mcp.endpoint(), 17, "minecraft.get_capabilities", new JsonObject());
-      assertEquals(18, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
+      assertEquals(19, mcpCapabilities.getAsJsonArray("tools").size(), "MCP capability tool count");
       assertEquals(
           2, mcpCapabilities.getAsJsonArray("integrations").size(), "MCP integration count");
       assertTrue(
@@ -666,6 +670,41 @@ public final class FabricProviderClientGameTest implements FabricClientGameTest 
         "native recursive final recipe");
     assertTrue(plan.getAsJsonArray("missingMaterials").isEmpty(), "native plan raw shortages");
     assertTrue(plan.getAsJsonArray("issues").isEmpty(), "native plan safety limits");
+  }
+
+  private static void verifyWorldEnvironmentTransitions(
+      ClientGameTestContext context, TestSingleplayerContext singleplayer, ToolRegistry tools) {
+    JsonObject day = invokeSuccessfully(context, tools, "minecraft.get_world_info", "{}");
+    assertEquals("DAY", day.get("daylightState").getAsString(), "daylight state");
+    assertTrue(!day.get("raining").getAsBoolean(), "clear weather state");
+    assertTrue(!day.get("thundering").getAsBoolean(), "clear thunder state");
+    assertTrue(!day.get("hardcore").getAsBoolean(), "non-hardcore test world");
+
+    singleplayer.getServer().runCommand("time set night");
+    JsonObject night = invokeSuccessfully(context, tools, "minecraft.get_world_info", "{}");
+    assertEquals("NIGHT", night.get("daylightState").getAsString(), "night state transition");
+
+    singleplayer.getServer().runCommand("weather rain");
+    waitTicks(context, 25);
+    JsonObject rain = invokeSuccessfully(context, tools, "minecraft.get_world_info", "{}");
+    assertTrue(rain.get("raining").getAsBoolean(), "rain state transition");
+    assertTrue(!rain.get("thundering").getAsBoolean(), "rain without thunder");
+
+    singleplayer.getServer().runCommand("weather thunder");
+    // Vanilla raises the thunder level by 0.01 per tick and only reports thunder above 0.9.
+    waitTicks(context, 100);
+    JsonObject thunder = invokeSuccessfully(context, tools, "minecraft.get_world_info", "{}");
+    assertTrue(thunder.get("raining").getAsBoolean(), "thunder retains rain");
+    assertTrue(thunder.get("thundering").getAsBoolean(), "thunder state transition");
+
+    singleplayer.getServer().runCommand("weather clear");
+    singleplayer.getServer().runCommand("time set day");
+  }
+
+  private static void waitTicks(ClientGameTestContext context, int ticks) {
+    for (int tick = 0; tick < ticks; tick++) {
+      context.waitTick();
+    }
   }
 
   private static JsonObject mcpTool(

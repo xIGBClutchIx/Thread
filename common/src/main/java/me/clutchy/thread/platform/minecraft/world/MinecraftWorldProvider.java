@@ -7,12 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.model.world.BlockEntityInfo;
 import me.clutchy.thread.core.model.world.BlockInfo;
 import me.clutchy.thread.core.model.world.BlockPosition;
 import me.clutchy.thread.core.model.world.ContainerInspectionQuery;
+import me.clutchy.thread.core.model.world.DaylightState;
 import me.clutchy.thread.core.model.world.EntityInfo;
 import me.clutchy.thread.core.model.world.NearbyContainerQuery;
 import me.clutchy.thread.core.model.world.NearbyContainerResult;
@@ -21,6 +23,7 @@ import me.clutchy.thread.core.model.world.NearbyContainerSummary;
 import me.clutchy.thread.core.model.world.NearbyEntityQuery;
 import me.clutchy.thread.core.model.world.NearbyEntityResult;
 import me.clutchy.thread.core.model.world.Position;
+import me.clutchy.thread.core.model.world.WorldInfo;
 import me.clutchy.thread.core.provider.GameThreadExecutor;
 import me.clutchy.thread.core.provider.WorldProvider;
 import me.clutchy.thread.core.tool.ToolResult;
@@ -34,14 +37,22 @@ import me.clutchy.thread.platform.minecraft.threading.MinecraftThreadExecutor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.locale.Language;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Util;
+import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.AABB;
 
 /** Loader-neutral bounded queries over entities already present in the client level. */
@@ -79,6 +90,21 @@ public final class MinecraftWorldProvider implements WorldProvider {
         Objects.requireNonNull(blockEntityInspectors, "blockEntityInspectors");
     this.blockEnrichers = Objects.requireNonNull(blockEnrichers, "blockEnrichers");
     this.gameThreadTimeout = Objects.requireNonNull(gameThreadTimeout, "gameThreadTimeout");
+  }
+
+  @Override
+  public ToolResult<WorldInfo> worldInfo() {
+    ToolResult<WorldInfoContext> captured =
+        MinecraftProviderSupport.read(
+            clientThread, "world.info.capture", this::captureWorldInfoContext);
+    if (!captured.successful()) {
+      return ToolResult.failure(Objects.requireNonNull(captured.error()));
+    }
+    WorldInfoContext context = Objects.requireNonNull(captured.value());
+    GameThreadExecutor serverThread =
+        MinecraftThreadExecutor.forServer(context.server(), gameThreadTimeout);
+    return MinecraftProviderSupport.read(
+        serverThread, "world.info.read", () -> readWorldInfo(context));
   }
 
   @Override
@@ -282,6 +308,97 @@ public final class MinecraftWorldProvider implements WorldProvider {
     return MinecraftProviderSupport.read(clientThread, operation, this::readWorldContext);
   }
 
+  private ToolResult<WorldInfoContext> captureWorldInfoContext() {
+    Optional<ToolError> unavailable = sessionGuard.gameplayUnavailable(client);
+    if (unavailable.isPresent()) {
+      return ToolResult.failure(unavailable.orElseThrow());
+    }
+    return ToolResult.success(
+        new WorldInfoContext(
+            Objects.requireNonNull(client.getSingleplayerServer()), client.player.getUUID()));
+  }
+
+  private ToolResult<WorldInfo> readWorldInfo(WorldInfoContext context) {
+    ServerPlayer player = context.server().getPlayerList().getPlayer(context.playerId());
+    if (player == null) {
+      return ToolResult.failure(
+          ToolError.of(
+              ToolErrorCode.PLAYER_NOT_AVAILABLE,
+              "The local player is no longer available.",
+              true));
+    }
+    ServerLevel level = player.level();
+    BlockPos playerBlockPosition = player.blockPosition();
+    if (!level
+        .getChunkSource()
+        .hasChunk(playerBlockPosition.getX() >> 4, playerBlockPosition.getZ() >> 4)) {
+      return ToolResult.failure(
+          ToolError.of(
+              ToolErrorCode.NOT_AVAILABLE,
+              "The player's current chunk is no longer loaded.",
+              true));
+    }
+
+    Holder<Biome> biome = level.getBiome(playerBlockPosition);
+    Optional<Identifier> biomeIdentifier = biome.unwrapKey().map(ResourceKey::identifier);
+    if (biomeIdentifier.isEmpty()) {
+      return ToolResult.failure(
+          ToolError.of(
+              ToolErrorCode.NOT_AVAILABLE,
+              "The player's current biome has no registered identity.",
+              true));
+    }
+
+    Position playerPosition = mapper.position(player);
+    LevelData.RespawnData spawn = level.getRespawnData();
+    String dimensionId = level.dimension().identifier().toString();
+    String spawnDimensionId = spawn.dimension().identifier().toString();
+    BlockPosition spawnPosition =
+        new BlockPosition(spawn.pos().getX(), spawn.pos().getY(), spawn.pos().getZ());
+    Double spawnDistance =
+        dimensionId.equals(spawnDimensionId) ? distance(playerPosition, spawnPosition) : null;
+    long dayTimeTicks = level.getOverworldClockTime();
+    int timeOfDayTicks = Math.floorMod(dayTimeTicks, WorldInfo.TICKS_PER_DAY);
+    Identifier biomeId = biomeIdentifier.orElseThrow();
+    String biomeTranslationKey = Util.makeDescriptionId("biome", biomeId);
+    Language language = Language.getInstance();
+
+    return ToolResult.success(
+        new WorldInfo(
+            dimensionId,
+            biomeId.toString(),
+            language.has(biomeTranslationKey) ? language.getOrDefault(biomeTranslationKey) : null,
+            playerPosition,
+            spawnDimensionId,
+            spawnPosition,
+            spawnDistance,
+            level.getDifficulty().getSerializedName(),
+            level.getLevelData().isHardcore(),
+            level.getGameTime(),
+            dayTimeTicks,
+            Math.floorDiv(dayTimeTicks, WorldInfo.TICKS_PER_DAY),
+            timeOfDayTicks,
+            daylightState(level.dimensionType().hasFixedTime(), timeOfDayTicks),
+            level.isRaining(),
+            level.isThundering(),
+            level.getMaxLocalRawBrightness(playerBlockPosition),
+            level
+                .environmentAttributes()
+                .getValue(EnvironmentAttributes.MOON_PHASE, playerBlockPosition)
+                .getSerializedName(),
+            biome.value().getBaseTemperature(),
+            biome.value().hasPrecipitation()));
+  }
+
+  static DaylightState daylightState(boolean fixedTime, int timeOfDayTicks) {
+    if (fixedTime) {
+      return DaylightState.FIXED;
+    }
+    return timeOfDayTicks >= 13_000 && timeOfDayTicks < 23_000
+        ? DaylightState.NIGHT
+        : DaylightState.DAY;
+  }
+
   private ToolResult<WorldContext> readWorldContext() {
     Optional<ToolError> unavailable = sessionGuard.gameplayUnavailable(client);
     if (unavailable.isPresent()) {
@@ -412,4 +529,6 @@ public final class MinecraftWorldProvider implements WorldProvider {
 
   private record WorldContext(
       MinecraftServer server, ResourceKey<Level> dimension, Position playerPosition) {}
+
+  private record WorldInfoContext(MinecraftServer server, UUID playerId) {}
 }
