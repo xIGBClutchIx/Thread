@@ -71,6 +71,10 @@ threadBuildMatrix.versions.each { minecraftVersion, versionConfig ->
             exclude 'pack.mcmeta'
         }
         from rootProject.file('gradle/universal/pack.mcmeta')
+        from(rootProject.file('LICENSE')) {
+            into 'META-INF'
+            rename { 'LICENSE_thread' }
+        }
     }
 
     universalJarTasks[minecraftVersion] = universalJar

@@ -1,0 +1,29 @@
+name: Verify packaged clients
+description: Runs the dedicated and universal packaged-client proofs for every supported version.
+
+runs:
+    using: composite
+    steps:
+        - name: Test dedicated Fabric JARs
+          shell: bash
+          run: bash "${GITHUB_WORKSPACE}/scripts/ci/run-packaged-client-tests.sh" fabric dedicated
+
+        - name: Test dedicated NeoForge JARs
+          shell: bash
+          run: bash "${GITHUB_WORKSPACE}/scripts/ci/run-packaged-client-tests.sh" neoforge dedicated
+
+        - name: Test dedicated Forge JARs
+          shell: bash
+          run: bash "${GITHUB_WORKSPACE}/scripts/ci/run-packaged-client-tests.sh" forge dedicated
+
+        - name: Test universal JARs on Fabric
+          shell: bash
+          run: bash "${GITHUB_WORKSPACE}/scripts/ci/run-packaged-client-tests.sh" fabric universal
+
+        - name: Test universal JARs on NeoForge
+          shell: bash
+          run: bash "${GITHUB_WORKSPACE}/scripts/ci/run-packaged-client-tests.sh" neoforge universal
+
+        - name: Test universal JARs on Forge
+          shell: bash
+          run: bash "${GITHUB_WORKSPACE}/scripts/ci/run-packaged-client-tests.sh" forge universal

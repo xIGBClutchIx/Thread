@@ -1,5 +1,7 @@
 # Thread
 
+<img src="docs/thread-icon.png" alt="Thread icon" width="192">
+
 Thread is a read-only Minecraft context server for AI clients. It exposes structured facts from a
 running single-player world through MCP without embedding an AI model or automating gameplay.
 
@@ -183,3 +185,7 @@ Contributor references:
 - [Current decisions](docs/DECISIONS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Agent instructions](AGENTS.md)
+
+## License
+
+Thread is available under the [MIT License](LICENSE).

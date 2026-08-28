@@ -98,6 +98,13 @@ configure(threadModuleProjects) { moduleProject ->
         reproducibleFileOrder = true
     }
 
+    tasks.withType(Jar).configureEach {
+        from(rootProject.file('LICENSE')) {
+            into 'META-INF'
+            rename { 'LICENSE_thread' }
+        }
+    }
+
     tasks.named('check') {
         dependsOn tasks.named('javadoc')
     }

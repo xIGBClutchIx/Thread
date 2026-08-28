@@ -22,17 +22,8 @@ jobs:
             - name: Check out sources
               uses: actions/checkout@v6
 
-            - name: Set up Java
-              uses: actions/setup-java@v5
-              with:
-                  distribution: temurin
-                  java-version: "25"
-
-            - name: Set up Gradle
-              uses: gradle/actions/setup-gradle@v6
-
-            - name: Verify Gradle wrapper permissions
-              run: chmod +x gradlew
+            - name: Set up Thread build
+              uses: ./.github/actions/setup-thread
 
             - name: Run quality gate
               run: ./gradlew --no-daemon clean spotlessCheck check build releaseBundle
@@ -40,77 +31,8 @@ jobs:
             - name: Export supported Minecraft matrix
               run: ./gradlew --no-daemon writeSupportedMinecraftVersions
 
-            - name: Test packaged Fabric mod with MCP enabled
-              run: |
-                  while IFS= read -r version; do
-                    ./gradlew --no-daemon ":loaders:fabric:${version}:runRestartProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test packaged Fabric mod with MCP disabled
-              run: |
-                  while IFS= read -r version; do
-                    ./gradlew --no-daemon ":loaders:fabric:${version}:runMcpDisabledProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test packaged NeoForge mod with MCP enabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:neoforge:${version}:verifyNeoForgeRestartProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test packaged NeoForge mod with MCP disabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:neoforge:${version}:verifyNeoForgeMcpDisabledProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test packaged Forge mod with MCP enabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:forge:${version}:verifyForgeRestartProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test packaged Forge mod with MCP disabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:forge:${version}:verifyForgeMcpDisabledProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test universal mod on Fabric with MCP enabled
-              run: |
-                  while IFS= read -r version; do
-                    ./gradlew --no-daemon ":loaders:fabric:${version}:runUniversalRestartProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test universal mod on Fabric with MCP disabled
-              run: |
-                  while IFS= read -r version; do
-                    ./gradlew --no-daemon ":loaders:fabric:${version}:runUniversalMcpDisabledProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test universal mod on NeoForge with MCP enabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:neoforge:${version}:verifyUniversalNeoForgeRestartProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test universal mod on NeoForge with MCP disabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:neoforge:${version}:verifyUniversalNeoForgeMcpDisabledProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test universal mod on Forge with MCP enabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:forge:${version}:verifyUniversalForgeRestartProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
-
-            - name: Test universal mod on Forge with MCP disabled
-              run: |
-                  while IFS= read -r version; do
-                    xvfb-run -a ./gradlew --no-daemon ":loaders:forge:${version}:verifyUniversalForgeMcpDisabledProductionClientGameTest"
-                  done < build/matrix/supported-minecraft-versions.txt
+            - name: Verify packaged clients
+              uses: ./.github/actions/verify-packaged-clients
 
             - name: Upload failure reports
               if: failure()

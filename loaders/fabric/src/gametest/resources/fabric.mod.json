@@ -3,6 +3,7 @@
     "id": "thread-gametest",
     "version": "1.2.3",
     "name": "Thread Client Game Tests",
+    "license": "MIT",
     "environment": "client",
     "entrypoints": {
         "fabric-client-gametest": [
