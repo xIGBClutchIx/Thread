@@ -9,7 +9,8 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
-import me.clutchy.thread.gametest.ClientTestWindow;
+import me.clutchy.thread.gametest.ClientTestClient;
+import me.clutchy.thread.gametest.ClientTestWorld;
 import me.clutchy.thread.gametest.ExternalProofIntegration;
 import me.clutchy.thread.gametest.LoaderParityAssertions;
 import me.clutchy.thread.gametest.MinecraftScreenAccess;
@@ -42,7 +43,7 @@ public final class NeoForgeProviderClientGameTest {
   private Stage stage = Stage.WAITING_FOR_MENU;
   private CompletableFuture<Void> proof;
   private int elapsedTicks;
-  private boolean windowMinimized;
+  private boolean clientPrepared;
 
   public NeoForgeProviderClientGameTest(IEventBus ignoredModEventBus) {
     NeoForge.EVENT_BUS.addListener(this::onClientTick);
@@ -51,9 +52,9 @@ public final class NeoForgeProviderClientGameTest {
   private void onClientTick(ClientTickEvent.Post event) {
     Minecraft client = Minecraft.getInstance();
     try {
-      if (!windowMinimized) {
-        ClientTestWindow.minimize(client);
-        windowMinimized = true;
+      if (!clientPrepared) {
+        ClientTestClient.prepare(client);
+        clientPrepared = true;
       }
       if (++elapsedTicks > TIMEOUT_TICKS) {
         throw new AssertionError("packaged client proof timed out in " + stage);
@@ -114,6 +115,7 @@ public final class NeoForgeProviderClientGameTest {
       return;
     }
     screen.getUiState().setName("Thread NeoForge Packaged Test");
+    ClientTestWorld.selectFlatPreset(screen);
     AbstractButton createButton =
         screen.children().stream()
             .filter(AbstractButton.class::isInstance)
