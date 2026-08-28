@@ -18,7 +18,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Check out tagged sources
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Set up Thread build
               uses: ./.github/actions/setup-thread
@@ -46,7 +46,7 @@ jobs:
               uses: ./.github/actions/verify-packaged-clients
 
             - name: Upload release bundle
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: thread-${{ github.ref_name }}
                   path: build/release/*
