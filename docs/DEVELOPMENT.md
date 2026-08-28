@@ -157,13 +157,14 @@ These proofs remain graphical client launches because they exercise Minecraft's 
 integrated server, and OpenGL-backed lifecycle; setting Java's headless flag would not provide the
 same coverage. Their test-only harness minimizes local test windows as soon as its client callback
 is available. Before opening a world, it also selects the built-in flat preset and limits render
-distance, simulation distance, and frame rate so world generation receives most of the available
-CPU. Fabric's client game-test builder supplies its equivalent deterministic flat preset. CI leaves
-the already-invisible Xvfb window active so Minecraft does not throttle client ticks while an
-integrated world starts on a resource-constrained runner. Every development, dedicated, and
-universal client-test run also seeds an isolated `options.txt` with master audio muted, fullscreen
-disabled, and pause-on-focus-loss disabled before Minecraft starts. Normal user options are never
-read or changed.
+distance, simulation distance, frame rate, and window size so world generation receives most of the
+available CPU. Fabric's client game-test builder supplies its equivalent deterministic flat preset.
+CI leaves the already-invisible Xvfb window active so Minecraft does not throttle client ticks while
+an integrated world starts on a resource-constrained runner, and limits the software renderer to
+one worker so it cannot starve spawn preparation. Every development, dedicated, and universal
+client-test run also seeds an isolated `options.txt` with master audio muted, fullscreen disabled,
+and pause-on-focus-loss disabled before Minecraft starts. Normal user options are never read or
+changed.
 
 The restart test launches that packaged client again from the same instance and proves an existing
 configuration is reloaded, including a changed MCP port. The disabled tests use separate fresh

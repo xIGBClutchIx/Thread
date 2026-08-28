@@ -11,6 +11,12 @@ artifact_kind="$2"
 matrix_file="build/matrix/supported-minecraft-versions.txt"
 launcher=()
 
+# Xvfb uses Mesa's software renderer on GitHub-hosted runners. Keeping llvmpipe to one worker
+# prevents the invisible client from starving the integrated server while it prepares spawn chunks.
+if [[ "${CI:-false}" == "true" ]]; then
+    export LP_NUM_THREADS="${LP_NUM_THREADS:-1}"
+fi
+
 case "${loader}:${artifact_kind}" in
     fabric:dedicated)
         enabled_task="runRestartProductionClientGameTest"

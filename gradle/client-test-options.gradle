@@ -12,7 +12,12 @@ ext.writeMutedClientTestOptions = { File runDirectory ->
             versionConfig.clientOptionsHeader +
                     'onboardAccessibility:false\n' +
                     'fullscreen:false\n' +
+                    'maxFps:30\n' +
+                    'overrideHeight:240\n' +
+                    'overrideWidth:320\n' +
                     'pauseOnLostFocus:false\n' +
+                    'renderDistance:2\n' +
+                    'simulationDistance:5\n' +
                     'soundCategory_master:0.0\n',
             'UTF-8')
 }
