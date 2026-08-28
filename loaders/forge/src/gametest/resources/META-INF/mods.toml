@@ -5,7 +5,7 @@ clientSideOnly=true
 
 [[mods]]
 modId="thread_forge_gametest"
-version="1.0.0"
+version="1.2.3"
 displayName="Thread Forge Packaged Tests"
 
 [[dependencies.thread_forge_gametest]]

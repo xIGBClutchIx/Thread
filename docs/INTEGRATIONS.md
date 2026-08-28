@@ -1,9 +1,9 @@
 # Thread Integrations
 
 Thread Integrations are future, separately distributed optional mods that contribute read-only
-capabilities to base Thread. Each 1.0 loader JAR contains native Minecraft support and the extension
+capabilities to base Thread. Each supported loader JAR contains native Minecraft support and the extension
 contracts, but no third-party gameplay-mod or recipe-viewer adapter or integration package ships as
-part of the 1.0 release.
+part of the base release.
 
 ## Supported external API
 
@@ -138,6 +138,36 @@ literal or eager implementation import.
 visible only after the callback and all duplicate/contract validation succeed. Callback,
 construction, linkage, duplicate, or metadata failures leave no partial registration and do not
 stop later candidates.
+
+External mods publish their own tools directly through the retained integration context:
+
+```java
+public final class ExampleIntegration implements ThreadIntegration {
+    @Override
+    public IntegrationId id() {
+        return IntegrationId.of("example");
+    }
+
+    @Override
+    public String version() {
+        return "1";
+    }
+
+    @Override
+    public String description() {
+        return "Adds read-only tools for Example Mod.";
+    }
+
+    @Override
+    public void register(IntegrationContext context) {
+        context.registerTool(new ExampleReadOnlyTool());
+    }
+}
+```
+
+The removed `core.context.ContextRegistry` and `ContextProvider` types were a separate generic
+value-provider experiment. They were not the `IntegrationContext`, did not publish tools through
+MCP, and had no runtime consumer. Tool integrations do not need them.
 
 Integrations must not retain the context, start generic background workers, or assume start/stop/
 reload callbacks. Add lifecycle only when a concrete external integration proves and tests that

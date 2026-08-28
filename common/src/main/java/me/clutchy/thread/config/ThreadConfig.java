@@ -7,7 +7,7 @@ import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.tool.ToolId;
 
 /**
- * Persistent Thread 1.0 settings for the local transport and bounded game-state queries.
+ * Persistent Thread settings for the local transport and bounded game-state queries.
  *
  * <p>Values are rejected instead of silently clamped so unsafe or mistyped configuration cannot
  * weaken Thread's limits without the player noticing.
@@ -72,9 +72,9 @@ public record ThreadConfig(
   }
 
   /**
-   * Returns conservative Thread 1.0 defaults.
+   * Returns conservative defaults.
    *
-   * @return loopback-only settings with every Thread 1.0 Minecraft tool enabled
+   * @return loopback-only settings with every built-in Minecraft tool enabled
    */
   public static ThreadConfig defaults() {
     return new ThreadConfig(

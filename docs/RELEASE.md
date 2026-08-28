@@ -17,7 +17,7 @@ From the repository root, first run the build and artifact gate:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
-  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v1.0.0"
+  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v<version>"
 ```
 
 Then run the restart and MCP-disabled packaged proofs separately for dedicated and universal JARs

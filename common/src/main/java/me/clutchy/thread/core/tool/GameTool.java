@@ -23,7 +23,7 @@ public interface GameTool<I, O> {
   /** Returns the codec and schema used to validate and serialize successful output. */
   JsonCodec<O> outputCodec();
 
-  /** Returns discovery metadata, including Thread 1.0's mandatory read-only declaration. */
+  /** Returns discovery metadata, including Thread's mandatory read-only declaration. */
   ToolCapabilities capabilities();
 
   /** Executes one invocation after registry input validation. */

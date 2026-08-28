@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import me.clutchy.thread.config.ThreadConfig;
 import me.clutchy.thread.config.ThreadConfigLoader;
 import me.clutchy.thread.core.error.ToolErrorCode;
@@ -35,7 +36,7 @@ public final class LoaderParityAssertions {
       "thread.gametest.expectedMinecraftVersion";
 
   private static final String PROTOCOL_VERSION = "2026-07-28";
-  private static final Set<String> EXPECTED_TOOLS =
+  private static final Set<String> BUILT_IN_TOOLS =
       Set.of(
           "minecraft.can_craft",
           "minecraft.find_item",
@@ -58,10 +59,13 @@ public final class LoaderParityAssertions {
           "minecraft.get_world_info",
           "minecraft.inspect_container",
           "minecraft.search_items");
+  private static final Set<String> EXPECTED_TOOLS =
+      Stream.concat(BUILT_IN_TOOLS.stream(), Stream.of(ExternalProofIntegration.TOOL_ID))
+          .collect(Collectors.toUnmodifiableSet());
 
   private LoaderParityAssertions() {}
 
-  /** Returns the built-in tool count expected by loader-specific parity extensions. */
+  /** Returns the complete test catalog count expected by loader-specific parity extensions. */
   public static int expectedToolCount() {
     return EXPECTED_TOOLS.size();
   }
@@ -137,6 +141,12 @@ public final class LoaderParityAssertions {
             .map(tool -> tool.get("name").getAsString())
             .collect(Collectors.toUnmodifiableSet());
     assertEquals(EXPECTED_TOOLS, mcpTools, "MCP tool catalog");
+    assertEquals(
+        "external-loader-discovery",
+        mcpTool(endpoint, 40, ExternalProofIntegration.TOOL_ID, new JsonObject())
+            .get("source")
+            .getAsString(),
+        "external integration MCP tool");
     assertEquals(
         "MAIN_MENU",
         mcpTool(endpoint, 3, "minecraft.get_status", new JsonObject()).get("state").getAsString(),
@@ -901,6 +911,10 @@ public final class LoaderParityAssertions {
             .map(descriptor -> descriptor.id().value())
             .collect(Collectors.toUnmodifiableSet());
     assertEquals(EXPECTED_TOOLS, toolIds, "registered tool catalog");
+    assertEquals(
+        "external-loader-discovery",
+        invoke(runtime.tools(), ExternalProofIntegration.TOOL_ID, "{}").get("source").getAsString(),
+        "external integration tool invocation");
     assertEquals(2, runtime.integrations().integrations().size(), "active integration count");
     IntegrationInfo external =
         runtime.integrations().integrations().stream()
@@ -911,13 +925,14 @@ public final class LoaderParityAssertions {
         integrationSource,
         external.metadata().get("gametest.source"),
         "external integration discovery source");
+    assertEquals("1", external.metadata().get("thread.tool_count"), "external tool metadata");
     IntegrationInfo vanilla =
         runtime.integrations().integrations().stream()
             .filter(integration -> integration.id().value().equals("vanilla"))
             .findFirst()
             .orElseThrow(() -> new AssertionError("vanilla integration was not activated"));
     assertEquals(
-        Integer.toString(EXPECTED_TOOLS.size()),
+        Integer.toString(BUILT_IN_TOOLS.size()),
         vanilla.metadata().get("thread.tool_count"),
         "vanilla contribution metadata");
   }

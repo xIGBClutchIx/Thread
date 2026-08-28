@@ -1,8 +1,8 @@
-# Thread 1.0 Scope
+# Thread Scope
 
 ## Product statement
 
-Thread 1.0 is a read-only Minecraft context server that exposes a focused set of live game tools to
+Thread is a read-only Minecraft context server that exposes a focused set of live game tools to
 MCP clients.
 
 Thread is not an AI model, chatbot, autonomous player, or modpack guide by itself. It provides structured Minecraft facts that an external model can request when useful.
@@ -11,7 +11,7 @@ Thread is not an AI model, chatbot, autonomous player, or modpack guide by itsel
 
 As a Minecraft player, I can install Thread and connect an MCP-capable AI client so the client can answer questions using my actual running game state rather than generic Minecraft knowledge alone.
 
-## 1.0 target
+## Current target
 
 - Minecraft Java Edition
 - Fabric, NeoForge, and Forge client loaders
@@ -26,12 +26,12 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
 
-Thread 1.0 ships separate 1.21.11, 26.1.2, and 26.2 implementations and artifacts. It never selects or
+Thread ships separate 1.21.11, 26.1.2, and 26.2 implementations and artifacts. It never selects or
 branches across versions at runtime. Minecraft 1.21.11 requires Java 21; both 26.x lanes require
 Java 25, which is also the Gradle build runtime.
 
 Minecraft 1.21.11 is the current minimum supported version. Minecraft 1.21.1 and older are not a
-current 1.0 priority: the intervening game, mappings, and loader API differences require substantial
+current priority: the intervening game, mappings, and loader API differences require substantial
 version-specific implementation plus the complete loader and packaged-artifact parity proof. This
 is a prioritization boundary rather than a claim that older support is impossible.
 
@@ -93,7 +93,7 @@ is a prioritization boundary rather than a claim that older support is impossibl
 - Checkstyle lint/style checks
 - `.editorconfig`
 - GitHub Actions CI for pushes/pull requests/manual runs
-- tag-driven validated release build by 1.0 release readiness
+- tag-driven validated release builds
 
 ### MCP
 
@@ -134,11 +134,11 @@ is a prioritization boundary rather than a claim that older support is impossibl
 - long-term player memory
 - voice input/output
 
-Thread 1.0 includes the generic integration framework but ships no third-party gameplay-mod or
+Thread includes the generic integration framework but ships no third-party gameplay-mod or
 recipe-viewer adapter. Future JEI, FTB Quests, Create, AE2, Mekanism, storage-network, and similar
-support belongs in separately distributed **Thread Integrations** packages after 1.0.
+support belongs in future, separately distributed **Thread Integrations** packages.
 
-## 1.0 success criteria
+## Current success criteria
 
 From a clean install, an MCP client can discover Thread and correctly answer each of these using live tool calls:
 
@@ -176,7 +176,7 @@ tool contracts.
 
 ## Non-goals that protect the architecture
 
-Thread 1.0 does not need to prove every future feature. It needs to prove that:
+Thread does not need to prove every future feature. It needs to prove that:
 
 - live Minecraft state can be represented cleanly;
 - tools can be added without coupling them to MCP;

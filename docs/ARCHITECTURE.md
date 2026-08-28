@@ -1,4 +1,4 @@
-# Thread 1.0 Architecture
+# Thread Architecture
 
 ## Module shape
 
@@ -256,7 +256,7 @@ machines without a second registry. The crafting source provider reuses the full
 path only for explicit expanded-scope requests and reports truncation or excluded unsafe contents.
 
 `ItemFinder` and `CraftingItemSourceProvider` compose small transport-independent `ItemSource`
-snapshots. Thread 1.0 supplies player inventory, equipment, and nearby-container sources; the nearby source
+snapshots. Thread supplies player inventory, equipment, and nearby-container sources; the nearby source
 uses one full bounded container scan on the integrated-server thread. Item search includes offhand
 and armor, while crafting intentionally excludes equipment. Main hand is not counted as equipment
 because it aliases the selected hotbar slot. Entries and reported source locations are ordered
@@ -296,5 +296,5 @@ Architecture and release tests enforce that:
 - each version/loader project's packaged-client tests exercise its dedicated JAR and matching
   universal JAR through menu/world/menu, restart, and MCP-disabled lifecycles.
 
-Thread 1.0 remains Java-only, Fabric/NeoForge/Forge, read-only, single-player-only, bounded, and
+Thread remains Java-only, Fabric/NeoForge/Forge, read-only, single-player-only, bounded, and
 loopback-only.

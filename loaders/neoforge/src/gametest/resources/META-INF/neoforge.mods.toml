@@ -4,7 +4,7 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="thread_neoforge_gametest"
-version="1.0.0"
+version="1.2.3"
 displayName="Thread NeoForge Packaged Tests"
 
 [[dependencies.thread_neoforge_gametest]]

@@ -1,7 +1,8 @@
 package me.clutchy.thread.core.integration;
 
 /**
- * Optional, transport-independent Thread extension activated during client startup.
+ * Optional, transport-independent Thread extension contributed by an external mod and activated
+ * during client startup.
  *
  * <p>An integration should be a small, preferably stateless contributor. Optional mod classes may
  * implement this contract, but their implementation class must be resolved only after the

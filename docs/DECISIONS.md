@@ -1,4 +1,4 @@
-# Thread 1.0 Decisions
+# Thread Decisions
 
 This file records current architectural choices that are easy to accidentally undo. Historical
 implementation steps belong in Git, not here.
@@ -9,9 +9,9 @@ Thread exposes structured live Minecraft facts to external clients. It does not 
 provider SDK, autonomous player, or custom assistant UI. MCP is the first transport over core tools,
 not the core API.
 
-## 1.0 is deliberately narrow
+## The current release is deliberately narrow
 
-Thread 1.0 is a Java client mod for Fabric, NeoForge, and Forge on Minecraft 1.21.11, 26.1.2, and 26.2.
+Thread is a Java client mod for Fabric, NeoForge, and Forge on Minecraft 1.21.11, 26.1.2, and 26.2.
 The 1.21.11 lane targets Java 21; 26.x targets Java 25. Every lane remains single-player,
 read-only, bounded, and loopback-only.
 Gameplay tools reject multiplayer before exposing state. `minecraft.get_status`,
@@ -77,7 +77,7 @@ Java type documentation belongs on public types and architecture documentation b
 
 ## Versions and dependencies are pinned
 
-The 1.0 baselines are Minecraft 1.21.11 on Java 21 with Fabric API 0.141.6+1.21.11, NeoForge
+The current baselines are Minecraft 1.21.11 on Java 21 with Fabric API 0.141.6+1.21.11, NeoForge
 21.11.45, and Forge 61.2.1; Minecraft 26.1.2 on Java 25 with Fabric API 0.154.0+26.1.2,
 NeoForge 26.1.2.41-beta, and Forge 64.0.12; and Minecraft 26.2 on Java 25 with Fabric API
 0.154.0+26.2, NeoForge 26.2.0.62, and Forge 65.1.2. All use Fabric Loader 0.19.3. Shared build
@@ -92,12 +92,14 @@ matrix instead of maintaining parallel version constants.
 Minecraft 1.21.11 is the current minimum supported version. Minecraft 1.21.1 and older are deferred
 because crossing that compatibility gap requires substantial version-specific Minecraft, mappings,
 and loader work followed by the same dedicated and universal packaged parity proof as every current
-lane. Older-version support may be reconsidered as a separate roadmap effort, but it is not a 1.0
+lane. Older-version support may be reconsidered as a separate roadmap effort, but it is not a current
 priority and must not be introduced as an incidental compatibility branch in shared code.
 
-The pre-1.0 context registry was removed because no runtime or MCP path exposed registered contexts.
-Integrations retain the contribution paths that have real consumers: tools, recipes, typed
-Minecraft-edge enrichers/inspectors, and bounded capability metadata.
+The unused generic `ContextRegistry` and `ContextProvider` API was removed because no runtime or MCP
+path exposed registered context values. This was not the public `IntegrationContext`: external mods
+still publish `GameTool` implementations through `IntegrationContext.registerTool`, alongside the
+contribution paths for recipes, typed Minecraft-edge enrichers/inspectors, and bounded capability
+metadata.
 
 Minecraft 1.21.11 and 26.1.2 expose the multiplayer predicate differently from 26.2. Their small
 session bindings use the public inverse `!Minecraft.isSingleplayer()` after confirming a loaded
@@ -265,7 +267,7 @@ maintenance.
 does not communicate with an unbounded external world. Dynamic game state is still guarded and
 validated at call time.
 
-## Quality and release proofs are part of 1.0
+## Quality and release proofs are mandatory
 
 Spotless, Checkstyle, compiler checks, unit/architecture tests, release-artifact inspection, and
 three packaged-client runs per artifact/loader pairing are mandatory. Dedicated and universal

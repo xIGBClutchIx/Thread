@@ -1,7 +1,7 @@
-# Thread 1.0 Tool Contracts
+# Thread Tool Contracts
 
 These are semantic contracts, not mandatory byte-for-byte JSON. Keep names and meanings stable once
-1.0 clients depend on them.
+clients depend on them.
 
 All results prefer canonical registry IDs over localized display names. The schemas returned by
 `tools/list` are authoritative for required fields, enums, defaults, and hard numeric limits;
@@ -182,7 +182,7 @@ Example result:
   "minecraftVersion": "<pinned-version>",
   "loader": "<fabric-neoforge-or-forge>",
   "loaderVersion": "<version>",
-  "threadVersion": "1.0.0"
+  "threadVersion": "<version>"
 }
 ```
 
@@ -1374,7 +1374,7 @@ Example result:
 
 ```json
 {
-  "threadVersion": "1.0.0",
+  "threadVersion": "<version>",
   "readOnly": true,
   "tools": [
     "minecraft.get_status",

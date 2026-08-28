@@ -167,11 +167,11 @@ may silently fall back to the source-set development classpath.
 
 ## Full local gate
 
-Before committing a 1.0 release change, run the release-equivalent gate from the repository root:
+Before committing a release change, run the release-equivalent gate from the repository root:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
-  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v1.0.0"
+  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v<version>"
 ```
 
 Then run the normal, restart, and MCP-disabled tasks from the table above for dedicated and

@@ -31,7 +31,7 @@ public record MinecraftProviderLimits(
     }
   }
 
-  /** Returns conservative Thread 1.0 limits for loaded-state queries. */
+  /** Returns conservative Thread limits for loaded-state queries. */
   public static MinecraftProviderLimits defaults() {
     return new MinecraftProviderLimits(64, 128, 8_192, 64, 16_384, 256);
   }

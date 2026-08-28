@@ -59,9 +59,7 @@ import me.clutchy.thread.core.tool.ToolCapabilities;
 import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolResult;
 
-/**
- * Built-in integration that installs Thread's complete transport-neutral vanilla 1.0 tool catalog.
- */
+/** Built-in integration that installs Thread's complete transport-neutral vanilla tool catalog. */
 public final class VanillaIntegration implements ThreadIntegration {
   private static final IntegrationId ID = IntegrationId.of("vanilla");
   private static final String VERSION = "1";

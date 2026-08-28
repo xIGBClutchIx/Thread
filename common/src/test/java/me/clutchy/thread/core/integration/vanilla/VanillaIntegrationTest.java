@@ -125,7 +125,7 @@ class VanillaIntegrationTest {
             1_048_576,
             8,
             "Thread",
-            "1.0.0");
+            "9.8.7");
     try (McpHttpServer server = McpHttpServer.start(catalog.tools(), options)) {
       HttpRequest request =
           HttpRequest.newBuilder(server.endpoint())
@@ -178,7 +178,7 @@ class VanillaIntegrationTest {
 
     JsonObject gameInfo = invoke(catalog.tools(), "minecraft.get_game_info", "{}");
     assertEquals("26.2", gameInfo.get("minecraftVersion").getAsString());
-    assertEquals("1.0.0", gameInfo.get("threadVersion").getAsString());
+    assertEquals("9.8.7", gameInfo.get("threadVersion").getAsString());
 
     JsonObject player = invoke(catalog.tools(), "minecraft.get_player", "{}");
     assertEquals("minecraft:overworld", player.get("dimension").getAsString());
@@ -986,7 +986,7 @@ class VanillaIntegrationTest {
             new FakeRecipeProvider(),
             new NearbyContainerQuery(16, 64),
             ignored -> true,
-            () -> integrations.capabilities("1.0.0")));
+            () -> integrations.capabilities("9.8.7")));
     assertToolFailure(tools, "minecraft.get_advancements", "{}", code);
     assertToolFailure(
         tools, "minecraft.get_advancement", "{\"advancementId\":\"minecraft:story/root\"}", code);
@@ -1040,7 +1040,7 @@ class VanillaIntegrationTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "9.8.7");
     }
   }
 
@@ -1053,7 +1053,7 @@ class VanillaIntegrationTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "9.8.7");
     }
   }
 
@@ -1066,7 +1066,7 @@ class VanillaIntegrationTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "9.8.7");
     }
   }
 

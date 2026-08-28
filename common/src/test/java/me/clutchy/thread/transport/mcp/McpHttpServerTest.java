@@ -38,7 +38,7 @@ class McpHttpServerTest {
   void discoversRegistryCatalogAndInvokesStructuredResults() throws Exception {
     ToolRegistry registry = registryWithEchoTool();
     try (McpHttpServer server =
-        McpHttpServer.start(registry, McpServerOptions.ephemeral("1.0.0"))) {
+        McpHttpServer.start(registry, McpServerOptions.ephemeral("9.8.7"))) {
       assertEquals("127.0.0.1", server.endpoint().getHost());
       assertTrue(server.running());
 
@@ -54,14 +54,14 @@ class McpHttpServerTest {
               .getAsJsonObject("_meta")
               .getAsJsonObject(McpJsonRpcHandler.SERVER_INFO_META);
       assertEquals("Thread", serverInfo.get("name").getAsString());
-      assertEquals("1.0.0", serverInfo.get("version").getAsString());
+      assertEquals("9.8.7", serverInfo.get("version").getAsString());
       assertEquals(60_000, discoverResult.get("ttlMs").getAsLong());
       assertEquals("public", discoverResult.get("cacheScope").getAsString());
       assertTrue(discover.headers().firstValue("Mcp-Session-Id").isEmpty());
 
       HttpResponse<String> listed = post(server.endpoint(), request(2, "tools/list"));
       JsonObject listResult = body(listed).getAsJsonObject("result");
-      assertServerInfo(listResult, "1.0.0");
+      assertServerInfo(listResult, "9.8.7");
       assertEquals(60_000, listResult.get("ttlMs").getAsLong());
       assertEquals("public", listResult.get("cacheScope").getAsString());
       JsonArray tools = listResult.getAsJsonArray("tools");
@@ -78,7 +78,7 @@ class McpHttpServerTest {
       HttpResponse<String> called = post(server.endpoint(), call);
       JsonObject callResult = body(called).getAsJsonObject("result");
       assertEquals(200, called.statusCode());
-      assertServerInfo(callResult, "1.0.0");
+      assertServerInfo(callResult, "9.8.7");
       assertFalse(callResult.get("isError").getAsBoolean());
       assertEquals(
           "hello", callResult.getAsJsonObject("structuredContent").get("message").getAsString());

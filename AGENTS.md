@@ -6,7 +6,7 @@ This file is the implementation contract for agents working in this repository.
 
 Read:
 
-1. `docs/V1_SCOPE.md`
+1. `docs/SCOPE.md`
 2. `docs/ARCHITECTURE.md`
 3. `docs/DEVELOPMENT.md` for source quality, tests, and release rules
 4. `docs/INTEGRATIONS.md` when working on the public integration API
@@ -21,21 +21,21 @@ Do not implement future roadmap items unless the user explicitly puts them in sc
 - MCP code must not directly query Minecraft state.
 - Minecraft/Fabric classes must not appear in public core DTOs or transport contracts.
 - Platform providers are responsible for converting Minecraft objects into Thread DTOs.
-- Thread 1.0 is single-player-only and read-only.
+- Thread is single-player-only and read-only.
 - Supported client loaders are Fabric, NeoForge, and Forge.
 - Supported Minecraft versions are 1.21.11, 26.1.2, and 26.2; do not add older-version work incidentally.
 - Implementation language is Java. Do not introduce Kotlin or a Kotlin runtime dependency.
 - Do not create `package-info.java` files. Put package-level/project documentation in Markdown under `docs/` and use Javadocs on public types where needed.
-- Thread 1.0 has no OpenAI/ChatGPT/Codex SDK dependency. Clients connect through MCP.
-- Thread 1.0 has no custom in-game assistant/chat UI.
-- Thread 1.0 bundles no JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or other third-party integration.
+- Thread has no OpenAI/ChatGPT/Codex SDK dependency. Clients connect through MCP.
+- Thread has no custom in-game assistant/chat UI.
+- Thread bundles no JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or other third-party integration.
 - Do not force-load chunks to satisfy a tool request.
 - All scan/query sizes must be bounded.
 - Default network binding must be loopback only.
 - Game-state reads must respect Minecraft logical side and thread requirements.
 - `minecraft.get_status` must remain callable from menus, loading states, supported single-player, and unsupported multiplayer.
 - A centralized session guard must reject unsupported multiplayer sessions before gameplay state is exposed by other tools.
-- Do not add multiplayer permissions, server trust, remote-player visibility, anti-cheat policy, or dedicated-server behavior in 1.0.
+- Do not add multiplayer permissions, server trust, remote-player visibility, anti-cheat policy, or dedicated-server behavior in the current release.
 
 ## Code quality
 

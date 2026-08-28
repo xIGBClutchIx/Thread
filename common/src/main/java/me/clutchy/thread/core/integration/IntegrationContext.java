@@ -41,7 +41,13 @@ public final class IntegrationContext {
     this.activeExtensions = Objects.requireNonNull(activeExtensions, "activeExtensions");
   }
 
-  /** Stages one transport-independent read-only tool. */
+  /**
+   * Stages one transport-independent read-only tool for discovery and invocation.
+   *
+   * <p>This is the public contribution point external mods use to add their own client-visible
+   * tools. The tool remains independent of MCP; active transports publish it after the integration
+   * registration commits successfully.
+   */
   public void registerTool(GameTool<?, ?> tool) {
     requireOpen();
     stagedToolValidation.register(tool);

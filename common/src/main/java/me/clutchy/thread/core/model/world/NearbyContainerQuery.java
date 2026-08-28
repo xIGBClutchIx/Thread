@@ -4,10 +4,10 @@ import me.clutchy.thread.core.model.validation.ModelValidation;
 
 /** Requested bounds for a nearby loaded-container query. */
 public record NearbyContainerQuery(double radius, int limit) {
-  /** Absolute 1.0 radius ceiling in blocks; configured limits may be lower. */
+  /** Absolute radius ceiling in blocks; configured limits may be lower. */
   public static final double HARD_MAX_RADIUS = 16.0D;
 
-  /** Absolute 1.0 result ceiling; configured limits may be lower. */
+  /** Absolute result ceiling; configured limits may be lower. */
   public static final int HARD_MAX_RESULTS = 64;
 
   public NearbyContainerQuery {

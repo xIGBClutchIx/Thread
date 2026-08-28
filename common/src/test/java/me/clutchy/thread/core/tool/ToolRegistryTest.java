@@ -127,7 +127,7 @@ class ToolRegistryTest {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> registry.register(new MutableTool()));
 
-    assertEquals("Thread 1.0 tools must be read-only: test.mutable", exception.getMessage());
+    assertEquals("Thread tools must be read-only: test.mutable", exception.getMessage());
   }
 
   private record FailingTool(ToolError failure) implements GameTool<Message, Message> {
@@ -202,7 +202,7 @@ class ToolRegistryTest {
 
     @Override
     public String description() {
-      return "Not valid in Thread 1.0.";
+      return "Not valid in Thread.";
     }
 
     @Override
