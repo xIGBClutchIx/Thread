@@ -21,21 +21,21 @@ Do not implement future roadmap items unless the user explicitly puts them in sc
 - MCP code must not directly query Minecraft state.
 - Minecraft/Fabric classes must not appear in public core DTOs or transport contracts.
 - Platform providers are responsible for converting Minecraft objects into Thread DTOs.
-- V1 is single-player only. Do not intentionally support live gameplay tools while connected to a multiplayer server.
-- V1 is read-only.
-- V1 is Fabric-only.
-- V1 implementation language is Java. Do not introduce Kotlin or a Kotlin runtime dependency.
+- Thread 1.0 is single-player-only and read-only.
+- Supported client loaders are Fabric, NeoForge, and Forge.
+- Supported Minecraft versions are 1.21.11, 26.1.2, and 26.2; do not add older-version work incidentally.
+- Implementation language is Java. Do not introduce Kotlin or a Kotlin runtime dependency.
 - Do not create `package-info.java` files. Put package-level/project documentation in Markdown under `docs/` and use Javadocs on public types where needed.
-- V1 has no OpenAI/ChatGPT/Codex SDK dependency. Clients connect through MCP.
-- V1 has no custom in-game assistant/chat UI.
-- V1 does not integrate JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or other third-party mods.
+- Thread 1.0 has no OpenAI/ChatGPT/Codex SDK dependency. Clients connect through MCP.
+- Thread 1.0 has no custom in-game assistant/chat UI.
+- Thread 1.0 bundles no JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or other third-party integration.
 - Do not force-load chunks to satisfy a tool request.
 - All scan/query sizes must be bounded.
 - Default network binding must be loopback only.
 - Game-state reads must respect Minecraft logical side and thread requirements.
 - `minecraft.get_status` must remain callable from menus, loading states, supported single-player, and unsupported multiplayer.
 - A centralized session guard must reject unsupported multiplayer sessions before gameplay state is exposed by other tools.
-- Do not add multiplayer permissions, server trust, remote-player visibility, anti-cheat policy, or dedicated-server behavior in V1.
+- Do not add multiplayer permissions, server trust, remote-player visibility, anti-cheat policy, or dedicated-server behavior in 1.0.
 
 ## Code quality
 

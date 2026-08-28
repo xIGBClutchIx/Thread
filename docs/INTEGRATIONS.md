@@ -1,8 +1,9 @@
 # Thread Integrations
 
-Thread Integrations are separately distributed optional mods that contribute read-only
-capabilities to base Thread. Each base loader JAR contains native Minecraft support and the
-extension contracts, but no third-party gameplay-mod or recipe-viewer adapter.
+Thread Integrations are future, separately distributed optional mods that contribute read-only
+capabilities to base Thread. Each 1.0 loader JAR contains native Minecraft support and the extension
+contracts, but no third-party gameplay-mod or recipe-viewer adapter or integration package ships as
+part of the 1.0 release.
 
 ## Supported external API
 
@@ -14,8 +15,8 @@ The supported loader-neutral integration surface is:
 | `IntegrationCandidate` | Stable ID, target mod, version requirement, and deferred implementation class name |
 | `IntegrationId` | Stable ordering/configuration/capability identity |
 | `ThreadIntegration` | Identity plus one transactional registration callback |
-| `IntegrationContext` | Contributes tools, contexts, recipes, typed extensions, and capability metadata |
-| `GameTool` / `ContextProvider` | Read-only core tool and bounded context contracts |
+| `IntegrationContext` | Contributes tools, recipes, typed extensions, and capability metadata |
+| `GameTool` | Read-only core tool contract |
 | `IntegrationRecipeProvider` | Optional detached recipe contribution |
 | `IntegrationExtensionPoint` | Typed extension key |
 | `CoreIntegrationExtensionPoints` | Core-owned extension keys such as recipe providers |

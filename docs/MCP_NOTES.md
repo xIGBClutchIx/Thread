@@ -124,6 +124,6 @@ inspection and conditional hostile, non-living, tame-owner, villager, equipment,
 
 ## Deliberately absent MCP features
 
-V1 exposes tools only. It does not implement MCP Apps, prompts, roots, sampling, tasks, elicitation,
+Thread 1.0 exposes tools only. It does not implement MCP Apps, prompts, roots, sampling, tasks, elicitation,
 logging, OAuth, remote discovery, server-to-client requests, protocol sessions, or legacy HTTP+SSE.
 Add one only for a concrete product requirement and keep it behind the transport boundary.

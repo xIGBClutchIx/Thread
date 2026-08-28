@@ -8,14 +8,14 @@ class ThreadRuntimeInfoTest {
   @Test
   void exposesLoaderNeutralGameInfoAndStartupMessage() {
     ThreadRuntimeInfo info =
-        new ThreadRuntimeInfo("0.1.0", "26.2", "fabric", "Fabric Loader", "0.19.3");
+        new ThreadRuntimeInfo("1.0.0", "26.2", "fabric", "Fabric Loader", "0.19.3");
 
     assertEquals(
-        "Thread 0.1.0 initialized for Minecraft 26.2 with Fabric Loader 0.19.3",
+        "Thread 1.0.0 initialized for Minecraft 26.2 with Fabric Loader 0.19.3",
         info.startupMessage());
     assertEquals("26.2", info.gameInfo().minecraftVersion());
     assertEquals("fabric", info.gameInfo().loader());
     assertEquals("0.19.3", info.gameInfo().loaderVersion());
-    assertEquals("0.1.0", info.gameInfo().threadVersion());
+    assertEquals("1.0.0", info.gameInfo().threadVersion());
   }
 }

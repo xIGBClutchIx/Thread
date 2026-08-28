@@ -11,6 +11,6 @@ displayName="Thread Forge Packaged Tests"
 [[dependencies.thread_forge_gametest]]
 modId="thread"
 mandatory=true
-versionRange="[0.1.0,)"
+versionRange="[1.0.0,)"
 ordering="AFTER"
 side="CLIENT"

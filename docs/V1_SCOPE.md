@@ -1,8 +1,9 @@
-# Thread V1 Scope
+# Thread 1.0 Scope
 
 ## Product statement
 
-Thread V1 is a read-only Minecraft context server that exposes a small set of live game tools to MCP clients.
+Thread 1.0 is a read-only Minecraft context server that exposes a focused set of live game tools to
+MCP clients.
 
 Thread is not an AI model, chatbot, autonomous player, or modpack guide by itself. It provides structured Minecraft facts that an external model can request when useful.
 
@@ -10,7 +11,7 @@ Thread is not an AI model, chatbot, autonomous player, or modpack guide by itsel
 
 As a Minecraft player, I can install Thread and connect an MCP-capable AI client so the client can answer questions using my actual running game state rather than generic Minecraft knowledge alone.
 
-## V1 target
+## 1.0 target
 
 - Minecraft Java Edition
 - Fabric, NeoForge, and Forge client loaders
@@ -25,9 +26,14 @@ As a Minecraft player, I can install Thread and connect an MCP-capable AI client
 - Read-only tools only
 - Java formatting/linting/tests enforced by Gradle and GitHub Actions
 
-V1 ships separate 1.21.11, 26.1.2, and 26.2 implementations and artifacts. It never selects or
+Thread 1.0 ships separate 1.21.11, 26.1.2, and 26.2 implementations and artifacts. It never selects or
 branches across versions at runtime. Minecraft 1.21.11 requires Java 21; both 26.x lanes require
 Java 25, which is also the Gradle build runtime.
+
+Minecraft 1.21.11 is the current minimum supported version. Minecraft 1.21.1 and older are not a
+current 1.0 priority: the intervening game, mappings, and loader API differences require substantial
+version-specific implementation plus the complete loader and packaged-artifact parity proof. This
+is a prioritization boundary rather than a claim that older support is impossible.
 
 ## In scope
 
@@ -36,10 +42,9 @@ Java 25, which is also the Gradle build runtime.
 - stable Thread DTOs
 - provider interfaces
 - tool registry
-- context registry
 - integration registry
 - optional-mod candidate discovery with absent-mod-safe class loading
-- transactional tool/context/recipe/enrichment contributions
+- transactional tool/recipe/enrichment contributions
 - structured errors
 - capability discovery
 - explicit limits
@@ -88,7 +93,7 @@ Java 25, which is also the Gradle build runtime.
 - Checkstyle lint/style checks
 - `.editorconfig`
 - GitHub Actions CI for pushes/pull requests/manual runs
-- tag-driven validated release build by V1 release readiness
+- tag-driven validated release build by 1.0 release readiness
 
 ### MCP
 
@@ -104,6 +109,8 @@ Java 25, which is also the Gradle build runtime.
 ## Explicitly out of scope
 
 - Quilt
+- Minecraft 1.21.1 and older
+- multiplayer gameplay access and dedicated-server mode
 - runtime cross-version compatibility or one JAR spanning Minecraft versions
 - custom in-game AI/chat screen
 - direct OpenAI API integration
@@ -119,6 +126,7 @@ Java 25, which is also the Gradle build runtime.
 - JEI/REI/EMI integration in the base artifact
 - FTB Quests integration
 - Create/Mekanism/AE2/etc. integrations
+- separately released Thread Integrations packages
 - unbounded or world-wide chest/container scanning
 - world-wide searches
 - chunk generation/loading for queries
@@ -126,11 +134,11 @@ Java 25, which is also the Gradle build runtime.
 - long-term player memory
 - voice input/output
 
-V1 includes the generic integration framework but ships no third-party gameplay-mod or
+Thread 1.0 includes the generic integration framework but ships no third-party gameplay-mod or
 recipe-viewer adapter. Future JEI, FTB Quests, Create, AE2, Mekanism, storage-network, and similar
-support belongs in separately distributed **Thread Integrations** packages.
+support belongs in separately distributed **Thread Integrations** packages after 1.0.
 
-## V1 success criteria
+## 1.0 success criteria
 
 From a clean install, an MCP client can discover Thread and correctly answer each of these using live tool calls:
 
@@ -168,7 +176,7 @@ tool contracts.
 
 ## Non-goals that protect the architecture
 
-V1 does not need to prove every future feature. It needs to prove that:
+Thread 1.0 does not need to prove every future feature. It needs to prove that:
 
 - live Minecraft state can be represented cleanly;
 - tools can be added without coupling them to MCP;

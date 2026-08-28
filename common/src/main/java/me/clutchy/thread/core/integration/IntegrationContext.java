@@ -5,9 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-import me.clutchy.thread.core.context.ContextDescriptor;
-import me.clutchy.thread.core.context.ContextProvider;
-import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.error.DuplicateRegistrationException;
 import me.clutchy.thread.core.integration.extension.CoreIntegrationExtensionPoints;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionPoint;
@@ -20,19 +17,16 @@ import me.clutchy.thread.core.tool.ToolRegistry;
 /**
  * Transactional contribution surface supplied to one integration during startup.
  *
- * <p>Tools and contexts use direct convenience methods. Recipe providers and platform-owned block,
+ * <p>Tools use a direct convenience method. Recipe providers and platform-owned block,
  * block-entity, or entity enrichers use typed extension points. Integrations implement only the
  * contribution methods they need.
  */
 public final class IntegrationContext {
   private final IntegrationId integrationId;
   private final ToolRegistry activeTools;
-  private final ContextRegistry activeContexts;
   private final IntegrationExtensionRegistry activeExtensions;
   private final ToolRegistry stagedToolValidation = new ToolRegistry();
-  private final ContextRegistry stagedContextValidation = new ContextRegistry();
   private final List<GameTool<?, ?>> stagedTools = new ArrayList<>();
-  private final List<ContextProvider<?>> stagedContexts = new ArrayList<>();
   private final List<PendingExtension<?>> stagedExtensions = new ArrayList<>();
   private final Map<String, Class<?>> stagedExtensionContracts = new TreeMap<>();
   private final Map<String, String> metadata = new TreeMap<>();
@@ -41,11 +35,9 @@ public final class IntegrationContext {
   IntegrationContext(
       IntegrationId integrationId,
       ToolRegistry activeTools,
-      ContextRegistry activeContexts,
       IntegrationExtensionRegistry activeExtensions) {
     this.integrationId = Objects.requireNonNull(integrationId, "integrationId");
     this.activeTools = Objects.requireNonNull(activeTools, "activeTools");
-    this.activeContexts = Objects.requireNonNull(activeContexts, "activeContexts");
     this.activeExtensions = Objects.requireNonNull(activeExtensions, "activeExtensions");
   }
 
@@ -54,13 +46,6 @@ public final class IntegrationContext {
     requireOpen();
     stagedToolValidation.register(tool);
     stagedTools.add(tool);
-  }
-
-  /** Stages one bounded static or semi-static context provider. */
-  public void registerContext(ContextProvider<?> contextProvider) {
-    requireOpen();
-    stagedContextValidation.register(contextProvider);
-    stagedContexts.add(contextProvider);
   }
 
   /** Stages a preferred recipe provider that is considered only after the guarded base read. */
@@ -107,11 +92,6 @@ public final class IntegrationContext {
         throw new DuplicateRegistrationException("tool", descriptor.id().toString());
       }
     }
-    for (ContextDescriptor descriptor : stagedContextValidation.descriptors()) {
-      if (activeContexts.contains(descriptor.id())) {
-        throw new DuplicateRegistrationException("context", descriptor.id().toString());
-      }
-    }
     stagedExtensions.forEach(PendingExtension::validateAgainst);
   }
 
@@ -120,7 +100,6 @@ public final class IntegrationContext {
       throw new IllegalStateException("integration context must be prepared before commit");
     }
     stagedTools.forEach(activeTools::register);
-    stagedContexts.forEach(activeContexts::register);
     stagedExtensions.forEach(PendingExtension::commit);
   }
 
@@ -136,9 +115,6 @@ public final class IntegrationContext {
         });
     if (!stagedTools.isEmpty()) {
       combined.put("thread.tool_count", Integer.toString(stagedTools.size()));
-    }
-    if (!stagedContexts.isEmpty()) {
-      combined.put("thread.context_count", Integer.toString(stagedContexts.size()));
     }
     if (!stagedExtensionContracts.isEmpty()) {
       combined.put("thread.extension_points", String.join(",", stagedExtensionContracts.keySet()));

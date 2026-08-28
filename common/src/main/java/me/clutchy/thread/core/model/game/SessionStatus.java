@@ -8,7 +8,7 @@ import java.util.Objects;
  * @param state stable high-level client state
  * @param worldLoaded whether a client world is present
  * @param playerAvailable whether the local player is present
- * @param supported whether V1 gameplay tools may expose state
+ * @param supported whether Thread 1.0 gameplay tools may expose state
  * @param reason why gameplay tools are unavailable, or {@code null} when supported
  */
 public record SessionStatus(

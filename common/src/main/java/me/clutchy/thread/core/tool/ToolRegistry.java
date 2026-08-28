@@ -18,7 +18,7 @@ public final class ToolRegistry {
       new ConcurrentSkipListMap<>();
 
   /**
-   * Registers one tool, rejecting duplicate IDs and non-read-only V1 capabilities.
+   * Registers one tool, rejecting duplicate IDs and non-read-only 1.0 capabilities.
    *
    * @throws me.clutchy.thread.core.error.DuplicateRegistrationException when the ID is registered
    *     already
@@ -85,7 +85,7 @@ public final class ToolRegistry {
     ToolCapabilities capabilities =
         Objects.requireNonNull(tool.capabilities(), "tool.capabilities()");
     if (!capabilities.readOnly()) {
-      throw new IllegalArgumentException("V1 tools must be read-only: " + id);
+      throw new IllegalArgumentException("Thread 1.0 tools must be read-only: " + id);
     }
     ToolDescriptor descriptor =
         new ToolDescriptor(

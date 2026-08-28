@@ -1,4 +1,4 @@
-# Thread V1 Architecture
+# Thread 1.0 Architecture
 
 ## Module shape
 
@@ -47,7 +47,7 @@ Minecraft:
 - provider contracts for game, local client options, player, vanilla advancements, world, recipes,
   and logical-thread execution;
 - JSON codecs and schemas;
-- tool, context, integration, and extension registries;
+- tool, integration, and extension registries;
 - deterministic direct crafting assessment and bounded recursive planning.
 
 Core public contracts use plain Java and Thread types. Raw NBT, component maps, Minecraft objects,
@@ -256,7 +256,7 @@ machines without a second registry. The crafting source provider reuses the full
 path only for explicit expanded-scope requests and reports truncation or excluded unsafe contents.
 
 `ItemFinder` and `CraftingItemSourceProvider` compose small transport-independent `ItemSource`
-snapshots. V1 supplies player inventory, equipment, and nearby-container sources; the nearby source
+snapshots. Thread 1.0 supplies player inventory, equipment, and nearby-container sources; the nearby source
 uses one full bounded container scan on the integrated-server thread. Item search includes offhand
 and armor, while crafting intentionally excludes equipment. Main hand is not counted as equipment
 because it aliases the selected hotbar slot. Entries and reported source locations are ordered
@@ -296,5 +296,5 @@ Architecture and release tests enforce that:
 - each version/loader project's packaged-client tests exercise its dedicated JAR and matching
   universal JAR through menu/world/menu, restart, and MCP-disabled lifecycles.
 
-V1 remains Java-only, Fabric/NeoForge/Forge, read-only, single-player-only, bounded, and
+Thread 1.0 remains Java-only, Fabric/NeoForge/Forge, read-only, single-player-only, bounded, and
 loopback-only.

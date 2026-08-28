@@ -115,7 +115,7 @@ class ProviderContractsTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
     }
   }
 

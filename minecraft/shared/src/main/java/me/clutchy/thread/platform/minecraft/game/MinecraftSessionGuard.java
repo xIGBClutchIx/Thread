@@ -5,7 +5,7 @@ import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import net.minecraft.client.Minecraft;
 
-/** Central V1 guard that blocks gameplay state outside supported single-player sessions. */
+/** Central 1.0 guard that blocks gameplay state outside supported single-player sessions. */
 public final class MinecraftSessionGuard {
   /**
    * Returns the reason gameplay state cannot be exposed, or empty when the session is supported.

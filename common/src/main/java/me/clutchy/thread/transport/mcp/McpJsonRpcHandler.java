@@ -32,7 +32,7 @@ final class McpJsonRpcHandler {
       List.of(PROTOCOL_VERSION, INITIALIZATION_PROTOCOL_VERSION);
   private static final String INSTRUCTIONS =
       "Use Thread's read-only tools for live Minecraft state. Check minecraft.get_status before "
-          + "gameplay tools; V1 gameplay access supports single-player only.";
+          + "gameplay tools; Thread 1.0 gameplay access supports single-player only.";
 
   private final ToolRegistry tools;
   private final Gson gson = ThreadJson.create();

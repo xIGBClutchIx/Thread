@@ -20,7 +20,7 @@ public record McpServerOptions(
   public McpServerOptions {
     Objects.requireNonNull(bindAddress, "bindAddress");
     if (!bindAddress.isLoopbackAddress()) {
-      throw new IllegalArgumentException("V1 MCP bind address must be loopback");
+      throw new IllegalArgumentException("Thread 1.0 MCP bind address must be loopback");
     }
     if (port < 0 || port > 65_535) {
       throw new IllegalArgumentException("port must be between 0 and 65535");
@@ -79,7 +79,8 @@ public record McpServerOptions(
     return switch (host.strip().toLowerCase(Locale.ROOT)) {
       case "127.0.0.1", "localhost" -> ipv4Loopback();
       case "::1", "[::1]" -> ipv6Loopback();
-      default -> throw new IllegalArgumentException("V1 MCP bind host must be explicit loopback");
+      default ->
+          throw new IllegalArgumentException("Thread 1.0 MCP bind host must be explicit loopback");
     };
   }
 

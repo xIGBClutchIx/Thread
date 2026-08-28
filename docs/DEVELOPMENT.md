@@ -167,11 +167,11 @@ may silently fall back to the source-set development classpath.
 
 ## Full local gate
 
-Before committing a V1-complete change, run the release-equivalent gate from the repository root:
+Before committing a 1.0 release change, run the release-equivalent gate from the repository root:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
-  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
+  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v1.0.0"
 ```
 
 Then run the normal, restart, and MCP-disabled tasks from the table above for dedicated and
@@ -188,6 +188,9 @@ shared runtime/provider classes, dedicated loader purity, universal loader cover
 `releaseBundle` writes three version-labeled universal JARs and nine dedicated JARs plus SHA-256 files
 to `build/release/`. See
 [Release](RELEASE.md) for the publishing checklist.
+
+For a release candidate, run the bundle twice from clean outputs and compare all twelve JAR
+digests. The tag workflow performs this check automatically before packaged-client proofs.
 
 ## Manual MCP smoke test
 

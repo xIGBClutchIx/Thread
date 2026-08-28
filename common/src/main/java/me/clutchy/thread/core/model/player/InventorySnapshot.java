@@ -16,7 +16,7 @@ import me.clutchy.thread.core.model.validation.ModelValidation;
  * @param slots non-empty inventory slots
  */
 public record InventorySnapshot(int selectedHotbarSlot, List<InventorySlotInfo> slots) {
-  /** Number of main inventory positions exposed by the V1 player inventory contract. */
+  /** Number of main inventory positions exposed by the 1.0 player inventory contract. */
   public static final int MAIN_SLOT_COUNT = 36;
 
   /** Number of selectable hotbar positions. */

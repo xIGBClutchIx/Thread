@@ -37,6 +37,17 @@ jobs:
                   ./gradlew --no-daemon clean spotlessCheck check build
                   verifyReleaseVersion releaseBundle -PreleaseTag="${GITHUB_REF_NAME}"
 
+            - name: Verify reproducible release JARs
+              shell: bash
+              run: |
+                  find build/release -maxdepth 1 -type f -name '*.jar' -print0 \
+                    | sort -z | xargs -0 sha256sum > "${RUNNER_TEMP}/thread-release-first.sha256"
+                  ./gradlew --no-daemon clean releaseBundle
+                  find build/release -maxdepth 1 -type f -name '*.jar' -print0 \
+                    | sort -z | xargs -0 sha256sum > "${RUNNER_TEMP}/thread-release-second.sha256"
+                  diff -u "${RUNNER_TEMP}/thread-release-first.sha256" \
+                    "${RUNNER_TEMP}/thread-release-second.sha256"
+
             - name: Export supported Minecraft matrix
               run: ./gradlew --no-daemon writeSupportedMinecraftVersions
 

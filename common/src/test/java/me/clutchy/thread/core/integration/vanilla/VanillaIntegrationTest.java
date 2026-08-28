@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
-import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.error.ToolError;
 import me.clutchy.thread.core.error.ToolErrorCode;
 import me.clutchy.thread.core.integration.IntegrationCandidate;
@@ -92,7 +91,7 @@ class VanillaIntegrationTest {
   private static final int MAX_TOOLS_LIST_BYTES = 128 * 1_024;
   private static final String CATALOG_SEMANTIC_FINGERPRINT =
       "cab2c05e06e7fa4e8ad7a82471f604226d5287944cf75e9c404da93625a7c352";
-  private static final List<String> V1_TOOL_IDS =
+  private static final List<String> BUILT_IN_TOOL_IDS =
       List.of(
           "minecraft.can_craft",
           "minecraft.find_item",
@@ -126,7 +125,7 @@ class VanillaIntegrationTest {
             1_048_576,
             8,
             "Thread",
-            "0.1.0");
+            "1.0.0");
     try (McpHttpServer server = McpHttpServer.start(catalog.tools(), options)) {
       HttpRequest request =
           HttpRequest.newBuilder(server.endpoint())
@@ -144,7 +143,7 @@ class VanillaIntegrationTest {
       assertEquals(200, response.statusCode());
       JsonObject body = JsonParser.parseString(response.body()).getAsJsonObject();
       CatalogContractAssertions.assertCatalog(
-          catalog.tools().descriptors(), body, V1_TOOL_IDS, CATALOG_SEMANTIC_FINGERPRINT);
+          catalog.tools().descriptors(), body, BUILT_IN_TOOL_IDS, CATALOG_SEMANTIC_FINGERPRINT);
       int payloadBytes = response.body().getBytes(StandardCharsets.UTF_8).length;
       assertTrue(
           payloadBytes <= MAX_TOOLS_LIST_BYTES,
@@ -157,11 +156,12 @@ class VanillaIntegrationTest {
   }
 
   @Test
-  void registersAndInvokesTheCompleteStructuredV1Catalog() {
+  void registersAndInvokesTheCompleteStructuredCatalog() {
     Catalog catalog = catalog(new SupportedGameProvider(), new FakePlayerProvider());
 
     List<ToolDescriptor> descriptors = catalog.tools().descriptors();
-    assertEquals(V1_TOOL_IDS, descriptors.stream().map(tool -> tool.id().toString()).toList());
+    assertEquals(
+        BUILT_IN_TOOL_IDS, descriptors.stream().map(tool -> tool.id().toString()).toList());
     assertTrue(descriptors.stream().allMatch(tool -> tool.capabilities().readOnly()));
     assertTrue(
         descriptors.stream()
@@ -178,7 +178,7 @@ class VanillaIntegrationTest {
 
     JsonObject gameInfo = invoke(catalog.tools(), "minecraft.get_game_info", "{}");
     assertEquals("26.2", gameInfo.get("minecraftVersion").getAsString());
-    assertEquals("0.1.0", gameInfo.get("threadVersion").getAsString());
+    assertEquals("1.0.0", gameInfo.get("threadVersion").getAsString());
 
     JsonObject player = invoke(catalog.tools(), "minecraft.get_player", "{}");
     assertEquals("minecraft:overworld", player.get("dimension").getAsString());
@@ -357,7 +357,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
     assertTrue(capabilities.get("readOnly").getAsBoolean());
-    assertEquals(V1_TOOL_IDS, strings(capabilities, "tools"));
+    assertEquals(BUILT_IN_TOOL_IDS, strings(capabilities, "tools"));
     assertEquals("vanilla", first(capabilities, "integrations").get("id").getAsString());
     assertEquals("1", first(capabilities, "integrations").get("version").getAsString());
   }
@@ -817,7 +817,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(V1_TOOL_IDS.size() + 1, strings(capabilities, "tools").size());
+    assertEquals(BUILT_IN_TOOL_IDS.size() + 1, strings(capabilities, "tools").size());
     assertTrue(strings(capabilities, "tools").contains("proof.echo"));
     assertEquals(
         List.of("proof", "vanilla"),
@@ -875,7 +875,7 @@ class VanillaIntegrationTest {
 
     JsonObject capabilities = invoke(catalog.tools(), "minecraft.get_capabilities", "{}");
 
-    assertEquals(V1_TOOL_IDS.size(), strings(capabilities, "tools").size());
+    assertEquals(BUILT_IN_TOOL_IDS.size(), strings(capabilities, "tools").size());
     assertEquals(
         List.of("vanilla"),
         capabilities.getAsJsonArray("integrations").asList().stream()
@@ -948,7 +948,7 @@ class VanillaIntegrationTest {
       Predicate<ToolId> enabledTools) {
     ToolRegistry tools = new ToolRegistry();
     IntegrationRegistry integrations =
-        new IntegrationRegistry(tools, new ContextRegistry(), new IntegrationExtensionRegistry());
+        new IntegrationRegistry(tools, new IntegrationExtensionRegistry());
     integrations.register(
         new VanillaIntegration(
             game,
@@ -975,7 +975,7 @@ class VanillaIntegrationTest {
   private static void assertAdvancementFailure(ToolErrorCode code) {
     ToolRegistry tools = new ToolRegistry();
     IntegrationRegistry integrations =
-        new IntegrationRegistry(tools, new ContextRegistry(), new IntegrationExtensionRegistry());
+        new IntegrationRegistry(tools, new IntegrationExtensionRegistry());
     integrations.register(
         new VanillaIntegration(
             new SupportedGameProvider(),
@@ -986,7 +986,7 @@ class VanillaIntegrationTest {
             new FakeRecipeProvider(),
             new NearbyContainerQuery(16, 64),
             ignored -> true,
-            () -> integrations.capabilities("0.1.0")));
+            () -> integrations.capabilities("1.0.0")));
     assertToolFailure(tools, "minecraft.get_advancements", "{}", code);
     assertToolFailure(
         tools, "minecraft.get_advancement", "{\"advancementId\":\"minecraft:story/root\"}", code);
@@ -1040,7 +1040,7 @@ class VanillaIntegrationTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
     }
   }
 
@@ -1053,7 +1053,7 @@ class VanillaIntegrationTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
     }
   }
 
@@ -1066,7 +1066,7 @@ class VanillaIntegrationTest {
 
     @Override
     public GameInfo gameInfo() {
-      return new GameInfo("26.2", "fabric", "0.19.3", "0.1.0");
+      return new GameInfo("26.2", "fabric", "0.19.3", "1.0.0");
     }
   }
 

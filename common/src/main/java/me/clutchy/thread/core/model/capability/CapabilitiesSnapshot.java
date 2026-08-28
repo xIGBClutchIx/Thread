@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Set;
 import me.clutchy.thread.core.model.validation.ModelValidation;
 
-/** Snapshot of the actual read-only tools and game integrations active in Thread V1. */
+/** Snapshot of the actual read-only tools and game integrations active in Thread 1.0. */
 public record CapabilitiesSnapshot(
     String threadVersion,
     boolean readOnly,
@@ -15,7 +15,7 @@ public record CapabilitiesSnapshot(
   public CapabilitiesSnapshot {
     threadVersion = ModelValidation.nonBlank(threadVersion, "threadVersion");
     if (!readOnly) {
-      throw new IllegalArgumentException("Thread V1 capabilities must be read-only");
+      throw new IllegalArgumentException("Thread 1.0 capabilities must be read-only");
     }
     tools =
         ModelValidation.immutableList(tools, "tools").stream()

@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Predicate;
-import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.error.DuplicateRegistrationException;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.model.capability.CapabilitiesSnapshot;
@@ -25,15 +24,12 @@ public final class IntegrationRegistry {
   private static final System.Logger LOGGER = System.getLogger(IntegrationRegistry.class.getName());
 
   private final ToolRegistry tools;
-  private final ContextRegistry contexts;
   private final IntegrationExtensionRegistry extensions;
   private final SortedMap<IntegrationId, IntegrationInfo> integrations = new TreeMap<>();
 
   /** Creates an integration registry backed by the core and typed extension registries. */
-  public IntegrationRegistry(
-      ToolRegistry tools, ContextRegistry contexts, IntegrationExtensionRegistry extensions) {
+  public IntegrationRegistry(ToolRegistry tools, IntegrationExtensionRegistry extensions) {
     this.tools = Objects.requireNonNull(tools, "tools");
-    this.contexts = Objects.requireNonNull(contexts, "contexts");
     this.extensions = Objects.requireNonNull(extensions, "extensions");
   }
 
@@ -179,7 +175,7 @@ public final class IntegrationRegistry {
       throw new DuplicateRegistrationException("integration", id.toString());
     }
 
-    IntegrationContext context = new IntegrationContext(id, tools, contexts, extensions);
+    IntegrationContext context = new IntegrationContext(id, tools, extensions);
     integration.register(context);
     context.prepareCommit();
     IntegrationInfo info =

@@ -10,6 +10,6 @@ displayName="Thread NeoForge Packaged Tests"
 [[dependencies.thread_neoforge_gametest]]
 modId="thread"
 type="required"
-versionRange="[0.1.0,)"
+versionRange="[1.0.0,)"
 ordering="AFTER"
 side="CLIENT"

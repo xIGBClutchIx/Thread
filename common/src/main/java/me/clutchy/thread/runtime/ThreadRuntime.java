@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Objects;
 import me.clutchy.thread.config.ThreadConfig;
 import me.clutchy.thread.config.ThreadConfigLoader;
-import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.integration.IntegrationCandidate;
 import me.clutchy.thread.core.integration.IntegrationEnvironment;
 import me.clutchy.thread.core.integration.IntegrationLoader;
@@ -132,7 +131,7 @@ public final class ThreadRuntime implements AutoCloseable {
 
     ToolRegistry toolRegistry = new ToolRegistry();
     IntegrationRegistry integrationRegistry =
-        new IntegrationRegistry(toolRegistry, new ContextRegistry(), extensionRegistry);
+        new IntegrationRegistry(toolRegistry, extensionRegistry);
     integrationRegistry.register(
         new VanillaIntegration(
             providers.game(),

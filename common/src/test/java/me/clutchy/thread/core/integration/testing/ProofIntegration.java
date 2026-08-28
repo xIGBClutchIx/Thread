@@ -1,13 +1,10 @@
 package me.clutchy.thread.core.integration.testing;
 
 import java.util.List;
-import me.clutchy.thread.core.context.ContextId;
-import me.clutchy.thread.core.context.ContextProvider;
 import me.clutchy.thread.core.integration.IntegrationContext;
 import me.clutchy.thread.core.integration.IntegrationId;
 import me.clutchy.thread.core.integration.ThreadIntegration;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionPoint;
-import me.clutchy.thread.core.serialization.JsonCodec;
 import me.clutchy.thread.core.testing.TestJsonContracts;
 import me.clutchy.thread.core.tool.ToolResult;
 
@@ -36,31 +33,8 @@ public final class ProofIntegration implements ThreadIntegration {
   @Override
   public void register(IntegrationContext context) {
     context.registerTool(TestJsonContracts.echoTool("proof.echo"));
-    context.registerContext(new ProofContext());
     context.registerRecipeProvider(itemId -> ToolResult.success(List.of()));
     context.contribute(PROOF_EXTENSION, () -> {});
     context.putMetadata("proof.mode", "test");
-  }
-
-  private static final class ProofContext implements ContextProvider<TestJsonContracts.Message> {
-    @Override
-    public ContextId id() {
-      return ContextId.of("proof.summary");
-    }
-
-    @Override
-    public String description() {
-      return "Proof integration context.";
-    }
-
-    @Override
-    public JsonCodec<TestJsonContracts.Message> outputCodec() {
-      return TestJsonContracts.messageCodec();
-    }
-
-    @Override
-    public ToolResult<TestJsonContracts.Message> provide() {
-      return ToolResult.success(new TestJsonContracts.Message("proof"));
-    }
   }
 }

@@ -1,8 +1,8 @@
 # Thread Roadmap
 
-The implemented V1 scope is authoritative. Items below are possible directions, not commitments.
+The implemented 1.0 scope is authoritative. Items below are possible directions, not commitments.
 
-## Current V1 hardening
+## Current 1.0 hardening
 
 Keep the existing product reliable before broadening it:
 
@@ -21,9 +21,15 @@ networks, or machinery, but the choice should follow a concrete use case and mai
 Each adapter must version independently, keep target-mod APIs outside base Thread, return detached
 bounded DTOs, and preserve native fallback behavior. Do not add an integration to the base JAR.
 
+## Deferred after 1.0
+
+Minecraft 1.21.1 and older, multiplayer gameplay access, write/action tools, and the first
+separately distributed Thread Integrations packages all require their own scoped designs and proof
+work. None is part of the 1.0 release.
+
 ## Better player context
 
-Keep `minecraft.get_player` focused after its V1 enrichment. Add another tool only when it answers a
+Keep `minecraft.get_player` focused after its 1.0 enrichment. Add another tool only when it answers a
 distinct question better than the existing twenty-one tools; avoid large background snapshots or generic
 world scanning. Prefer focused, conditional metadata over raw attributes, NBT, or full entity dumps.
 
@@ -41,5 +47,5 @@ Read-only local Thread should remain a supported mode even if action-capable pro
 ## Parked ideas
 
 Voice, persistent semantic world memory, automated gameplay, global build planning, remote
-observability, and Quilt remain parked. The current architecture should not block them, but V1
+observability, and Quilt remain parked. The current architecture should not block them, but 1.0
 should not prebuild frameworks for speculative work.

@@ -3,9 +3,13 @@
 Thread is a read-only Minecraft context server for AI clients. It exposes structured facts from a
 running single-player world through MCP without embedding an AI model or automating gameplay.
 
-Thread 0.1.0 targets Minecraft 1.21.11, 26.1.2, and 26.2. Minecraft 1.21.11 uses Java 21; the
+Thread 1.0.0 targets Minecraft 1.21.11, 26.1.2, and 26.2. Minecraft 1.21.11 uses Java 21; the
 26.x lanes use Java 25. Each Minecraft version has its own Fabric, NeoForge, Forge, and universal
-artifact; no JAR spans Minecraft versions. V1 is single-player-only and bound to loopback.
+artifact; no JAR spans Minecraft versions. Thread 1.0 is single-player-only and bound to loopback.
+
+Minecraft 1.21.11 is the current minimum supported version. Support for Minecraft 1.21.1 and older
+is not a current priority because the intervening Minecraft and loader API changes require a
+substantial separate compatibility and parity effort.
 
 ## What it exposes
 
@@ -49,10 +53,10 @@ with an explicit `PLAYER_AND_NEARBY` scope when a client wants eligible loaded c
    | 26.1.2 | 25 | Loader 0.19.3 + Fabric API 0.154.0+26.1.2 | 26.1.2.41-beta | 64.0.12 |
    | 26.2 | 25 | Loader 0.19.3 + Fabric API 0.154.0+26.2 | 26.2.0.62 | 65.1.2 |
 
-2. Put the matching `thread-universal-<minecraft>-0.1.0.jar` in the instance's `mods` folder. It
+2. Put the matching `thread-universal-<minecraft>-1.0.0.jar` in the instance's `mods` folder. It
    works on all three loaders for that exact Minecraft version. Matching dedicated
-   `thread-fabric-<minecraft>-0.1.0.jar`, `thread-neoforge-<minecraft>-0.1.0.jar`, and
-   `thread-forge-<minecraft>-0.1.0.jar` builds remain available for modpacks and troubleshooting.
+   `thread-fabric-<minecraft>-1.0.0.jar`, `thread-neoforge-<minecraft>-1.0.0.jar`, and
+   `thread-forge-<minecraft>-1.0.0.jar` builds remain available for modpacks and troubleshooting.
    Install exactly one Thread JAR.
 3. Launch Minecraft. Thread starts its MCP server automatically.
 
@@ -119,21 +123,23 @@ Set `mcpEnabled` to `false` to initialize Thread without opening the HTTP listen
 
 ## Thread Integrations
 
-The base artifact includes no third-party gameplay-mod or recipe-viewer adapter. Separate optional
-mods can use the metadata-only `thread:integrations` Fabric entrypoint or NeoForge/Forge Java service
-provider and Thread's public, transactional contribution contracts. Target-mod types remain
-outside Thread core and MCP.
+The 1.0 base artifact includes no third-party gameplay-mod or recipe-viewer adapter. Future,
+separately distributed integration mods can use the metadata-only `thread:integrations` Fabric
+entrypoint or NeoForge/Forge Java service provider and Thread's public transactional contribution
+contracts. Target-mod types remain outside Thread core and MCP.
 
 See [Thread Integrations](docs/INTEGRATIONS.md) for the supported API and packaging boundary.
 
-## V1 boundaries
+## 1.0 boundaries
 
+- No Minecraft 1.21.1 or older support; 1.21.11 is the current minimum.
 - No multiplayer gameplay queries or dedicated-server mode.
 - No remote binding, authentication, or public MCP hosting.
 - No commands, movement, crafting actions, inventory changes, or world edits.
 - No automatic item movement or implicit use of nearby storage in crafting calculations.
 - No raw NBT/components or Minecraft objects in public core contracts.
 - No bundled JEI, EMI, REI, FTB Quests, Create, AE2, Mekanism, or similar adapter.
+- No separately released Thread Integrations package yet; those remain future work.
 - Crafting plans are deterministic and bounded, not exhaustive global optimizers.
 
 `minecraft.get_status`, `minecraft.get_game_info`, `minecraft.get_client_options`,
@@ -164,7 +170,7 @@ Module tasks and outputs are documented in [Build](docs/BUILD.md). Packaged-clie
 
 Contributor references:
 
-- [V1 scope](docs/V1_SCOPE.md)
+- [1.0 scope](docs/V1_SCOPE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Build](docs/BUILD.md)
 - [Tool contracts](docs/TOOL_CONTRACTS.md)

@@ -11,15 +11,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import me.clutchy.thread.core.context.ContextId;
-import me.clutchy.thread.core.context.ContextProvider;
-import me.clutchy.thread.core.context.ContextRegistry;
 import me.clutchy.thread.core.error.DuplicateRegistrationException;
 import me.clutchy.thread.core.integration.extension.CoreIntegrationExtensionPoints;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionPoint;
 import me.clutchy.thread.core.integration.extension.IntegrationExtensionRegistry;
 import me.clutchy.thread.core.integration.testing.ProofIntegration;
-import me.clutchy.thread.core.serialization.JsonCodec;
 import me.clutchy.thread.core.testing.TestJsonContracts;
 import me.clutchy.thread.core.tool.ToolId;
 import me.clutchy.thread.core.tool.ToolRegistry;
@@ -74,7 +70,6 @@ class IntegrationRegistryTest {
                         new AtomicInteger(),
                         context -> {
                           context.registerTool(TestJsonContracts.echoTool("failed.echo"));
-                          context.registerContext(testContext("failed.summary"));
                           context.registerRecipeProvider(itemId -> ToolResult.success(List.of()));
                           context.contribute(ORDERED_EXTENSION, "failed");
                           context.putMetadata("failed.mode", "test");
@@ -83,7 +78,6 @@ class IntegrationRegistryTest {
 
     assertTrue(harness.registry().integrations().isEmpty());
     assertFalse(harness.tools().contains(ToolId.of("failed.echo")));
-    assertFalse(harness.contexts().contains(ContextId.of("failed.summary")));
     assertTrue(
         harness
             .extensions()
@@ -109,7 +103,6 @@ class IntegrationRegistryTest {
 
     assertEquals(IntegrationActivationStatus.ACTIVE, activations.getFirst().status());
     assertTrue(harness.tools().contains(ToolId.of("proof.echo")));
-    assertTrue(harness.contexts().contains(ContextId.of("proof.summary")));
     assertEquals(
         1,
         harness.extensions().contributions(CoreIntegrationExtensionPoints.RECIPE_PROVIDER).size());
@@ -122,7 +115,6 @@ class IntegrationRegistryTest {
     assertEquals("proof-mod", info.metadata().get("thread.target_mod"));
     assertEquals("2.4.0", info.metadata().get("thread.target_mod_version"));
     assertEquals("1", info.metadata().get("thread.tool_count"));
-    assertEquals("1", info.metadata().get("thread.context_count"));
     assertEquals(
         "proof.callback,thread.recipe_provider", info.metadata().get("thread.extension_points"));
   }
@@ -286,10 +278,8 @@ class IntegrationRegistryTest {
 
   private static Harness harness() {
     ToolRegistry tools = new ToolRegistry();
-    ContextRegistry contexts = new ContextRegistry();
     IntegrationExtensionRegistry extensions = new IntegrationExtensionRegistry();
-    return new Harness(
-        tools, contexts, extensions, new IntegrationRegistry(tools, contexts, extensions));
+    return new Harness(tools, extensions, new IntegrationRegistry(tools, extensions));
   }
 
   private static IntegrationCandidate candidate(String id, String modId, String className) {
@@ -337,33 +327,6 @@ class IntegrationRegistryTest {
     };
   }
 
-  private static ContextProvider<TestJsonContracts.Message> testContext(String id) {
-    return new ContextProvider<>() {
-      @Override
-      public ContextId id() {
-        return ContextId.of(id);
-      }
-
-      @Override
-      public String description() {
-        return "Test integration context.";
-      }
-
-      @Override
-      public JsonCodec<TestJsonContracts.Message> outputCodec() {
-        return TestJsonContracts.messageCodec();
-      }
-
-      @Override
-      public ToolResult<TestJsonContracts.Message> provide() {
-        return ToolResult.success(new TestJsonContracts.Message("test"));
-      }
-    };
-  }
-
   private record Harness(
-      ToolRegistry tools,
-      ContextRegistry contexts,
-      IntegrationExtensionRegistry extensions,
-      IntegrationRegistry registry) {}
+      ToolRegistry tools, IntegrationExtensionRegistry extensions, IntegrationRegistry registry) {}
 }

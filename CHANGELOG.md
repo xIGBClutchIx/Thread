@@ -4,6 +4,8 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
 
 ## Unreleased
 
+## 1.0.0 - 2026-08-27
+
 ### Added
 
 - Minecraft 1.21.11 support as an isolated Java 21 lane with Fabric Loader 0.19.3 plus Fabric API
@@ -73,15 +75,19 @@ All notable user-visible changes to Thread are recorded here. Releases follow se
   while Minecraft's live recipe manager remains the guarded base and fallback.
 - Defined **Thread Integrations** as future separately distributed optional mods/packages rather
   than code bundled into the base Thread artifact.
-- Consolidated contributor documentation around the current V1 system and narrowed unused internal
+- Finalized Minecraft 1.21.11 as the current minimum and deferred 1.21.1 and older compatibility to
+  a separate post-1.0 effort.
+- Consolidated contributor documentation around the current 1.0 system and narrowed unused internal
   API surface without changing tool behavior.
-- Hardened 0.1.0 packaging with reproducible archives, strict release version/tag validation,
+- Hardened 1.0.0 packaging with reproducible archives, strict release version/tag validation,
   public integration-contract checks, development-content rejection, and restart coverage.
 - Kept unexpected serialization failures out of public tool-error details while retaining concise,
   structured client errors.
 
 ### Removed
 
+- Removed the unused context registry and integration context-contribution API, which had no MCP or
+  runtime consumer.
 - Removed the bundled JEI adapter, dependency repository/configuration, capability metadata,
   plugin entrypoints, tests, packaged runs, CI tasks, and installation instructions.
 

@@ -8,13 +8,16 @@ install exactly one artifact matching their exact Minecraft version.
 come from root packaging tasks rather than per-version universal source projects; release
 validation and bundling consume the same matrix and task outputs.
 
+The tag workflow builds the complete bundle twice from clean outputs and compares every JAR's
+SHA-256 digest before running packaged-client proofs or publishing.
+
 ## Release gate
 
 From the repository root, first run the build and artifact gate:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain clean spotlessApply spotlessCheck check build `
-  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v0.1.0"
+  verifyReleaseArtifact releaseBundle verifyReleaseVersion "-PreleaseTag=v1.0.0"
 ```
 
 Then run the restart and MCP-disabled packaged proofs separately for dedicated and universal JARs
